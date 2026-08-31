@@ -1,0 +1,15 @@
+{
+  "@@locale": "en",
+  "appTitle": "Period.",
+  "@appTitle": {
+    "description": "The app name, shown in the task switcher and as the default screen title. A brand name, so it is identical in every language."
+  },
+  "todayTitle": "Today",
+  "@todayTitle": {
+    "description": "Title of the Today screen, the app's home."
+  },
+  "nothingLoggedYet": "Nothing logged yet.",
+  "@nothingLoggedYet": {
+    "description": "Placeholder shown on the Today screen before the user has recorded anything."
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher name. A brand name, so it is identical in every language
+         and needs no values-de/ variant. Platform launcher labels come from
+         Android resources rather than the ARB files, which cover in-app copy. -->
+    <string name="app_name">Period.</string>
+</resources>

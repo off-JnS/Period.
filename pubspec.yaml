@@ -1,0 +1,34 @@
+name: period
+description: "Menstrual cycle tracking that never leaves the device."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+# CLAUDE.md section 6 governs this list. Nothing that makes a network request,
+# reports a crash, or collects analytics belongs here, and nothing is added
+# without asking first.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # Locale-aware date and number formatting for the presentation layer. Dates are
+  # never formatted by hand: CycleDate.toIso8601() is for storage, not for people.
+  intl: ^0.20.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  # Lets `dart test` run the domain suite on the plain Dart VM with no Flutter
+  # binding, which is what CLAUDE.md section 2 requires of the domain layer.
+  test: ^1.31.1
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  # Generates AppLocalizations from lib/l10n/*.arb per l10n.yaml. Section 8: no
+  # user-facing string is ever hardcoded in a widget.
+  generate: true
