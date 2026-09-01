@@ -1,0 +1,63 @@
+name: CI
+
+# Runs the checks CLAUDE.md's definition of done asks for, so they hold against a
+# future change rather than against someone remembering to run them locally.
+#
+# test/architecture_test.dart rides along in both test steps, which is the point:
+# from here every push re-checks that lib/domain imports nothing, that it mentions
+# no DateTime or Duration, and that the release manifest declares no INTERNET.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read the checkout and nothing else. Nothing in this workflow should be able to
+# write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Both actions are pinned by commit SHA rather than by tag: a tag can be
+      # moved under us, a commit cannot. The trailing comment records which
+      # version each SHA is, so upgrading stays a readable diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1c5eb12d812966ca84680edc38353a0851c8fd56 # v2.14.0
+        with:
+          # Pinned rather than "stable" so a Flutter release cannot turn this red
+          # on its own schedule. Bump deliberately, with the suite re-run.
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+
+      # Also regenerates lib/l10n/app_localizations*.dart, which is gitignored.
+      # That makes this step double as proof the generation works from a clean
+      # checkout, rather than only on a machine where it has already run once.
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      # Section 2 requires the domain to run with no Flutter binding. This is the
+      # step that proves it: dart test cannot resolve package:flutter, so a stray
+      # import in lib/domain fails here.
+      - name: Test domain on the Dart VM
+        run: dart test
+
+      # And the whole suite under Flutter. Both are run deliberately -- a Flutter
+      # import in the domain would break dart test while flutter test kept
+      # passing, so only running both catches it.
+      - name: Test everything
+        run: flutter test

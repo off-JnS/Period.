@@ -78,7 +78,10 @@ class CycleDate implements Comparable<CycleDate> {
     final era = (z >= 0 ? z : z - 146096) ~/ 146097;
     final dayOfEra = z - era * 146097; // [0, 146096]
     final yearOfEra =
-        (dayOfEra - dayOfEra ~/ 1460 + dayOfEra ~/ 36524 - dayOfEra ~/ 146096) ~/
+        (dayOfEra -
+            dayOfEra ~/ 1460 +
+            dayOfEra ~/ 36524 -
+            dayOfEra ~/ 146096) ~/
         365; // [0, 399]
     final year = yearOfEra + era * 400;
     final dayOfYear =
@@ -147,7 +150,10 @@ class CycleDate implements Comparable<CycleDate> {
         int.parse(match.group(3)!),
       );
     } on ArgumentError catch (error) {
-      throw FormatException('Not a real calendar date: ${error.message}', value);
+      throw FormatException(
+        'Not a real calendar date: ${error.message}',
+        value,
+      );
     }
   }
 

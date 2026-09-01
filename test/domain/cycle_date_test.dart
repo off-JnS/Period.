@@ -14,15 +14,20 @@ void main() {
     test('rejects a day outside the real length of the month', () {
       expect(() => CycleDate(2024, 1, 0), throwsArgumentError);
       expect(() => CycleDate(2024, 1, 32), throwsArgumentError);
-      expect(() => CycleDate(2024, 4, 31), throwsArgumentError,
-          reason: 'April has 30 days');
+      expect(
+        () => CycleDate(2024, 4, 31),
+        throwsArgumentError,
+        reason: 'April has 30 days',
+      );
     });
 
-    test('rejects 29 February in a common year but allows it in a leap year',
-        () {
-      expect(() => CycleDate(2023, 2, 29), throwsArgumentError);
-      expect(aDate(2024, 2, 29).day, 29);
-    });
+    test(
+      'rejects 29 February in a common year but allows it in a leap year',
+      () {
+        expect(() => CycleDate(2023, 2, 29), throwsArgumentError);
+        expect(aDate(2024, 2, 29).day, 29);
+      },
+    );
 
     test('does not silently normalise an impossible date into a real one', () {
       // Normalising 2023-02-29 to 2023-03-01 would move a logged entry to a day
@@ -86,8 +91,11 @@ void main() {
     test('round-trips for a range of offsets', () {
       final start = aDate(2024, 2, 29);
       for (var n = -400; n <= 400; n += 7) {
-        expect(start.addDays(n).addDays(-n), start,
-            reason: 'offset $n did not round-trip');
+        expect(
+          start.addDays(n).addDays(-n),
+          start,
+          reason: 'offset $n did not round-trip',
+        );
       }
     });
 
@@ -239,8 +247,11 @@ void main() {
         '2024-01-05T00:00:00Z',
         'today',
       ]) {
-        expect(() => CycleDate.parseIso8601(bad), throwsFormatException,
-            reason: 'accepted $bad');
+        expect(
+          () => CycleDate.parseIso8601(bad),
+          throwsFormatException,
+          reason: 'accepted $bad',
+        );
       }
     });
 

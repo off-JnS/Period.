@@ -23,8 +23,8 @@ void main() {
       final offenders = <String>[];
       for (final file in domainFiles) {
         for (final line in file.readAsLinesSync()) {
-          final match =
-              RegExp(r'''^\s*import\s+['"]([^'"]+)['"]''').firstMatch(line);
+          final match = RegExp(r'''^\s*import\s+['"]([^'"]+)['"]''')
+              .firstMatch(line);
           if (match == null) continue;
           final uri = match.group(1)!;
 
@@ -38,7 +38,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'domain depends on nothing. Move the logic, do not add the '
+        reason:
+            'domain depends on nothing. Move the logic, do not add the '
             'import. Offending imports:\n${offenders.join('\n')}',
       );
     });
@@ -47,8 +48,10 @@ void main() {
       final forbidden = {
         'DateTime': 'a cycle day is a calendar day, not a point in time',
         'Duration': 'use CycleDate.addDays, which cannot skip a day',
-        'millisecondsSinceEpoch': 'never persist an epoch value for a cycle day',
-        'microsecondsSinceEpoch': 'never persist an epoch value for a cycle day',
+        'millisecondsSinceEpoch':
+            'never persist an epoch value for a cycle day',
+        'microsecondsSinceEpoch':
+            'never persist an epoch value for a cycle day',
       };
       final offenders = <String>[];
       for (final file in domainFiles) {
@@ -70,7 +73,8 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason: 'CLAUDE.md section 3. Offending lines:\n'
+        reason:
+            'CLAUDE.md section 3. Offending lines:\n'
             '${offenders.join('\n')}',
       );
     });
@@ -81,12 +85,16 @@ void main() {
       // src/main is the only manifest merged into a release build, so this is
       // the one that decides whether a shipped APK can open a socket at all.
       final manifest = File('android/app/src/main/AndroidManifest.xml');
-      expect(manifest.existsSync(), isTrue,
-          reason: 'the release manifest has moved; this check must follow it');
+      expect(
+        manifest.existsSync(),
+        isTrue,
+        reason: 'the release manifest has moved; this check must follow it',
+      );
       expect(
         manifest.readAsStringSync(),
         isNot(contains('android.permission.INTERNET')),
-        reason: 'if a build breaks because something wants INTERNET, remove the '
+        reason:
+            'if a build breaks because something wants INTERNET, remove the '
             'dependency rather than the permission',
       );
     });
@@ -113,8 +121,11 @@ void main() {
         if (match != null) runtimeDependencies.add(match.group(1)!);
       }
 
-      expect(runtimeDependencies, isNotEmpty,
-          reason: 'failed to parse the dependencies block');
+      expect(
+        runtimeDependencies,
+        isNotEmpty,
+        reason: 'failed to parse the dependencies block',
+      );
 
       const banned = {
         'http',
