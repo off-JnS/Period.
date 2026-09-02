@@ -19,29 +19,73 @@ void main() {
       expect(domainFiles, isNotEmpty);
     });
 
-    test('imports nothing outside the Dart core libraries', () {
-      final offenders = <String>[];
-      for (final file in domainFiles) {
-        for (final line in file.readAsLinesSync()) {
-          final match = RegExp(r'''^\s*import\s+['"]([^'"]+)['"]''')
-              .firstMatch(line);
-          if (match == null) continue;
-          final uri = match.group(1)!;
+    // Section 2 forbids the domain importing "flutter, drift, or any plugin".
+    // This check started out stricter than that -- it allowed no package: import
+    // at all -- which turned out to be stricter than the rules intend: section 6
+    // allowlists freezed, and the domain models are exactly what freezed is for.
+    //
+    // So the rule here is an allowlist rather than a blanket ban. What earns a
+    // place on it: pure Dart, no Flutter binding, no platform channel, no I/O.
+    // An annotation package qualifies. drift does not, because it reaches the
+    // database. Anything not named here is still refused.
+    const allowedPackages = {'freezed_annotation'};
 
-          // Relative imports within the domain are fine; package: and dart:
-          // imports are not, with the sole exception of dart:core primitives,
-          // which are implicit and never written out.
-          if (!uri.startsWith('package:') && !uri.startsWith('dart:')) continue;
-          offenders.add('${file.path}: $uri');
+    test(
+      'imports only the Dart core libraries and allowlisted annotations',
+      () {
+        final offenders = <String>[];
+        for (final file in domainFiles) {
+          for (final line in file.readAsLinesSync()) {
+            final match = RegExp(r'''^\s*import\s+['"]([^'"]+)['"]''')
+                .firstMatch(line);
+            if (match == null) continue;
+            final uri = match.group(1)!;
+
+            // Relative imports within the domain are fine.
+            if (!uri.startsWith('package:') && !uri.startsWith('dart:')) {
+              continue;
+            }
+
+            if (uri.startsWith('package:')) {
+              final package = uri.substring('package:'.length).split('/').first;
+              if (allowedPackages.contains(package)) {
+                continue;
+              }
+            }
+            offenders.add('${file.path}: $uri');
+          }
         }
-      }
+        expect(
+          offenders,
+          isEmpty,
+          reason:
+              'the domain depends on nothing but Dart and the allowlist. Move '
+              'the logic, do not add the import. Offending imports:\n'
+              '${offenders.join('\n')}',
+        );
+      },
+    );
+
+    test('the allowlist itself stays small and pure', () {
+      // A guard on the guard. Widening the allowlist should be a deliberate act
+      // with a reason, not something that accretes; anything that reaches
+      // Flutter, a plugin or the database must never appear here.
       expect(
-        offenders,
-        isEmpty,
-        reason:
-            'domain depends on nothing. Move the logic, do not add the '
-            'import. Offending imports:\n${offenders.join('\n')}',
+        allowedPackages,
+        everyElement(
+          isNot(
+            anyOf(
+              contains('flutter'),
+              contains('drift'),
+              contains('sqlite'),
+              contains('sqlcipher'),
+              contains('path_provider'),
+              contains('secure_storage'),
+            ),
+          ),
+        ),
       );
+      expect(allowedPackages, hasLength(lessThanOrEqualTo(3)));
     });
 
     test('mentions no DateTime, Duration or epoch timestamp', () {
