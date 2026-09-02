@@ -43,7 +43,7 @@ dev_dependencies:
   # network. Required by drift and freezed rather than chosen separately.
   build_runner: ^2.10.0
   drift_dev: ^2.30.0
-  freezed: ^3.2.3
+  freezed: ^4.0.1
 
 flutter:
   uses-material-design: true
