@@ -18,6 +18,19 @@ dependencies:
   # Locale-aware date and number formatting for the presentation layer. Dates are
   # never formatted by hand: CycleDate.toIso8601() is for storage, not for people.
   intl: ^0.20.3
+  # Local database. SQLCipher rather than plain sqlite3: section 1 treats this
+  # data as something that can be used against its owner, so it is encrypted at
+  # rest from schema v1. Note sqlite3_flutter_libs is deliberately absent --
+  # shipping both links two sqlite3 builds and the plain one can win silently,
+  # producing an unencrypted database that behaves normally.
+  drift: ^2.30.0
+  sqlcipher_flutter_libs: ^0.6.6
+  path_provider: ^2.1.5
+  # Holds the database key in the Android Keystore / iOS Keychain. Wrapped
+  # behind DatabaseKeyStore so this package stays swappable.
+  flutter_secure_storage: ^9.2.4
+  # Annotations only; the generator is a dev dependency.
+  freezed_annotation: ^3.1.0
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +39,11 @@ dev_dependencies:
   # binding, which is what CLAUDE.md section 2 requires of the domain layer.
   test: ^1.31.1
   flutter_lints: ^6.0.0
+  # Code generation for the models and the database. Dev-only, no runtime, no
+  # network. Required by drift and freezed rather than chosen separately.
+  build_runner: ^2.10.0
+  drift_dev: ^2.30.0
+  freezed: ^3.2.3
 
 flutter:
   uses-material-design: true

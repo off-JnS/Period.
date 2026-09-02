@@ -44,8 +44,18 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # freezed and drift generate the models and the database. The output is
+      # gitignored, so this step is what makes analyze and the tests possible
+      # from a clean checkout -- and it fails here if a generator ever stops
+      # agreeing with the source.
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      # Only hand-written sources. git ls-files lists tracked files, and
+      # generated output is gitignored, so it is excluded by construction rather
+      # than by a pattern that could drift out of date.
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed .
+        run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart')
 
       - name: Analyze
         run: flutter analyze --fatal-infos
