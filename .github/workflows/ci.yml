@@ -62,9 +62,15 @@ jobs:
 
       # Section 2 requires the domain to run with no Flutter binding. This is the
       # step that proves it: dart test cannot resolve package:flutter, so a stray
-      # import in lib/domain fails here.
+      # import into lib/domain makes this fail even though flutter test would
+      # still pass.
+      #
+      # Scoped to test/domain deliberately. It is the domain that carries the
+      # guarantee, and one test genuinely needs Flutter -- it fakes the secure
+      # storage plugin -- so running the whole tree here would fail for a reason
+      # that has nothing to do with the rule being checked.
       - name: Test domain on the Dart VM
-        run: dart test
+        run: dart test test/domain
 
       # And the whole suite under Flutter. Both are run deliberately -- a Flutter
       # import in the domain would break dart test while flutter test kept

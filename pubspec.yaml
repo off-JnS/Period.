@@ -44,6 +44,9 @@ dev_dependencies:
   build_runner: ^2.10.0
   drift_dev: ^2.30.0
   freezed: ^4.0.1
+  # Allowlisted in section 6. Used to fake the secure storage plugin so the
+  # key store can be tested without a platform channel.
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true
