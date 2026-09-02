@@ -191,4 +191,29 @@ void main() {
       );
     });
   });
+
+  group('encryption at rest (CLAUDE.md section 6)', () {
+    test('sqlite3_flutter_libs is not resolved alongside sqlcipher', () {
+      // Both packages provide a native sqlite3 and the plain one can win at
+      // link time. The result is an unencrypted database that behaves
+      // completely normally -- nothing fails, nothing warns, and the app's
+      // central promise is quietly broken. A silent failure needs a check
+      // rather than a paragraph, and it has to read the lockfile because the
+      // conflict can arrive transitively through a package nobody chose.
+      final lock = File('pubspec.lock').readAsStringSync();
+
+      expect(
+        lock,
+        contains('sqlcipher_flutter_libs:'),
+        reason: 'the encrypted sqlite build must be present',
+      );
+      expect(
+        lock,
+        isNot(contains('sqlite3_flutter_libs:')),
+        reason:
+            'shipping both leaves the plain sqlite3 able to win at link '
+            'time, producing an unencrypted database that looks fine',
+      );
+    });
+  });
 }

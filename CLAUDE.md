@@ -96,7 +96,19 @@ Allowed:
 `flutter_riverpod`, `freezed`, `json_serializable`, `go_router`, `fl_chart`,
 `flutter_local_notifications`, `timezone`, `local_auth`, `health`,
 `in_app_purchase`, `intl`, `flutter_localizations`, `pdf`, `printing`,
-`share_plus`, `file_picker`, `mocktail`, `golden_toolkit`
+`share_plus`, `file_picker`, `flutter_secure_storage`, `mocktail`,
+`golden_toolkit`
+
+`flutter_secure_storage` holds the database encryption key in the Android
+Keystore and the iOS Keychain. Nothing else on this list can store a secret —
+`local_auth` only prompts. Keep it behind the `DatabaseKeyStore` interface so
+nothing else in the codebase depends on it directly.
+
+**Never ship `sqlite3_flutter_libs` and `sqlcipher_flutter_libs` together.** Both
+provide a native sqlite3, and the plain one can win at link time. The result is
+an unencrypted database that behaves completely normally, so nothing fails and
+nothing warns you. This app uses `sqlcipher_flutter_libs` alone; if you see
+`sqlite3_flutter_libs` appear in `pubspec.lock`, that is a bug, not a detail.
 
 **Forbidden, without exception:**
 
@@ -174,7 +186,9 @@ special case bolted on later.
 - Commit after each working slice. Conventional commits (`feat:`, `fix:`, `test:`).
 - Never commit with failing tests or analyzer errors.
 - When a requirement is ambiguous, ask. Do not invent cycle-science behaviour —
-  the medical logic is specified in the project docs, not up to interpretation.
+  the medical logic is specified in `docs/cycle-logic.md`, not up to
+  interpretation. If a case is not covered there, it goes in that document
+  first, with its basis, before any code depends on it.
 - When you finish a task, state plainly what you did NOT do or test.
 
 ## Definition of done
