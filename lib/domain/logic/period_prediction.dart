@@ -98,10 +98,7 @@ PeriodPrediction predictNextPeriod({
   final all = cyclesFrom(periodStarts);
   final eligible = eligibleForStatistics(all);
   if (eligible.length < cyclesNeededToPredict) {
-    return NotEnoughCycles(
-      have: eligible.length,
-      need: cyclesNeededToPredict,
-    );
+    return NotEnoughCycles(have: eligible.length, need: cyclesNeededToPredict);
   }
 
   final median = medianCycleLength(eligible)!;

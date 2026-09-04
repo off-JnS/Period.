@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'domain/logic/period_prediction.dart';
 import 'l10n/app_localizations.dart';
+import 'presentation/today/today_screen.dart';
 
 void main() => runApp(const PeriodApp());
 
@@ -27,20 +29,14 @@ class PeriodApp extends StatelessWidget {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(useMaterial3: true),
-      home: const _TodayPlaceholder(),
-    );
-  }
-}
-
-class _TodayPlaceholder extends StatelessWidget {
-  const _TodayPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.todayTitle)),
-      body: Center(child: Text(l10n.nothingLoggedYet)),
+      home: const TodayScreen(
+        // Not yet wired to the database: this is the state of a fresh install,
+        // with nothing logged. Reading real entries needs a way to log them
+        // first, which is the next slice.
+        data: TodayViewData(
+          prediction: NotEnoughCycles(have: 0, need: cyclesNeededToPredict),
+        ),
+      ),
     );
   }
 }

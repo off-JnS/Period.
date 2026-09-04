@@ -149,4 +149,44 @@ void main() {
       expect(eligible.every((c) => c.lengthInDays == 28), isTrue);
     });
   });
+
+  group('cycleDayOn', () {
+    test('is null when nothing has been logged', () {
+      expect(cycleDayOn(aDate(2024, 1, 15), const []), isNull);
+    });
+
+    test('the period start itself is day 1', () {
+      expect(cycleDayOn(aDate(2024, 1, 1), [aDate(2024, 1, 1)]), 1);
+    });
+
+    test('counts forward from the most recent start', () {
+      expect(cycleDayOn(aDate(2024, 1, 15), [aDate(2024, 1, 1)]), 15);
+    });
+
+    test('restarts at the next period', () {
+      final starts = [aDate(2024, 1, 1), aDate(2024, 1, 29)];
+      expect(cycleDayOn(aDate(2024, 1, 28), starts), 28);
+      expect(cycleDayOn(aDate(2024, 1, 29), starts), 1);
+      expect(cycleDayOn(aDate(2024, 1, 30), starts), 2);
+    });
+
+    test('is null before the first recorded start', () {
+      // Not day zero -- outside the data entirely.
+      expect(cycleDayOn(aDate(2023, 12, 31), [aDate(2024, 1, 1)]), isNull);
+    });
+
+    test('keeps counting past the expected length', () {
+      // A late period does not reset the count or stop it.
+      expect(cycleDayOn(aDate(2024, 3, 1), [aDate(2024, 1, 1)]), 61);
+    });
+
+    test('ignores starts logged out of order', () {
+      final starts = [aDate(2024, 1, 29), aDate(2024, 1, 1)];
+      expect(cycleDayOn(aDate(2024, 1, 30), starts), 2);
+    });
+
+    test('spans a year boundary', () {
+      expect(cycleDayOn(aDate(2024, 1, 5), [aDate(2023, 12, 29)]), 8);
+    });
+  });
 }

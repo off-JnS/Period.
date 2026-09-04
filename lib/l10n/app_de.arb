@@ -2,5 +2,20 @@
   "@@locale": "de",
   "appTitle": "Period.",
   "todayTitle": "Heute",
-  "nothingLoggedYet": "Noch nichts eingetragen."
+  "nothingLoggedYet": "Noch nichts eingetragen.",
+  "cycleDay": "Tag {day}",
+  "cycleDayAccessibility": "Zyklustag {day}",
+  "noCycleInProgress": "Noch kein Zyklus",
+  "nextPeriodHeading": "Nächste Periode",
+  "estimatedRange": "{from} – {to}",
+  "estimatedFromYourEntries": "Geschätzt, basierend auf deinen Einträgen",
+  "needMoreCycles": "Trage {remaining, plural, =1{noch eine Periode} other{noch {remaining} Perioden}} ein, bevor eine Schätzung möglich ist",
+  "cyclesTooVariable": "Deine Zykluslängen schwanken derzeit zu stark für eine Schätzung",
+  "predictionsOffContraception": "Schätzungen sind ausgeschaltet, während du hormonelle Verhütung einträgst, denn eine Abbruchblutung folgt deinem Präparat und nicht einem natürlichen Zyklus",
+  "predictionsOffPregnancy": "Schätzungen sind während der Schwangerschaft ausgeschaltet. Alles, was du einträgst, wird weiterhin gespeichert",
+  "predictionsOffPerimenopause": "Schätzungen sind ausgeschaltet. In den Wechseljahren ändern sich Zykluslängen oft stark, deshalb kann eine Schätzung in die Irre führen. Du kannst Schätzungen in den Einstellungen einschalten",
+  "fertileWindowHeading": "Geschätztes fruchtbares Fenster",
+  "fertileWindowCaveat": "Eine grobe Schätzung allein aus Daten. Daten können nicht zeigen, wann der Eisprung stattfindet. Nicht zur Schwangerschaftsverhütung geeignet",
+  "doctorHint": "Deine letzten Zyklen haben stärker geschwankt als sonst. Das könntest du bei einem Arztbesuch ansprechen",
+  "dismiss": "Ausblenden"
 }

@@ -63,3 +63,19 @@ bool _isPlausible(Cycle cycle) {
   if (length == null) return false;
   return length >= shortestPlausibleCycle && length <= longestPlausibleCycle;
 }
+
+/// Which day of the current cycle [today] is, counting the period start as day
+/// 1, or null when there is no cycle in progress on that date.
+///
+/// Computed on read like everything else here. Returns null when nothing has
+/// been logged, and when [today] falls before the first recorded start -- a user
+/// looking at a date earlier than her history is not on cycle day zero, she is
+/// outside the data.
+int? cycleDayOn(CycleDate today, Iterable<CycleDate> periodStarts) {
+  final starts = periodStarts.toSet().toList()..sort();
+  if (starts.isEmpty) return null;
+  if (today.isBefore(starts.first)) return null;
+
+  final start = starts.lastWhere((s) => !s.isAfter(today));
+  return start.daysUntil(today) + 1;
+}
