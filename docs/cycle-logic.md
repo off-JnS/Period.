@@ -95,9 +95,11 @@ state.
 
     median        = median length of the eligible cycles
     spread        = interquartile spread of those lengths
-    halfWidth     = clamp(spread, 1, 7)          // days
-    centre        = last period start + median
+    halfWidth     = max(round(spread), 1)        // days
+    centre        = last period start + round(median)
     window        = [centre - halfWidth, centre + halfWidth]
+
+    if halfWidth > 7: no prediction -- report "too variable" instead
 
 **The window is personal, not fixed.** A user whose cycles are genuinely
 consistent earns a tight window she can rely on. A user whose cycles vary gets an

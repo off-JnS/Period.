@@ -34,4 +34,16 @@ abstract class Cycle with _$Cycle {
   /// An in-progress cycle has no length yet, which is why so much of section 7's
   /// awkward-case list is about this state.
   bool get isInProgress => end == null;
+
+  /// The length in days, or null while the cycle is still in progress.
+  ///
+  /// Counted so that a period starting 1 January and the next starting 29
+  /// January is a 28-day cycle, per docs/cycle-logic.md. Computed on read and
+  /// never stored: section 4 forbids persisting it, because a user correcting a
+  /// start date would leave the stored copy wrong.
+  int? get lengthInDays {
+    final last = end;
+    if (last == null) return null;
+    return start.daysUntil(last) + 1;
+  }
 }
