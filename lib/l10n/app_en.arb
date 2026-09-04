@@ -10,6 +10,70 @@
   },
   "nothingLoggedYet": "Nothing logged yet.",
   "@nothingLoggedYet": {
-    "description": "Placeholder shown on the Today screen before the user has recorded anything."
+    "description": "Shown on the Today screen before the user has recorded anything at all."
+  },
+  "cycleDay": "Day {day}",
+  "@cycleDay": {
+    "description": "The current day of the cycle, shown in the middle of the ring. Kept very short because it sits inside a circle.",
+    "placeholders": { "day": { "type": "int" } }
+  },
+  "cycleDayAccessibility": "Cycle day {day}",
+  "@cycleDayAccessibility": {
+    "description": "Spoken description of the cycle ring for screen readers. Says the value aloud, because the ring itself conveys nothing to a screen reader.",
+    "placeholders": { "day": { "type": "int" } }
+  },
+  "noCycleInProgress": "No cycle yet",
+  "@noCycleInProgress": {
+    "description": "Shown in the middle of the ring when no period start has been logged, so there is no cycle day to count."
+  },
+  "nextPeriodHeading": "Next period",
+  "@nextPeriodHeading": {
+    "description": "Heading above the estimated next period date range."
+  },
+  "estimatedRange": "{from} – {to}",
+  "@estimatedRange": {
+    "description": "A date range. Never a single date: an estimate is always a window.",
+    "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
+  },
+  "estimatedFromYourEntries": "Estimated, based on your entries",
+  "@estimatedFromYourEntries": {
+    "description": "Qualifier under every estimate. Required wording: an estimate must never read as a certainty."
+  },
+  "needMoreCycles": "Log {remaining, plural, =1{one more period} other{{remaining} more periods}} before an estimate is possible",
+  "@needMoreCycles": {
+    "description": "Explains why there is no estimate yet. Says what to do rather than only what is missing.",
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "cyclesTooVariable": "Your cycle lengths vary too much to estimate a range right now",
+  "@cyclesTooVariable": {
+    "description": "Shown instead of an estimate when the spread is so wide that a window would be meaningless. Describes the data, never the person."
+  },
+  "predictionsOffContraception": "Estimates are off while you are tracking hormonal contraception, because a withdrawal bleed follows your regimen rather than a natural cycle",
+  "@predictionsOffContraception": {
+    "description": "Explains why no estimate is shown in the hormonal contraception mode. Explaining beats showing nothing, which reads as a bug."
+  },
+  "predictionsOffPregnancy": "Estimates are off during pregnancy. Everything you log is still saved",
+  "@predictionsOffPregnancy": {
+    "description": "Explains why no estimate is shown during pregnancy, and reassures that logging still works."
+  },
+  "predictionsOffPerimenopause": "Estimates are off. Cycle lengths often change a lot during perimenopause, so an estimate can be misleading. You can turn estimates on in settings",
+  "@predictionsOffPerimenopause": {
+    "description": "Explains why estimates are off in perimenopause and that the user may re-enable them."
+  },
+  "fertileWindowHeading": "Estimated fertile window",
+  "@fertileWindowHeading": {
+    "description": "Heading above the fertile window estimate."
+  },
+  "fertileWindowCaveat": "A wide estimate based on dates alone. Dates cannot show when ovulation happens. Not suitable for preventing pregnancy",
+  "@fertileWindowCaveat": {
+    "description": "Required note beside the fertile window. Must always be visible, never behind a tap."
+  },
+  "doctorHint": "Your recent cycles have varied more than usual. This might be worth mentioning to a doctor",
+  "@doctorHint": {
+    "description": "Shown rarely. Describes the entries and suggests a conversation. Never names a condition and never states a finding."
+  },
+  "dismiss": "Dismiss",
+  "@dismiss": {
+    "description": "Button that hides the doctor hint."
   }
 }
