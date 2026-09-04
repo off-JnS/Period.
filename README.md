@@ -49,9 +49,26 @@ is wrong.
 ## Working on it
 
     flutter pub get
+    dart run build_runner build   # models and database are generated, not committed
     flutter analyze
     dart test          # domain runs on the plain Dart VM, with no Flutter binding
     flutter test       # the whole suite
+
+Golden files under `test/presentation/goldens/` are the visual review surface:
+they are pictures of real screens, so a change to what a person sees shows up as
+an image diff. Regenerate them deliberately, never reflexively, with
+`flutter test --update-goldens`, and read the diff before accepting it.
+
+## Running it on a device
+
+Requires a Mac with Xcode for iOS, or the Android SDK for Android; neither has
+been done yet. CI compiles the iOS app on every change (`flutter build ios
+--no-codesign`), which proves it builds but produces nothing installable — that
+still needs a Mac and a signing identity.
+
+Until someone runs it on a real device, the SQLCipher encryption is **written
+but unverified**: the tests exercise the schema against plain in-memory sqlite3,
+which cannot tell you whether the shipped database is actually encrypted.
 
 `CLAUDE.md` holds the rules for this repository and is worth reading before
 changing anything — particularly the sections on dates, migrations and the
