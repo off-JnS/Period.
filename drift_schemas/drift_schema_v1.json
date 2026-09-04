@@ -1,0 +1,168 @@
+{
+  "_meta": {
+    "description": "This file contains a serialized version of schema entities for drift.",
+    "version": "1.3.0"
+  },
+  "options": {
+    "store_date_time_values_as_text": false
+  },
+  "entities": [
+    {
+      "id": 0,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "period_starts",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "date",
+            "getter_name": "date",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const CycleDateConverter()",
+              "dart_type_name": "CycleDate"
+            }
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "date"
+        ]
+      }
+    },
+    {
+      "id": 1,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "day_entries",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "date",
+            "getter_name": "date",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const CycleDateConverter()",
+              "dart_type_name": "CycleDate"
+            }
+          },
+          {
+            "name": "flow",
+            "getter_name": "flow",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const FlowIntensityConverter()",
+              "dart_type_name": "FlowIntensity"
+            }
+          },
+          {
+            "name": "note",
+            "getter_name": "note",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "date"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "day_symptoms",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "date",
+            "getter_name": "date",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const CycleDateConverter()",
+              "dart_type_name": "CycleDate"
+            }
+          },
+          {
+            "name": "symptom_key",
+            "getter_name": "symptomKey",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "date",
+          "symptom_key"
+        ]
+      }
+    }
+  ],
+  "fixed_sql": [
+    {
+      "name": "period_starts",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"period_starts\" (\"date\" TEXT NOT NULL, PRIMARY KEY (\"date\"));"
+        }
+      ]
+    },
+    {
+      "name": "day_entries",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"day_entries\" (\"date\" TEXT NOT NULL, \"flow\" TEXT NULL, \"note\" TEXT NULL, PRIMARY KEY (\"date\"));"
+        }
+      ]
+    },
+    {
+      "name": "day_symptoms",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"day_symptoms\" (\"date\" TEXT NOT NULL, \"symptom_key\" TEXT NOT NULL, PRIMARY KEY (\"date\", \"symptom_key\"));"
+        }
+      ]
+    }
+  ]
+}

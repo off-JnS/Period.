@@ -1,0 +1,55 @@
+name: period
+description: "Menstrual cycle tracking that never leaves the device."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.2
+
+# CLAUDE.md section 6 governs this list. Nothing that makes a network request,
+# reports a crash, or collects analytics belongs here, and nothing is added
+# without asking first.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # Locale-aware date and number formatting for the presentation layer. Dates are
+  # never formatted by hand: CycleDate.toIso8601() is for storage, not for people.
+  intl: ^0.20.3
+  # Local database. SQLCipher rather than plain sqlite3: section 1 treats this
+  # data as something that can be used against its owner, so it is encrypted at
+  # rest from schema v1. Note sqlite3_flutter_libs is deliberately absent --
+  # shipping both links two sqlite3 builds and the plain one can win silently,
+  # producing an unencrypted database that behaves normally.
+  drift: ^2.30.0
+  sqlcipher_flutter_libs: ^0.6.6
+  path_provider: ^2.1.5
+  # Holds the database key in the Android Keystore / iOS Keychain. Wrapped
+  # behind DatabaseKeyStore so this package stays swappable.
+  flutter_secure_storage: ^9.2.4
+  # Annotations only; the generator is a dev dependency.
+  freezed_annotation: ^3.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  # Lets `dart test` run the domain suite on the plain Dart VM with no Flutter
+  # binding, which is what CLAUDE.md section 2 requires of the domain layer.
+  test: ^1.31.1
+  flutter_lints: ^6.0.0
+  # Code generation for the models and the database. Dev-only, no runtime, no
+  # network. Required by drift and freezed rather than chosen separately.
+  build_runner: ^2.10.0
+  drift_dev: ^2.30.0
+  freezed: ^4.0.1
+  # Allowlisted in section 6. Used to fake the secure storage plugin so the
+  # key store can be tested without a platform channel.
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  # Generates AppLocalizations from lib/l10n/*.arb per l10n.yaml. Section 8: no
+  # user-facing string is ever hardcoded in a widget.
+  generate: true

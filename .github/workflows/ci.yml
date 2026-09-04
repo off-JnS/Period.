@@ -1,0 +1,79 @@
+name: CI
+
+# Runs the checks CLAUDE.md's definition of done asks for, so they hold against a
+# future change rather than against someone remembering to run them locally.
+#
+# test/architecture_test.dart rides along in both test steps, which is the point:
+# from here every push re-checks that lib/domain imports nothing, that it mentions
+# no DateTime or Duration, and that the release manifest declares no INTERNET.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read the checkout and nothing else. Nothing in this workflow should be able to
+# write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Both actions are pinned by commit SHA rather than by tag: a tag can be
+      # moved under us, a commit cannot. The trailing comment records which
+      # version each SHA is, so upgrading stays a readable diff.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1c5eb12d812966ca84680edc38353a0851c8fd56 # v2.14.0
+        with:
+          # Pinned rather than "stable" so a Flutter release cannot turn this red
+          # on its own schedule. Bump deliberately, with the suite re-run.
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+
+      # Also regenerates lib/l10n/app_localizations*.dart, which is gitignored.
+      # That makes this step double as proof the generation works from a clean
+      # checkout, rather than only on a machine where it has already run once.
+      - name: Install dependencies
+        run: flutter pub get
+
+      # freezed and drift generate the models and the database. The output is
+      # gitignored, so this step is what makes analyze and the tests possible
+      # from a clean checkout -- and it fails here if a generator ever stops
+      # agreeing with the source.
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      # Only hand-written sources. git ls-files lists tracked files, and
+      # generated output is gitignored, so it is excluded by construction rather
+      # than by a pattern that could drift out of date.
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart')
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      # Section 2 requires the domain to run with no Flutter binding. This is the
+      # step that proves it: dart test cannot resolve package:flutter, so a stray
+      # import into lib/domain makes this fail even though flutter test would
+      # still pass.
+      #
+      # Scoped to test/domain deliberately. It is the domain that carries the
+      # guarantee, and one test genuinely needs Flutter -- it fakes the secure
+      # storage plugin -- so running the whole tree here would fail for a reason
+      # that has nothing to do with the rule being checked.
+      - name: Test domain on the Dart VM
+        run: dart test test/domain
+
+      # And the whole suite under Flutter. Both are run deliberately -- a Flutter
+      # import in the domain would break dart test while flutter test kept
+      # passing, so only running both catches it.
+      - name: Test everything
+        run: flutter test
