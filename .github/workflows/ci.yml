@@ -77,3 +77,41 @@ jobs:
       # passing, so only running both catches it.
       - name: Test everything
         run: flutter test
+
+  # Proves the iOS app actually compiles, which the checks above do not: they
+  # run Dart, while a shipped app also has to link CocoaPods and the native code
+  # inside sqlcipher_flutter_libs, flutter_secure_storage and path_provider.
+  # None of that had ever been built before this job existed.
+  #
+  # --no-codesign means no Apple account, no certificates and no provisioning
+  # profile are needed. It does not produce anything installable on a phone --
+  # that still needs a Mac, Xcode and a signing identity -- but it does answer
+  # "does this build at all" on every change rather than the first time someone
+  # opens Xcode.
+  #
+  # macOS runners cost roughly ten times a Linux minute, which is why this is a
+  # separate job on the same narrow triggers rather than something that runs on
+  # every push to every branch. It also lets the fast Linux checks fail first.
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1c5eb12d812966ca84680edc38353a0851c8fd56 # v2.14.0
+        with:
+          flutter-version: 3.47.2
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # The models and database are generated and gitignored, so the build has
+      # nothing to compile without this.
+      - name: Generate code
+        run: dart run build_runner build
+
+      # Generates ios/Podfile on first run, resolves the pods, and compiles the
+      # whole app including every plugin's native code.
+      - name: Build iOS without signing
+        run: flutter build ios --no-codesign
