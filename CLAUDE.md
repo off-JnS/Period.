@@ -92,7 +92,7 @@ adding a symptom must never require a migration.
 
 Allowed:
 
-`drift`, `sqlite3_flutter_libs`, `sqlcipher_flutter_libs`, `path_provider`,
+`drift`, `sqlite3`, `path_provider`,
 `flutter_riverpod`, `freezed`, `json_serializable`, `go_router`, `fl_chart`,
 `flutter_local_notifications`, `timezone`, `local_auth`, `health`,
 `in_app_purchase`, `intl`, `flutter_localizations`, `pdf`, `printing`,
@@ -104,11 +104,32 @@ Keystore and the iOS Keychain. Nothing else on this list can store a secret —
 `local_auth` only prompts. Keep it behind the `DatabaseKeyStore` interface so
 nothing else in the codebase depends on it directly.
 
-**Never ship `sqlite3_flutter_libs` and `sqlcipher_flutter_libs` together.** Both
-provide a native sqlite3, and the plain one can win at link time. The result is
-an unencrypted database that behaves completely normally, so nothing fails and
-nothing warns you. This app uses `sqlcipher_flutter_libs` alone; if you see
-`sqlite3_flutter_libs` appear in `pubspec.lock`, that is a bug, not a detail.
+**Encryption comes from `hooks.user_defines` in `pubspec.yaml`, not from a
+package:**
+
+```yaml
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
+```
+
+sqlite3 3.x loads its native library through Dart build hooks. It does **not**
+consult `sqlcipher_flutter_libs` or `sqlite3_flutter_libs`; adding either back
+links a library nothing uses and makes the app look encrypted while it is not.
+Neither belongs in this project.
+
+This is the most dangerous failure mode in the codebase, because it is silent.
+An unknown pragma is a no-op in SQLite, so on a plain build `PRAGMA key`
+succeeds, changes nothing, and every query works perfectly against a plaintext
+file. Nothing fails. Nothing warns. A green build proves only that the app
+links, never which library it linked.
+
+It has already happened once: schema v1 shipped configured the old way and wrote
+its database in the clear. Two things now stop a repeat, and both must stay:
+`applyKeyAndVerify` refuses to open a database when `PRAGMA cipher` returns
+nothing, and `open_database_test.dart` writes a file, reopens it without the
+key, and asserts the plaintext is not on disk. **Do not weaken either.**
 
 **Forbidden, without exception:**
 
