@@ -203,5 +203,57 @@
         "type": "int"
       }
     }
+  },
+  "calendarTitle": "Calendar",
+  "@calendarTitle": {
+    "description": "Title of the calendar screen."
+  },
+  "navToday": "Today",
+  "@navToday": {
+    "description": "Label of the Today tab in the bottom navigation bar. Deliberately separate from todayTitle: a tab label has less room than a screen title and may need to be shortened in a language where the title cannot be."
+  },
+  "navCalendar": "Calendar",
+  "@navCalendar": {
+    "description": "Label of the Calendar tab in the bottom navigation bar."
+  },
+  "previousMonth": "Previous month",
+  "@previousMonth": {
+    "description": "Spoken label for the button that moves the calendar back one month."
+  },
+  "nextMonth": "Next month",
+  "@nextMonth": {
+    "description": "Spoken label for the button that moves the calendar forward one month."
+  },
+  "legendPeriodStart": "Period start",
+  "@legendPeriodStart": {
+    "description": "Names the filled marker in the calendar legend. Every calendar state is named in words as well as drawn, because meaning must never rest on colour alone."
+  },
+  "legendLogged": "Logged",
+  "@legendLogged": {
+    "description": "Names the dot marking a day with an entry."
+  },
+  "legendEstimated": "Estimated period",
+  "@legendEstimated": {
+    "description": "Names the outlined marker for days inside the predicted window."
+  },
+  "dayAccessibility": "{date}{markers}",
+  "@dayAccessibility": {
+    "description": "Spoken description of one calendar day: the date, then whatever is true of it. Screen readers get nothing from a coloured circle.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "markers": {
+        "type": "String"
+      }
+    }
+  },
+  "nothingLoggedThisMonth": "Nothing logged this month",
+  "@nothingLoggedThisMonth": {
+    "description": "Shown under an empty calendar month, so a blank grid does not read as a broken screen."
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Names the current day in the calendar legend and in spoken day descriptions."
   }
 }
