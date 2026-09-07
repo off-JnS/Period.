@@ -9,6 +9,7 @@ class SettingsViewData {
   const SettingsViewData({
     this.cycle = const CycleSettings(),
     this.fertileWindowOptedIn = false,
+    this.appLockEnabled = false,
   });
 
   /// The mode and its opt-in.
@@ -16,6 +17,9 @@ class SettingsViewData {
 
   /// Whether the fertile window estimate is shown on the Today screen.
   final bool fertileWindowOptedIn;
+
+  /// Whether the app asks the device to confirm it is her before opening.
+  final bool appLockEnabled;
 }
 
 /// Where the user says what kind of cycle she has, and erases everything.
@@ -38,11 +42,19 @@ class SettingsScreen extends StatelessWidget {
     this.onDeleteEverything,
     this.onExportBackup,
     this.onRestoreBackup,
+    this.onAppLockChanged,
+    this.lockAvailable = true,
     super.key,
   });
 
   /// The current settings.
   final SettingsViewData data;
+
+  /// Whether this device can authenticate at all.
+  ///
+  /// False when there is no biometric enrolled and no passcode set. The switch
+  /// says so rather than silently refusing to move.
+  final bool lockAvailable;
 
   /// Called with the mode the user chose.
   final void Function(CycleMode mode)? onModeChanged;
@@ -61,6 +73,9 @@ class SettingsScreen extends StatelessWidget {
 
   /// Called to restore from a backup file.
   final VoidCallback? onRestoreBackup;
+
+  /// Called when she turns the app lock on or off.
+  final void Function({required bool enabled})? onAppLockChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +141,24 @@ class SettingsScreen extends StatelessWidget {
               // rather than only on the Today screen after it. Section 8 wants
               // it visible; the moment it matters most is here.
               subtitle: Text(l10n.fertileWindowCaveat),
+              isThreeLine: true,
+            ),
+
+            const Divider(height: 24),
+
+            _SectionHeading(l10n.appLockHeading),
+            SwitchListTile(
+              value: data.appLockEnabled,
+              onChanged: onAppLockChanged == null || !lockAvailable
+                  ? null
+                  : (value) => onAppLockChanged!.call(enabled: value),
+              title: Text(l10n.appLockSwitch),
+              // Says two things she needs before choosing: the app keeps no PIN
+              // of its own, and it will not trap her out of her own data if the
+              // phone cannot authenticate.
+              subtitle: Text(
+                lockAvailable ? l10n.appLockDetail : l10n.appLockUnavailable,
+              ),
               isThreeLine: true,
             ),
 

@@ -5,6 +5,7 @@ import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
 import 'package:period/presentation/calendar/month_grid.dart';
+import 'package:period/presentation/lock/lock_screen.dart';
 import 'package:period/presentation/settings/passphrase_dialog.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/log_entry_sheet.dart';
@@ -124,6 +125,7 @@ void main() {
       onDeleteEverything: () {},
       onExportBackup: () {},
       onRestoreBackup: () {},
+      onAppLockChanged: ({required enabled}) {},
     );
 
     testWidgets('light', (tester) async {
@@ -146,6 +148,11 @@ void main() {
     testWidgets('dark', (tester) async {
       await expectAccessibleInDark(tester, screen(const SettingsViewData()));
     });
+  });
+
+  testWidgets('the lock screen', (tester) async {
+    // The one screen a user meets before she can do anything else.
+    await expectAccessible(tester, LockScreen(onUnlock: () {}));
   });
 
   group('the passphrase dialogue', () {

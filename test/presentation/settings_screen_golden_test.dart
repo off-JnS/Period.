@@ -27,13 +27,14 @@ void main() {
         onDeleteEverything: () {},
         onExportBackup: () {},
         onRestoreBackup: () {},
+        onAppLockChanged: ({required enabled}) {},
       ),
       locale: locale,
       brightness: brightness,
       textScale: textScale,
       // Taller than the other screens: this one is a list of choices and the
       // whole list is the thing worth looking at.
-      surface: const Size(400, 1100),
+      surface: const Size(400, 1300),
     );
     await expectLater(
       find.byType(SettingsScreen),
@@ -93,8 +94,9 @@ void main() {
         onDeleteEverything: () {},
         onExportBackup: () {},
         onRestoreBackup: () {},
+        onAppLockChanged: ({required enabled}) {},
       ),
-      surface: const Size(400, 1100),
+      surface: const Size(400, 1300),
     );
     await tester.tap(find.text(tap));
     await tester.pumpAndSettle();

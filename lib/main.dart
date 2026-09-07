@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/database/open_database.dart';
 import 'l10n/app_localizations.dart';
 import 'presentation/app_shell.dart';
+import 'presentation/lock/lock_gate.dart';
 import 'presentation/providers.dart';
 
 Future<void> main() async {
@@ -44,7 +45,9 @@ class PeriodApp extends StatelessWidget {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(useMaterial3: true),
-      home: const AppShell(),
+      // The gate, not the shell. While locked it replaces the app rather
+      // than covering it, so nothing of hers is built behind the lock.
+      home: const LockGate(child: AppShell()),
     );
   }
 }

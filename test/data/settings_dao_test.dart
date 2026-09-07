@@ -53,6 +53,19 @@ void main() {
     expect((await db.settingsDao.readSettings()).fertileWindowOptedIn, isFalse);
   });
 
+  test('the app lock is off unless asked for, and round-trips', () async {
+    // Section 9 makes the lock optional, which is also why the database key is
+    // generated rather than derived from it: defaulting this on would be a
+    // different app than the one CLAUDE.md describes.
+    expect((await db.settingsDao.readSettings()).appLockEnabled, isFalse);
+
+    await db.settingsDao.writeAppLockEnabled(enabled: true);
+    expect((await db.settingsDao.readSettings()).appLockEnabled, isTrue);
+
+    await db.settingsDao.writeAppLockEnabled(enabled: false);
+    expect((await db.settingsDao.readSettings()).appLockEnabled, isFalse);
+  });
+
   test('changing mode overwrites rather than accumulating rows', () async {
     await db.settingsDao.writeCycleSettings(
       const CycleSettings(mode: CycleMode.pregnancy),

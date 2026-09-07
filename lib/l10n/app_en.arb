@@ -434,5 +434,38 @@
   "@backupFailed": {
     "description": "Shown if writing the file fails, e.g. no space left."
   }
+,
+  "appLockHeading": "Locking",
+  "@appLockHeading": {
+    "description": "Heading above the app lock switch in settings."
+  },
+  "appLockSwitch": "Ask before opening the app",
+  "@appLockSwitch": {
+    "description": "Switch turning on the optional lock. Phrased as what happens rather than as a security claim."
+  },
+  "appLockDetail": "Uses whatever unlocks your phone. If your phone has no lock set, the app opens as usual rather than shutting you out.",
+  "@appLockDetail": {
+    "description": "Two facts she needs before choosing: the app stores no PIN of its own, and it will never trap her out of her own data if the device cannot authenticate."
+  },
+  "appLockUnavailable": "Your phone has no lock set, so this cannot be used yet.",
+  "@appLockUnavailable": {
+    "description": "Shown when the device has neither a biometric enrolled nor a passcode. Explains rather than silently refusing the switch."
+  },
+  "lockedTitle": "Locked",
+  "@lockedTitle": {
+    "description": "Heading on the lock screen. Deliberately says nothing about what the app is for -- it can be read over a shoulder."
+  },
+  "lockedBody": "Unlock to continue.",
+  "@lockedBody": {
+    "description": "The lock screen's only sentence. Neutral for the same reason notification text is."
+  },
+  "unlockAction": "Unlock",
+  "@unlockAction": {
+    "description": "Button that asks the device to authenticate again."
+  },
+  "unlockReason": "Unlock to continue",
+  "@unlockReason": {
+    "description": "The sentence the operating system shows in its own authentication prompt. Says nothing about cycles: the prompt appears on a screen anyone nearby can see."
+  }
 
 }

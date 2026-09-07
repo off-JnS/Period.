@@ -17,6 +17,12 @@ abstract final class SettingKeys {
 
   /// Whether she asked to see the fertile window estimate.
   static const fertileWindowOptedIn = 'fertile_window_opted_in';
+
+  /// Whether the app asks the device to confirm it is her before opening.
+  ///
+  /// A new key in a table built to take them, so section 9's lock needed no
+  /// schema change at all.
+  static const appLockEnabled = 'app_lock_enabled';
 }
 
 /// Everything the app reads out of the settings table.
@@ -28,6 +34,7 @@ class StoredSettings {
   const StoredSettings({
     this.cycle = const CycleSettings(),
     this.fertileWindowOptedIn = false,
+    this.appLockEnabled = false,
   });
 
   /// The cycle mode and its opt-in.
@@ -36,6 +43,12 @@ class StoredSettings {
   /// Whether the fertile window estimate is shown. Off unless asked for,
   /// per docs/cycle-logic.md section 4.
   final bool fertileWindowOptedIn;
+
+  /// Whether the app asks the device to confirm it is her before opening.
+  ///
+  /// Off unless asked for, per section 9: the lock is optional, which is also
+  /// why the database key is generated rather than derived from it.
+  final bool appLockEnabled;
 }
 
 /// Reads and writes the user's preferences.
@@ -56,6 +69,7 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
         predictionsOptedIn: _readBool(stored[SettingKeys.predictionsOptedIn]),
       ),
       fertileWindowOptedIn: _readBool(stored[SettingKeys.fertileWindowOptedIn]),
+      appLockEnabled: _readBool(stored[SettingKeys.appLockEnabled]),
     );
   }
 
@@ -94,6 +108,10 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   /// Stores whether the fertile window estimate is shown.
   Future<void> writeFertileWindowOptIn({required bool optedIn}) =>
       _write(SettingKeys.fertileWindowOptedIn, optedIn.toString());
+
+  /// Stores whether the app locks itself.
+  Future<void> writeAppLockEnabled({required bool enabled}) =>
+      _write(SettingKeys.appLockEnabled, enabled.toString());
 
   Future<void> _write(String key, String value) async {
     await into(settings).insert(

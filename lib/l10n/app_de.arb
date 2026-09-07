@@ -97,5 +97,14 @@
   "backupNewerVersion": "Diese Sicherung stammt aus einer neueren Version der App. Aktualisiere die App und versuche es erneut.",
   "backupDamaged": "Diese Sicherung ist beschädigt und lässt sich nicht lesen.",
   "backupFailed": "Die Sicherung konnte nicht erstellt werden."
+,
+  "appLockHeading": "Sperre",
+  "appLockSwitch": "Vor dem Öffnen nachfragen",
+  "appLockDetail": "Verwendet das, womit du dein Handy entsperrst. Ist auf dem Handy keine Sperre eingerichtet, öffnet sich die App wie gewohnt, statt dich auszusperren.",
+  "appLockUnavailable": "Auf deinem Handy ist keine Sperre eingerichtet, daher lässt sich das noch nicht verwenden.",
+  "lockedTitle": "Gesperrt",
+  "lockedBody": "Zum Fortfahren entsperren.",
+  "unlockAction": "Entsperren",
+  "unlockReason": "Zum Fortfahren entsperren"
 
 }

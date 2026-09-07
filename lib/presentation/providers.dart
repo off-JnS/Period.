@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/app_lock.dart';
 import '../data/backup/backup_service.dart';
 import '../data/backup/backup_transfer.dart';
 import '../data/database/daos/settings_dao.dart';
@@ -29,6 +30,21 @@ final databaseProvider = Provider<AppDatabase>(
 
 /// Today's date. The single place the app asks what day it is.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
+
+/// Asks the device to confirm it is her, for section 9's optional lock.
+///
+/// Behind a seam like the backup transfer, so the gate's behaviour is testable
+/// without a device -- including the case that matters most, where the device
+/// cannot authenticate at all.
+final appLockProvider = Provider<AppLock>((ref) => DeviceAppLock());
+
+/// Whether this device can authenticate at all.
+///
+/// Read once and shown in settings, so the switch can explain itself rather
+/// than sitting there refusing to move.
+final lockAvailableProvider = FutureProvider<bool>(
+  (ref) => ref.watch(appLockProvider).isAvailable(),
+);
 
 /// How a backup file leaves the app and comes back.
 ///

@@ -14,6 +14,8 @@ void main() {
     void Function({required bool optedIn})? onPredictionsOptInChanged,
     void Function({required bool optedIn})? onFertileWindowChanged,
     VoidCallback? onDeleteEverything,
+    void Function({required bool enabled})? onAppLockChanged,
+    bool lockAvailable = true,
     Locale locale = const Locale('en'),
   }) async {
     await pumpApp(
@@ -33,6 +35,8 @@ void main() {
         onDeleteEverything: onDeleteEverything ?? () {},
         onExportBackup: () {},
         onRestoreBackup: () {},
+        onAppLockChanged: onAppLockChanged ?? ({required enabled}) {},
+        lockAvailable: lockAvailable,
       ),
       locale: locale,
     );
@@ -210,6 +214,60 @@ void main() {
 
       await tester.tap(find.text('Show the fertile window estimate'));
       expect(turnedOn, isTrue);
+    });
+  });
+
+  group('the app lock', () {
+    testWidgets('is off unless asked for', (tester) async {
+      await pumpSettings(tester);
+      final tile = tester.widget<SwitchListTile>(
+        find.widgetWithText(SwitchListTile, 'Ask before opening the app'),
+      );
+      expect(tile.value, isFalse);
+    });
+
+    testWidgets('says it uses the phone\'s own lock and will not trap her', (
+      tester,
+    ) async {
+      // Both facts belong beside the switch: the app keeps no PIN of its own,
+      // and a phone with no lock set opens the app rather than shutting her
+      // out of her own data.
+      await pumpSettings(tester);
+      expect(
+        find.textContaining('Uses whatever unlocks your phone'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('opens as usual rather than shutting you out'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('explains itself when the phone cannot authenticate', (
+      tester,
+    ) async {
+      await pumpSettings(tester, lockAvailable: false);
+
+      expect(find.textContaining('no lock set'), findsOneWidget);
+      final tile = tester.widget<SwitchListTile>(
+        find.widgetWithText(SwitchListTile, 'Ask before opening the app'),
+      );
+      expect(
+        tile.onChanged,
+        isNull,
+        reason: 'a switch that cannot do anything must not look like it can',
+      );
+    });
+
+    testWidgets('reports the change', (tester) async {
+      bool? asked;
+      await pumpSettings(
+        tester,
+        onAppLockChanged: ({required enabled}) => asked = enabled,
+      );
+
+      await tester.tap(find.text('Ask before opening the app'));
+      expect(asked, isTrue);
     });
   });
 

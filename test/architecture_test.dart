@@ -7,6 +7,28 @@ import 'package:test/test.dart';
 /// are remembered. Both describe promises to the user, not house style: the
 /// first keeps cycle days free of timestamps, the second is what makes "this app
 /// makes no network requests" verifiable instead of merely asserted.
+/// Permissions a dependency may declare, each one looked at and accepted.
+///
+/// Not a formality. Every entry widens what a shipped build can do, so a new
+/// permission fails the test above until someone has read what it is for and
+/// written it down here.
+const acknowledgedPermissions = <String, Set<String>>{
+  // Section 9's optional app lock. It lets the app ask Android to run its own
+  // biometric prompt; it grants no access to data, to the network, or to
+  // anything the app could not already reach.
+  'local_auth_android': {'android.permission.USE_BIOMETRIC'},
+};
+
+/// Permissions that can never be acknowledged, because they are the promise.
+///
+/// Section 6 makes the absence of INTERNET what makes "this app makes no
+/// network requests" checkable rather than merely stated.
+const _networkPermissions = <String>{
+  'android.permission.INTERNET',
+  'android.permission.ACCESS_NETWORK_STATE',
+  'android.permission.ACCESS_WIFI_STATE',
+};
+
 void main() {
   group('domain layer purity (CLAUDE.md sections 2 and 3)', () {
     final domainFiles = Directory('lib/domain')
@@ -150,6 +172,12 @@ void main() {
       // which that check would never see. Section 6 makes the absence of
       // INTERNET the thing that keeps the no-network promise verifiable, so
       // the plugins have to be looked at too.
+      //
+      // Two different rules apply. INTERNET can never be acknowledged: it is
+      // the promise. Anything else is a decision someone has to make and
+      // record, which is what acknowledgedPermissions is -- a new permission
+      // fails this test until a person has looked at it and written down why
+      // it is acceptable.
       final config = File('.dart_tool/package_config.json');
       expect(
         config.existsSync(),
@@ -162,7 +190,8 @@ void main() {
                   as Map<String, Object?>)['packages']!
               as List<Object?>;
 
-      final offenders = <String>[];
+      final unacknowledged = <String>[];
+      final networkPermissions = <String>[];
       for (final entry in packages.cast<Map<String, Object?>>()) {
         // Two things bite here, and both make this check silently pass while
         // looking at nothing. A rootUri has no trailing slash, so resolving
@@ -178,22 +207,37 @@ void main() {
         );
         if (!manifest.existsSync()) continue;
 
+        final name = entry['name']! as String;
         final declared = RegExp(r'android\.permission\.[A-Z_]+')
             .allMatches(manifest.readAsStringSync())
             .map((m) => m[0]!)
             .toSet();
-        if (declared.isNotEmpty) {
-          offenders.add('${entry['name']}: ${declared.join(', ')}');
+
+        for (final permission in declared) {
+          if (_networkPermissions.contains(permission)) {
+            networkPermissions.add('$name: $permission');
+          } else if (!(acknowledgedPermissions[name] ?? const {}).contains(
+            permission,
+          )) {
+            unacknowledged.add('$name: $permission');
+          }
         }
       }
 
       expect(
-        offenders,
+        networkPermissions,
         isEmpty,
         reason:
-            'a dependency declares an Android permission this app never asked '
-            'for. If it is INTERNET, remove the dependency rather than the '
-            'permission; anything else needs a deliberate decision.',
+            'a dependency wants network access. Section 6 is explicit: remove '
+            'the dependency rather than the permission.',
+      );
+      expect(
+        unacknowledged,
+        isEmpty,
+        reason:
+            'a dependency declares an Android permission nobody has signed off '
+            'on. Read what it is for, then add it to acknowledgedPermissions '
+            'with a comment -- or drop the dependency.',
       );
     });
 

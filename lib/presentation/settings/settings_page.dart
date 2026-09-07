@@ -35,7 +35,9 @@ class SettingsPage extends ConsumerWidget {
         data: SettingsViewData(
           cycle: stored.cycle,
           fertileWindowOptedIn: stored.fertileWindowOptedIn,
+          appLockEnabled: stored.appLockEnabled,
         ),
+        lockAvailable: ref.watch(lockAvailableProvider).value ?? false,
         onModeChanged: (mode) => _saveCycle(
           ref,
           // The opt-in belongs to perimenopause. Carrying it across a mode
@@ -52,6 +54,13 @@ class SettingsPage extends ConsumerWidget {
               .read(databaseProvider)
               .settingsDao
               .writeFertileWindowOptIn(optedIn: optedIn);
+          ref.invalidate(settingsProvider);
+        },
+        onAppLockChanged: ({required enabled}) async {
+          await ref
+              .read(databaseProvider)
+              .settingsDao
+              .writeAppLockEnabled(enabled: enabled);
           ref.invalidate(settingsProvider);
         },
         onDeleteEverything: () => _deleteEverything(context, ref),
