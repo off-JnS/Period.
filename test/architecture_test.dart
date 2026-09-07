@@ -29,6 +29,20 @@ const _networkPermissions = <String>{
   'android.permission.ACCESS_WIFI_STATE',
 };
 
+/// Source with its `//` comments removed.
+///
+/// Every platform check below was matching prose rather than code: the comments
+/// explaining why FLAG_SECURE matters contain the words "FLAG_SECURE", so
+/// deleting the call left the guard green. A check satisfied by its own
+/// explanation is worse than none, because it is counted as coverage.
+String codeOnly(String source) => source
+    .split('\n')
+    .map((line) {
+      final comment = line.indexOf('//');
+      return comment == -1 ? line : line.substring(0, comment);
+    })
+    .join('\n');
+
 void main() {
   group('domain layer purity (CLAUDE.md sections 2 and 3)', () {
     final domainFiles = Directory('lib/domain')
@@ -147,6 +161,86 @@ void main() {
     });
   });
 
+  group('screenshot protection (CLAUDE.md section 9)', () {
+    // None of this can be executed here. `flutter build ios --no-codesign`
+    // proves only that it compiles, and no widget test can ask the operating
+    // system what it put in the app switcher. What these checks buy is that the
+    // code is present and the right shape -- the same technique that now guards
+    // the two lockout bugs a review found in these exact files, both of which
+    // were invisible to the whole suite and to CI.
+
+    test('Android sets FLAG_SECURE, before the first frame', () {
+      final activity = codeOnly(
+        File('android/app/src/main/kotlin/app/period/MainActivity.kt')
+            .readAsStringSync(),
+      );
+
+      expect(
+        activity,
+        contains('window.setFlags('),
+        reason: 'nothing blanks the app-switcher thumbnail',
+      );
+      expect(activity, contains('WindowManager.LayoutParams.FLAG_SECURE'));
+      // In onCreate rather than later: anywhere else leaves a window between
+      // launch and protection.
+      expect(
+        activity.indexOf('onCreate'),
+        lessThan(activity.indexOf('FLAG_SECURE')),
+        reason: 'FLAG_SECURE must be set in onCreate',
+      );
+    });
+
+    test('iOS covers the window when the app resigns active', () {
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(
+        delegate,
+        contains('override func applicationWillResignActive'),
+        reason: 'nothing covers the window before the snapshot is taken',
+      );
+      expect(
+        delegate,
+        contains('UIBlurEffect'),
+        reason: 'section 9 asks for a blur overlay',
+      );
+    });
+
+    test('iOS hooks resign-active, not did-enter-background', () {
+      // The snapshot is taken as the app resigns active. A cover added in
+      // didEnterBackground arrives after the picture has been taken: it
+      // compiles, runs, looks right in every log, and protects nothing. That
+      // is the exact class of bug this file exists to catch.
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(
+        delegate,
+        isNot(contains('applicationDidEnterBackground')),
+        reason:
+            'covering on didEnterBackground is too late -- the app switcher '
+            'already has its picture',
+      );
+    });
+
+    test('iOS removes the cover again', () {
+      // A cover added and never removed is its own lockout: the app running
+      // normally behind a blur that nothing clears.
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(delegate, contains('override func applicationDidBecomeActive'));
+      expect(
+        delegate,
+        contains('removeFromSuperview'),
+        reason: 'the cover is never taken down',
+      );
+    });
+  });
+
   group('the app lock cannot lock her out (CLAUDE.md section 9)', () {
     // Both of these are permanent-lockout bugs, and neither is visible from
     // Dart: the plugin reports the device as perfectly capable of
@@ -169,8 +263,8 @@ void main() {
         reason: 'the activity has moved; this check must follow it',
       );
       expect(
-        activity.readAsStringSync(),
-        contains('FlutterFragmentActivity'),
+        codeOnly(activity.readAsStringSync()),
+        contains(': FlutterFragmentActivity'),
         reason:
             'local_auth needs a FragmentActivity. With FlutterActivity the app '
             'lock refuses every unlock and her data is unreachable.',
