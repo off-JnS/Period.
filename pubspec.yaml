@@ -24,13 +24,23 @@ dependencies:
   # shipping both links two sqlite3 builds and the plain one can win silently,
   # producing an unencrypted database that behaves normally.
   drift: ^2.30.0
-  sqlcipher_flutter_libs: ^0.6.6
+  # Encryption comes from the `hooks.user_defines` block at the bottom of this
+  # file, NOT from a plugin package. sqlite3 3.x loads its native library
+  # through Dart build hooks, and its changelog is explicit that
+  # sqlcipher_flutter_libs should be dropped when upgrading. Adding that package
+  # back would link a library nothing uses and quietly leave the database
+  # unencrypted.
+  sqlite3: ^3.5.2
   path_provider: ^2.1.5
   # Holds the database key in the Android Keystore / iOS Keychain. Wrapped
   # behind DatabaseKeyStore so this package stays swappable.
   flutter_secure_storage: ^9.2.4
   # Annotations only; the generator is a dev dependency.
   freezed_annotation: ^3.1.0
+  # State management. Allowlisted in section 6. Wires the database to the UI
+  # without threading objects through constructors, and lets tests and goldens
+  # swap in an in-memory database.
+  flutter_riverpod: ^3.0.3
 
 dev_dependencies:
   flutter_test:
@@ -53,3 +63,17 @@ flutter:
   # Generates AppLocalizations from lib/l10n/*.arb per l10n.yaml. Section 8: no
   # user-facing string is ever hardcoded in a widget.
   generate: true
+
+# Selects an encrypting build of SQLite. Without this the app bundles plain
+# SQLite, `PRAGMA key` is silently ignored -- unknown pragmas are a no-op in
+# SQLite -- and the database is written in the clear while behaving completely
+# normally. Section 1 makes that the worst failure this app can have.
+#
+# sqlite3mc (SQLite3MultipleCiphers) rather than sqlcipher: it does not link
+# OpenSSL, which keeps a third-party crypto library out of a privacy-critical
+# app and the binary smaller, and it tracks a more current SQLite than the
+# SQLCipher build shipped by package:sqlite3.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

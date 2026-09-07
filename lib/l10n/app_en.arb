@@ -15,12 +15,20 @@
   "cycleDay": "Day {day}",
   "@cycleDay": {
     "description": "The current day of the cycle, shown in the middle of the ring. Kept very short because it sits inside a circle.",
-    "placeholders": { "day": { "type": "int" } }
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
   },
   "cycleDayAccessibility": "Cycle day {day}",
   "@cycleDayAccessibility": {
     "description": "Spoken description of the cycle ring for screen readers. Says the value aloud, because the ring itself conveys nothing to a screen reader.",
-    "placeholders": { "day": { "type": "int" } }
+    "placeholders": {
+      "day": {
+        "type": "int"
+      }
+    }
   },
   "noCycleInProgress": "No cycle yet",
   "@noCycleInProgress": {
@@ -33,7 +41,14 @@
   "estimatedRange": "{from} – {to}",
   "@estimatedRange": {
     "description": "A date range. Never a single date: an estimate is always a window.",
-    "placeholders": { "from": { "type": "String" }, "to": { "type": "String" } }
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
   },
   "estimatedFromYourEntries": "Estimated, based on your entries",
   "@estimatedFromYourEntries": {
@@ -42,7 +57,11 @@
   "needMoreCycles": "Log {remaining, plural, =1{one more period} other{{remaining} more periods}} before an estimate is possible",
   "@needMoreCycles": {
     "description": "Explains why there is no estimate yet. Says what to do rather than only what is missing.",
-    "placeholders": { "remaining": { "type": "int" } }
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      }
+    }
   },
   "cyclesTooVariable": "Your cycle lengths vary too much to estimate a range right now",
   "@cyclesTooVariable": {
@@ -75,5 +94,94 @@
   "dismiss": "Dismiss",
   "@dismiss": {
     "description": "Button that hides the doctor hint."
+  },
+  "logToday": "Log today",
+  "@logToday": {
+    "description": "Button on the Today screen that opens the sheet for recording a day."
+  },
+  "logForDate": "Log {date}",
+  "@logForDate": {
+    "description": "Title of the logging sheet, naming the day being recorded.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "periodStartedToday": "My period started this day",
+  "@periodStartedToday": {
+    "description": "Switch marking a day as the first day of a period. This is the only thing the app treats as a cycle boundary, so the wording has to be unambiguous about which day."
+  },
+  "flowHeading": "Bleeding",
+  "@flowHeading": {
+    "description": "Heading above the bleeding intensity choices."
+  },
+  "flowNone": "None",
+  "@flowNone": {
+    "description": "Bleeding intensity: none recorded for this day. Distinct from not answering at all."
+  },
+  "flowLight": "Light",
+  "@flowLight": {
+    "description": "Bleeding intensity: light."
+  },
+  "flowMedium": "Medium",
+  "@flowMedium": {
+    "description": "Bleeding intensity: medium."
+  },
+  "flowHeavy": "Heavy",
+  "@flowHeavy": {
+    "description": "Bleeding intensity: heavy."
+  },
+  "symptomsHeading": "Symptoms",
+  "@symptomsHeading": {
+    "description": "Heading above the symptom chips."
+  },
+  "symptomCramps": "Cramps",
+  "@symptomCramps": {
+    "description": "Symptom label. The database stores an opaque key; this is its translation."
+  },
+  "symptomHeadache": "Headache",
+  "@symptomHeadache": {
+    "description": "Symptom label."
+  },
+  "symptomTiredness": "Tiredness",
+  "@symptomTiredness": {
+    "description": "Symptom label."
+  },
+  "symptomBloating": "Bloating",
+  "@symptomBloating": {
+    "description": "Symptom label."
+  },
+  "symptomMoodChange": "Mood change",
+  "@symptomMoodChange": {
+    "description": "Symptom label. Deliberately neutral: describes what the user noticed, never diagnoses it."
+  },
+  "symptomBackPain": "Back pain",
+  "@symptomBackPain": {
+    "description": "Symptom label."
+  },
+  "noteHeading": "Note",
+  "@noteHeading": {
+    "description": "Heading above the free-text note field."
+  },
+  "noteHint": "Anything you want to remember",
+  "@noteHint": {
+    "description": "Placeholder in the note field. Open-ended on purpose: the app never parses this text."
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Confirms and stores the day's entry."
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Closes the logging sheet without saving."
+  },
+  "nothingRecordedYet": "Nothing recorded for this day yet",
+  "@nothingRecordedYet": {
+    "description": "Shown in the logging sheet when the day has no entry."
+  },
+  "entrySaved": "Saved",
+  "@entrySaved": {
+    "description": "Brief confirmation after an entry is stored."
   }
 }

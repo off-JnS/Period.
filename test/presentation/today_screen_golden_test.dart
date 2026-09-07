@@ -40,7 +40,9 @@ void main() {
   }) async {
     await pumpApp(
       tester,
-      TodayScreen(data: data),
+      // A callback so the log button renders: it is the only way into the app,
+      // and a golden without it would not show what the user actually sees.
+      TodayScreen(data: data, onLogToday: () {}),
       locale: locale,
       brightness: brightness,
       textScale: textScale,

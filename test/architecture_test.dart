@@ -193,27 +193,55 @@ void main() {
   });
 
   group('encryption at rest (CLAUDE.md section 6)', () {
-    test('sqlite3_flutter_libs is not resolved alongside sqlcipher', () {
-      // Both packages provide a native sqlite3 and the plain one can win at
-      // link time. The result is an unencrypted database that behaves
-      // completely normally -- nothing fails, nothing warns, and the app's
-      // central promise is quietly broken. A silent failure needs a check
-      // rather than a paragraph, and it has to read the lockfile because the
-      // conflict can arrive transitively through a package nobody chose.
-      final lock = File('pubspec.lock').readAsStringSync();
+    // This guard used to assert that sqlcipher_flutter_libs was a dependency,
+    // which was exactly backwards. sqlite3 3.x loads its native library through
+    // Dart build hooks and never consults that package, so its presence proved
+    // nothing while its absence looked like the bug. The database was being
+    // written unencrypted and every check here passed.
+    //
+    // What actually decides it is the hooks.user_defines block in pubspec.yaml.
+    // open_database_test.dart proves the result end to end by reopening a
+    // written file without the key; this only catches the configuration
+    // regressing, quickly and without touching the disk.
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+
+    test('an encrypting build of SQLite is selected', () {
+      final hooks = RegExp(
+        r'hooks:\s*\n\s*user_defines:\s*\n\s*sqlite3:\s*\n\s*source:\s*(\w+)',
+      ).firstMatch(pubspec);
 
       expect(
-        lock,
-        contains('sqlcipher_flutter_libs:'),
-        reason: 'the encrypted sqlite build must be present',
+        hooks,
+        isNotNull,
+        reason:
+            'without hooks.user_defines the app bundles plain SQLite, '
+            'PRAGMA key is a silent no-op, and the database is written in the '
+            'clear while behaving completely normally',
       );
       expect(
-        lock,
-        isNot(contains('sqlite3_flutter_libs:')),
+        hooks!.group(1),
+        anyOf('sqlite3mc', 'sqlcipher'),
         reason:
-            'shipping both leaves the plain sqlite3 able to win at link '
-            'time, producing an unencrypted database that looks fine',
+            'only these two sources support encryption; "sqlite3" is the '
+            'plain build',
       );
+    });
+
+    test('no inert encryption plugin is depended on', () {
+      // Adding either back would look like encryption while doing nothing,
+      // which is worse than not having it: it invites the false assumption.
+      for (final obsolete in const [
+        'sqlcipher_flutter_libs',
+        'sqlite3_flutter_libs',
+      ]) {
+        expect(
+          pubspec,
+          isNot(contains('$obsolete:')),
+          reason:
+              'sqlite3 3.x does not consult $obsolete; encryption comes '
+              'from hooks.user_defines instead',
+        );
+      }
     });
   });
 }

@@ -66,9 +66,14 @@ been done yet. CI compiles the iOS app on every change (`flutter build ios
 --no-codesign`), which proves it builds but produces nothing installable — that
 still needs a Mac and a signing identity.
 
-Until someone runs it on a real device, the SQLCipher encryption is **written
-but unverified**: the tests exercise the schema against plain in-memory sqlite3,
-which cannot tell you whether the shipped database is actually encrypted.
+The database is encrypted at rest, and that is **tested rather than asserted**:
+`test/data/open_database_test.dart` writes a file with a key, reopens it without
+one, and checks the plaintext is not on disk. Encryption is selected by the
+`hooks.user_defines` block in `pubspec.yaml` — see `CLAUDE.md` §6 before
+touching it, because getting it wrong fails silently.
+
+Those tests run on Linux. Confirming the same holds on a real iPhone or Android
+device is still outstanding.
 
 `CLAUDE.md` holds the rules for this repository and is worth reading before
 changing anything — particularly the sections on dates, migrations and the
