@@ -38,11 +38,19 @@ void main() {
     expect(find.text('May 2024'), findsNothing);
   });
 
-  testWidgets('both destinations are named', (tester) async {
+  testWidgets('every destination is named', (tester) async {
     await pumpShell(tester);
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.text('Today'), findsWidgets);
-    expect(find.text('Calendar'), findsWidgets);
+    for (final label in ['Today', 'Calendar', 'Settings']) {
+      expect(find.text(label), findsWidgets, reason: 'missing $label');
+    }
+  });
+
+  testWidgets('settings is one tap away', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.text('Settings'));
+    await settleDatabase(tester);
+    expect(find.text('Your cycle right now'), findsOneWidget);
   });
 
   testWidgets('the calendar is one tap away', (tester) async {
@@ -85,5 +93,6 @@ void main() {
     );
     expect(find.text('Heute'), findsWidgets);
     expect(find.text('Kalender'), findsWidgets);
+    expect(find.text('Einstellungen'), findsWidgets);
   });
 }

@@ -255,5 +255,94 @@
   "today": "Today",
   "@today": {
     "description": "Names the current day in the calendar legend and in spoken day descriptions."
+  },
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the settings screen."
+  },
+  "navSettings": "Settings",
+  "@navSettings": {
+    "description": "Label of the Settings tab in the bottom navigation bar."
+  },
+  "cycleModeHeading": "Your cycle right now",
+  "@cycleModeHeading": {
+    "description": "Heading above the cycle mode choices. Phrased as a current situation rather than an identity, because it changes and the user will come back to change it."
+  },
+  "cycleModeExplanation": "This decides whether estimates make sense. You can change it whenever things change.",
+  "@cycleModeExplanation": {
+    "description": "Explains why the app asks for a cycle mode at all."
+  },
+  "modeNatural": "A natural cycle",
+  "@modeNatural": {
+    "description": "The default mode."
+  },
+  "modeNaturalDetail": "Estimates are based on the dates you record",
+  "@modeNaturalDetail": {
+    "description": "What the natural mode does. Never states an estimate as certainty."
+  },
+  "modeContraception": "Hormonal contraception",
+  "@modeContraception": {
+    "description": "A mode covering the pill, implant, hormonal coil and similar. Named by what the user is using, never by any effect on her body."
+  },
+  "modeContraceptionDetail": "No estimates. A withdrawal bleed follows your regimen rather than a cycle, and some regimens bring no bleed at all",
+  "@modeContraceptionDetail": {
+    "description": "Says what happens and why. Section 10 requires every mode to state why estimates are off rather than silently showing nothing."
+  },
+  "modePregnancy": "Pregnant",
+  "@modePregnancy": {
+    "description": "A mode for pregnancy."
+  },
+  "modePregnancyDetail": "No estimates. Everything you log is still saved",
+  "@modePregnancyDetail": {
+    "description": "Reassures that logging continues to work, because symptom logging matters more here rather than less."
+  },
+  "modePerimenopause": "Perimenopause",
+  "@modePerimenopause": {
+    "description": "A mode for the menopausal transition."
+  },
+  "modePerimenopauseDetail": "No estimates unless you ask for them. Cycle lengths often change a lot, so an estimate can be misleading",
+  "@modePerimenopauseDetail": {
+    "description": "The one mode where the user may turn estimates back on. Explains why they are off by default without naming a condition or making a finding."
+  },
+  "showEstimatesAnyway": "Show estimates anyway",
+  "@showEstimatesAnyway": {
+    "description": "Switch offered only under perimenopause, the one mode that honours it."
+  },
+  "showEstimatesAnywayDetail": "Shown as wide ranges, so the spread is visible rather than smoothed away",
+  "@showEstimatesAnywayDetail": {
+    "description": "Sets the expectation before the user opts in, per section 8: a prediction is never a certainty."
+  },
+  "showFertileWindow": "Show the fertile window estimate",
+  "@showFertileWindow": {
+    "description": "Switch turning on the fertile window section of the Today screen. Off unless asked for."
+  },
+  "yourDataHeading": "Your data",
+  "@yourDataHeading": {
+    "description": "Heading above the data management section of settings."
+  },
+  "dataStaysHere": "Everything you log stays on this device, encrypted. Nothing is sent anywhere, and there is no account.",
+  "@dataStaysHere": {
+    "description": "States the app's central promise where the user can see it. Present tense and factual, not a marketing claim."
+  },
+  "deleteAllData": "Delete all data",
+  "@deleteAllData": {
+    "description": "Opens the confirmation for erasing everything."
+  },
+  "deleteAllDataConfirmTitle": "Delete everything?",
+  "@deleteAllDataConfirmTitle": {
+    "description": "Title of the confirmation dialogue."
+  },
+  "deleteAllDataConfirmBody": "Every date, entry, symptom and setting will be erased, and the app will start over as if newly installed. This cannot be undone: there is no backup anywhere.",
+  "@deleteAllDataConfirmBody": {
+    "description": "Names exactly what goes, including the settings, and that the cycle mode resets with them. Says plainly that there is no recovery, because there is none."
+  },
+  "deleteEverything": "Delete everything",
+  "@deleteEverything": {
+    "description": "The confirming button in the delete dialogue. Repeats the action rather than saying OK, so a mistap on an unread dialogue is less likely."
+  },
+  "everythingDeleted": "Everything deleted",
+  "@everythingDeleted": {
+    "description": "Confirmation shown after the data is erased."
   }
+
 }

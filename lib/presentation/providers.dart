@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/database/daos/settings_dao.dart';
 import '../data/database/database.dart';
 import '../data/system_clock.dart';
 import '../domain/logic/cycle_analysis.dart';
@@ -9,7 +10,6 @@ import '../domain/logic/period_prediction.dart';
 import '../domain/models/clock.dart';
 import '../domain/models/cycle.dart';
 import '../domain/models/cycle_date.dart';
-import '../domain/models/cycle_mode.dart';
 import '../domain/models/day_entry.dart';
 import 'today/today_screen.dart';
 
@@ -28,21 +28,19 @@ final databaseProvider = Provider<AppDatabase>(
 /// Today's date. The single place the app asks what day it is.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
-/// The user's cycle mode.
+/// The user's preferences, read from the database.
 ///
-/// Not persisted yet: choosing a mode needs a settings screen, and storing it
-/// needs a schema migration, which section 5 says not to write casually. The
-/// default is a natural cycle with predictions on, so the logic path exercised
-/// here is the one most users see.
-final cycleSettingsProvider = Provider<CycleSettings>(
-  (ref) => const CycleSettings(),
+/// One provider for all of them rather than one each: they are one row set, one
+/// read and one invalidation, and a screen that showed the mode from a fresh
+/// read beside an opt-in from a stale one would be showing two different
+/// moments at once.
+///
+/// A fresh install has no rows and gets the defaults -- a natural cycle with
+/// predictions on. A stored value this build cannot read throws rather than
+/// guessing; see [SettingsDao].
+final settingsProvider = FutureProvider<StoredSettings>(
+  (ref) => ref.watch(databaseProvider).settingsDao.readSettings(),
 );
-
-/// Whether the user has opted into the fertile window estimate.
-///
-/// Off by default, per docs/cycle-logic.md. Persisting the choice waits on the
-/// same settings screen.
-final fertileWindowOptedInProvider = Provider<bool>((ref) => false);
 
 /// Every period start the user has recorded, oldest first.
 ///
@@ -87,27 +85,47 @@ final loggedDaysProvider =
 /// moment it is saved.
 final todayViewDataProvider = Provider<AsyncValue<TodayViewData>>((ref) {
   final today = ref.watch(clockProvider).today();
-  final settings = ref.watch(cycleSettingsProvider);
+  final settings = ref.watch(settingsProvider);
+  final starts = ref.watch(periodStartsProvider);
 
-  return ref.watch(periodStartsProvider).whenData((starts) {
-    final prediction = predictNextPeriod(
-      periodStarts: starts,
-      settings: settings,
-    );
-    final eligible = eligibleForStatistics(cyclesFrom(starts));
-
-    return TodayViewData(
-      cycleDay: cycleDayOn(today, starts),
-      typicalCycleLength: _typicalLength(eligible),
-      prediction: prediction,
-      fertileWindow: estimateFertileWindow(
-        prediction: prediction,
-        optedIn: ref.watch(fertileWindowOptedInProvider),
-      ),
-      showDoctorHint: shouldSuggestSeeingADoctor(eligible),
-    );
-  });
+  // Both reads have to land before anything is computed. Showing a prediction
+  // against default settings while the real ones are still loading would flash
+  // an estimate at a user who has predictions turned off, which is the one
+  // thing section 10 is there to prevent.
+  return switch ((settings, starts)) {
+    (AsyncError(:final error, :final stackTrace), _) ||
+    (
+      _,
+      AsyncError(:final error, :final stackTrace),
+    ) => AsyncError(error, stackTrace),
+    (AsyncValue(:final value?), AsyncValue(value: final recorded?)) =>
+      AsyncData(_todayFrom(today, recorded, value)),
+    _ => const AsyncLoading(),
+  };
 });
+
+TodayViewData _todayFrom(
+  CycleDate today,
+  List<CycleDate> starts,
+  StoredSettings settings,
+) {
+  final prediction = predictNextPeriod(
+    periodStarts: starts,
+    settings: settings.cycle,
+  );
+  final eligible = eligibleForStatistics(cyclesFrom(starts));
+
+  return TodayViewData(
+    cycleDay: cycleDayOn(today, starts),
+    typicalCycleLength: _typicalLength(eligible),
+    prediction: prediction,
+    fertileWindow: estimateFertileWindow(
+      prediction: prediction,
+      optedIn: settings.fertileWindowOptedIn,
+    ),
+    showDoctorHint: shouldSuggestSeeingADoctor(eligible),
+  );
+}
 
 /// The length the ring fills against, or null when there is not enough history.
 ///

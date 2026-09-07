@@ -41,19 +41,20 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
 
     final starts = ref.watch(periodStartsProvider);
+    final settings = ref.watch(settingsProvider);
     // Only the visible weeks, padding days included, so paging back through
     // years never grows the query.
     final logged = ref.watch(
       loggedDaysProvider((grid.days.first, grid.days.last)),
     );
 
-    if (starts.hasError || logged.hasError) {
+    if (starts.hasError || logged.hasError || settings.hasError) {
       return _Frame(child: DataErrorPanel(onRetry: _reload));
     }
     // Riverpod keeps the previous value while a re-read is in flight, so a save
     // refreshes the grid in place instead of blanking the month the user is
     // looking at. The spinner is only for the first read.
-    if (!starts.hasValue || !logged.hasValue) {
+    if (!starts.hasValue || !logged.hasValue || !settings.hasValue) {
       return const _Frame(child: Center(child: CircularProgressIndicator()));
     }
 
@@ -63,7 +64,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final periodStarts = starts.requireValue;
     final prediction = predictNextPeriod(
       periodStarts: periodStarts,
-      settings: ref.watch(cycleSettingsProvider),
+      settings: settings.requireValue.cycle,
     );
 
     return CalendarScreen(
@@ -83,6 +84,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   void _reload() {
     ref
       ..invalidate(periodStartsProvider)
+      ..invalidate(settingsProvider)
       ..invalidate(loggedDaysProvider);
   }
 }

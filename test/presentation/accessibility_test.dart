@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
+import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
 import 'package:period/presentation/calendar/month_grid.dart';
+import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/log_entry_sheet.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
@@ -109,6 +111,37 @@ void main() {
           const TodayViewData(prediction: NotEnoughCycles(have: 0, need: 2)),
         ),
       );
+    });
+  });
+
+  group('settings', () {
+    Widget screen(SettingsViewData data) => SettingsScreen(
+      data: data,
+      onModeChanged: (_) {},
+      onPredictionsOptInChanged: ({required optedIn}) {},
+      onFertileWindowChanged: ({required optedIn}) {},
+      onDeleteEverything: () {},
+    );
+
+    testWidgets('light', (tester) async {
+      await expectAccessible(tester, screen(const SettingsViewData()));
+    });
+
+    testWidgets('with the perimenopause opt-in showing', (tester) async {
+      // The one row that appears conditionally, and so the one most likely to
+      // be missed by a check that only ever sees the default screen.
+      await expectAccessible(
+        tester,
+        screen(
+          const SettingsViewData(
+            cycle: CycleSettings(mode: CycleMode.perimenopause),
+          ),
+        ),
+      );
+    });
+
+    testWidgets('dark', (tester) async {
+      await expectAccessibleInDark(tester, screen(const SettingsViewData()));
     });
   });
 
