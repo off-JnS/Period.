@@ -41,10 +41,14 @@ class TodayViewData {
 /// The app's home: where the user is in her cycle, and what is estimated next.
 class TodayScreen extends StatefulWidget {
   /// Creates the screen.
-  const TodayScreen({required this.data, super.key});
+  const TodayScreen({required this.data, this.onLogToday, super.key});
 
   /// The already-computed state to render.
   final TodayViewData data;
+
+  /// Opens the logging sheet. Null in golden tests, where the screen is
+  /// rendered without anything to tap.
+  final VoidCallback? onLogToday;
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
@@ -60,11 +64,18 @@ class _TodayScreenState extends State<TodayScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.todayTitle)),
+      floatingActionButton: widget.onLogToday == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: widget.onLogToday,
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(l10n.logToday),
+            ),
       body: SafeArea(
         // Scrollable rather than a fixed column: at 200% text size, or in
         // German, this content is taller than a phone screen and must not clip.
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 96),
           children: [
             Center(
               child: CycleDayRing(

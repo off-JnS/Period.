@@ -1,11 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'domain/logic/period_prediction.dart';
-import 'l10n/app_localizations.dart';
-import 'presentation/today/today_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() => runApp(const PeriodApp());
+import 'data/database/open_database.dart';
+import 'l10n/app_localizations.dart';
+import 'presentation/providers.dart';
+import 'presentation/today/today_page.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Opened once, here, rather than lazily inside a provider: it is async and
+  // touches the filesystem and the keystore, and a failure to decrypt should
+  // stop the app rather than surface as a broken screen.
+  final database = await openEncryptedDatabase();
+
+  runApp(
+    ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(database)],
+      child: const PeriodApp(),
+    ),
+  );
+}
 
 /// The application root.
 ///
@@ -29,14 +46,7 @@ class PeriodApp extends StatelessWidget {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       theme: ThemeData(useMaterial3: true),
-      home: const TodayScreen(
-        // Not yet wired to the database: this is the state of a fresh install,
-        // with nothing logged. Reading real entries needs a way to log them
-        // first, which is the next slice.
-        data: TodayViewData(
-          prediction: NotEnoughCycles(have: 0, need: cyclesNeededToPredict),
-        ),
-      ),
+      home: const TodayPage(),
     );
   }
 }
