@@ -112,6 +112,26 @@ void main() {
       );
     });
 
+    test('a container claiming a newer version is refused before parsing', () {
+      // The column is checked, not merely stored: a newer file is refused
+      // before any of it is read, rather than after.
+      writeRaw(
+        version: BackupDocument.currentFormatVersion + 1,
+        payload: jsonEncode({
+          'formatVersion': BackupDocument.currentFormatVersion,
+          'exportedOn': '2024-05-17',
+          'periodStarts': <String>[],
+          'entries': <Object>[],
+          'settings': <String, String>{},
+        }),
+      );
+
+      expect(
+        () => readBackupFile(file, passphrase),
+        throwsProblem(BackupProblem.newerFormat),
+      );
+    });
+
     test('a flow value this build does not know is refused, not dropped', () {
       // Silently dropping it would lose something the user recorded, which is
       // the exact failure a backup exists to prevent.

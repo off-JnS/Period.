@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -12,10 +13,17 @@ import 'package:share_plus/share_plus.dart';
 /// choice of plugin stays revisitable.
 abstract class BackupTransfer {
   /// A file to write a backup into, named [name].
+  ///
+  /// Somewhere temporary. The copy the user keeps is wherever she sent it; the
+  /// caller deletes this one once it has been handed on.
   Future<File> fileToWrite(String name);
 
   /// Hands [file] to the system, so the user picks where it goes.
-  Future<void> send(File file);
+  ///
+  /// [origin] is where the share sheet should appear from. iPad presents it as
+  /// a popover and refuses to show one without a source rectangle, so omitting
+  /// it there means the export can never leave the device.
+  Future<void> send(File file, {Rect? origin});
 
   /// Asks the user to choose a backup file, or null if she does not.
   Future<File?> choose();
@@ -37,8 +45,10 @@ class SystemBackupTransfer implements BackupTransfer {
   }
 
   @override
-  Future<void> send(File file) async {
-    await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+  Future<void> send(File file, {Rect? origin}) async {
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)], sharePositionOrigin: origin),
+    );
   }
 
   @override

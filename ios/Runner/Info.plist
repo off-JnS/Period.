@@ -66,5 +66,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Required the moment Face ID is used. Without it iOS terminates the
+	     process on the first prompt, and because the lock resolves before any
+	     screen is reachable she could never get back into settings to turn it
+	     off. Says nothing about cycles: it is shown on a screen anyone nearby
+	     can read. architecture_test.dart pins this. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Used to unlock the app.</string>
 </dict>
 </plist>

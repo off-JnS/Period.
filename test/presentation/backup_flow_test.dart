@@ -107,21 +107,55 @@ void main() {
 
       expect(find.text('Backup ready to save'), findsOneWidget);
       expect(transfer.sent, isTrue);
-      expect(transfer.written!.existsSync(), isTrue);
       expect(
         String.fromCharCodes(
-          transfer.written!.readAsBytesSync().take(16).toList(),
+          transfer.sentCopy!.readAsBytesSync().take(16).toList(),
         ),
         isNot(startsWith('SQLite format 3')),
         reason: 'the file handed to the share sheet is not encrypted',
       );
     });
 
-    testWidgets('the file is named for the day it was made', (tester) async {
+    testWidgets(
+      'the file is named for the day it was made, with an extension',
+      (tester) async {
+        // The extension is what Android derives a MIME type from and iOS a UTI.
+        // Without one, share targets refuse the file or rename it.
+        await pumpSettings(tester);
+        await exportBackup(tester);
+
+        expect(
+          transfer.written!.path,
+          endsWith('period-backup-2024-05-17.period'),
+        );
+      },
+    );
+
+    testWidgets('no copy is left behind in the app once it is handed on', (
+      tester,
+    ) async {
+      // fileToWrite justifies temporary storage on the grounds that a second
+      // copy of her data has no business in the app's own storage. That is only
+      // true if something removes it.
       await pumpSettings(tester);
       await exportBackup(tester);
 
-      expect(transfer.written!.path, endsWith('period-backup-2024-05-17'));
+      expect(transfer.sentCopy, isNotNull, reason: 'nothing was shared');
+      expect(
+        transfer.written!.existsSync(),
+        isFalse,
+        reason: 'the export is still sitting in app storage',
+      );
+    });
+
+    testWidgets('the share sheet is told where to appear from', (tester) async {
+      // iPad presents it as a popover and refuses to show one without a source
+      // rectangle, so without this the export can never leave the device.
+      await pumpSettings(tester);
+      await exportBackup(tester);
+
+      expect(transfer.origin, isNotNull);
+      expect(transfer.origin!.width, greaterThan(0));
     });
 
     testWidgets('says the passphrase cannot be recovered, before she types', (
@@ -239,6 +273,21 @@ void main() {
       expect(await db.logDao.allPeriodStarts(), [aDate(2024, 5, 12)]);
     });
 
+    testWidgets('a file that cannot be opened at all still says something', (
+      tester,
+    ) async {
+      // sqlite3.open throws outside readBackupFile's own try block, so this
+      // used to escape as an unhandled exception and the restore appeared to
+      // do nothing whatsoever.
+      final directory = Directory('${dir.path}/not-a-file')..createSync();
+      transfer.toChoose = File(directory.path);
+      await pumpSettings(tester);
+
+      await restoreBackup(tester);
+
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+
     testWidgets('a file that is not a backup says so', (tester) async {
       final notABackup = File('${dir.path}/holiday.jpg')
         ..writeAsBytesSync(List.filled(2048, 7));
@@ -290,7 +339,9 @@ void main() {
     await pumpSettings(tester);
 
     await exportBackup(tester);
-    transfer.toChoose = transfer.written;
+    // Restored from the copy that left the app, not from the app's own
+    // temporary file -- which is deleted, and which she would never see.
+    transfer.toChoose = transfer.sentCopy;
 
     await tapRow(tester, 'Delete all data');
     await tester.tap(find.text('Delete everything'));

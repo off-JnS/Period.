@@ -51,12 +51,17 @@ class _LockGateState extends ConsumerState<LockGate>
   /// lifecycle handler would re-lock in the middle of unlocking.
   bool _authenticating = false;
 
+  /// Whether the app has actually been in the background since the last
+  /// prompt, as opposed to merely losing focus to that prompt.
+  bool _wasAway = false;
+
   /// Whether the stored setting has been read yet.
   bool _decided = false;
 
-  /// The setting, once read. Kept here because the lifecycle callback is
-  /// synchronous and must not wait on a database read to know whether this app
-  /// locks at all.
+  /// The setting as last seen. Mirrored into state because the lifecycle
+  /// callback is synchronous and cannot wait on a database read -- but kept in
+  /// step by [build] watching the provider, so turning the lock on or off takes
+  /// effect immediately rather than on the next launch.
   bool _enabled = false;
 
   @override
@@ -82,8 +87,16 @@ class _LockGateState extends ConsumerState<LockGate>
       // rendered and possibly seen.
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
+        _wasAway = true;
         if (!_locked) setState(() => _locked = true);
       case AppLifecycleState.resumed:
+        // Only after the app was genuinely away. The device's own prompt
+        // resigns the app active and hands back a `resumed` when it closes, so
+        // re-prompting on every resume means a refused prompt immediately
+        // raises another one -- a loop with no way out but force-quitting.
+        // She reaches the same place with the Unlock button, by choosing to.
+        if (!_wasAway) return;
+        _wasAway = false;
         if (_locked) unawaited(_authenticate());
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
@@ -93,12 +106,22 @@ class _LockGateState extends ConsumerState<LockGate>
 
   /// Reads the setting and, if the lock is on, asks the device.
   Future<void> _open() async {
-    final settings = await ref.read(settingsProvider.future);
+    bool enabled;
+    try {
+      enabled = (await ref.read(settingsProvider.future)).appLockEnabled;
+    } on Object {
+      // The settings row is unreadable -- a cycle mode from a newer build, or
+      // a corrupt value. SettingsDao throws there deliberately, and the screen
+      // behind this gate knows how to explain it. Staying locked would mean she
+      // could never reach that explanation, or the delete-everything button,
+      // and an app that cannot be opened is data that has been erased.
+      enabled = false;
+    }
     if (!mounted) return;
 
     setState(() {
       _decided = true;
-      _enabled = settings.appLockEnabled;
+      _enabled = enabled;
       if (!_enabled) _locked = false;
     });
 
@@ -128,6 +151,18 @@ class _LockGateState extends ConsumerState<LockGate>
 
   @override
   Widget build(BuildContext context) {
+    // Watched, not read once: flipping the switch in settings has to reach the
+    // gate now rather than on the next launch. A switch that says the app is
+    // locked while it is not would be worse than no switch.
+    final enabled = ref.watch(settingsProvider).value?.appLockEnabled;
+    if (enabled != null && enabled != _enabled) {
+      _enabled = enabled;
+      // Turning it on does not prompt here -- she is looking at settings, and
+      // an unprovoked prompt mid-toggle is jarring. It takes effect the next
+      // time the app leaves the foreground, which is when it matters.
+      if (!enabled) _locked = false;
+    }
+
     // Locked until proven otherwise, including before the setting has been
     // read. The child is not built at all in that state.
     if (!_decided || _locked) {

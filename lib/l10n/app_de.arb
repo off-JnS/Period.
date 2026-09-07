@@ -106,5 +106,7 @@
   "lockedBody": "Zum Fortfahren entsperren.",
   "unlockAction": "Entsperren",
   "unlockReason": "Zum Fortfahren entsperren"
+,
+  "fertileWindowNeedsEstimates": "Benötigt Schätzungen, die in diesem Modus aus sind. Das Zeitfenster wird von einer geschätzten Periode zurückgerechnet, es gibt also nichts anzuzeigen."
 
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/widgets.dart';
 import 'package:period/data/backup/backup_transfer.dart';
 
 /// A [BackupTransfer] backed by a real directory instead of a share sheet.
@@ -23,12 +24,27 @@ class FakeBackupTransfer implements BackupTransfer {
   /// Whether the finished file was handed on.
   bool sent = false;
 
+  /// Where the share sheet was told to appear from, which iPad requires.
+  Rect? origin;
+
+  /// A copy of what was handed on, kept where the caller's cleanup cannot
+  /// reach it.
+  ///
+  /// Models what really happens: the file leaves the app and lives wherever she
+  /// saved it, while the app deletes its own temporary copy. A test that wants
+  /// to inspect the export, or restore from it, uses this.
+  File? sentCopy;
+
   @override
   Future<File> fileToWrite(String name) async =>
       written = File('${directory.path}/$name');
 
   @override
-  Future<void> send(File file) async => sent = true;
+  Future<void> send(File file, {Rect? origin}) async {
+    sent = true;
+    this.origin = origin;
+    sentCopy = file.copySync('${file.path}.sent');
+  }
 
   @override
   Future<File?> choose() async => toChoose;

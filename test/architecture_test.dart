@@ -147,6 +147,62 @@ void main() {
     });
   });
 
+  group('the app lock cannot lock her out (CLAUDE.md section 9)', () {
+    // Both of these are permanent-lockout bugs, and neither is visible from
+    // Dart: the plugin reports the device as perfectly capable of
+    // authenticating, then fails in a way that looks like a refusal. There is
+    // no backup and no recovery path, so an unopenable app is an erased one.
+    //
+    // Neither is caught by `flutter build ios --no-codesign` or by any widget
+    // test, which is why they are pinned here as text.
+
+    test('the Android activity is a FragmentActivity', () {
+      // local_auth_android refuses anything else and returns an error the Dart
+      // side cannot tell apart from "she declined", so a plain FlutterActivity
+      // means every unlock fails forever.
+      final activity = File(
+        'android/app/src/main/kotlin/app/period/MainActivity.kt',
+      );
+      expect(
+        activity.existsSync(),
+        isTrue,
+        reason: 'the activity has moved; this check must follow it',
+      );
+      expect(
+        activity.readAsStringSync(),
+        contains('FlutterFragmentActivity'),
+        reason:
+            'local_auth needs a FragmentActivity. With FlutterActivity the app '
+            'lock refuses every unlock and her data is unreachable.',
+      );
+    });
+
+    test('iOS declares why it uses Face ID', () {
+      // iOS terminates the process on the first Face ID prompt when the
+      // purpose string is absent. The lock resolves before any screen is
+      // reachable, so she could never get back into settings to turn it off.
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(
+        plist,
+        contains('NSFaceIDUsageDescription'),
+        reason: 'iOS kills the app on its first Face ID prompt without this',
+      );
+      // Held to the same rule as notification text: it appears on a screen
+      // anyone nearby can read.
+      final reason = RegExp(
+        r'<key>NSFaceIDUsageDescription</key>\s*<string>([^<]*)</string>',
+      ).firstMatch(plist)?.group(1);
+      expect(reason, isNotNull, reason: 'the key has no string beside it');
+      for (final word in ['period', 'cycle', 'fertile', 'pregnan']) {
+        expect(
+          reason!.toLowerCase(),
+          isNot(contains(word)),
+          reason: 'the Face ID prompt must not mention "$word"',
+        );
+      }
+    });
+  });
+
   group('no network (CLAUDE.md section 6)', () {
     test('the release manifest does not request INTERNET', () {
       // src/main is the only manifest merged into a release build, so this is

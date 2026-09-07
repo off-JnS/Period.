@@ -70,3 +70,8 @@ lib/l10n/app_localizations*.dart
 # are the source of truth and ARE committed; this is derived output like the
 # files above, regenerated in CI.
 test/data/generated/
+
+# Written by a failing golden comparison. They are diagnostic output, they are
+# large, and a committed one is evidence a test was red when someone committed
+# anyway -- which section 11 forbids.
+test/**/failures/

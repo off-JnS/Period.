@@ -18,11 +18,19 @@ import 'package:sqlite3/sqlite3.dart';
 /// applies without complaint and fails on the first read. Callers that accept a
 /// key from a user have to read something to find out -- see
 /// `data/backup/backup_file.dart`.
-void applyKeyAndVerify(Database database, String key) {
+/// [readCipher] exists so a build *without* encryption can be simulated. It is
+/// the only way to test the guard itself: on a build that links
+/// SQLite3MultipleCiphers, `PRAGMA cipher` always answers, so every test would
+/// pass whether or not this function checked anything -- which is how a guard
+/// quietly stops guarding.
+void applyKeyAndVerify(
+  Database database,
+  String key, {
+  Object? Function(Database database) readCipher = _readCipher,
+}) {
   database.execute(pragmaKeyStatement(key));
 
-  final cipher = database.select('PRAGMA cipher;').singleOrNull;
-  final active = cipher?.values.firstOrNull;
+  final active = readCipher(database);
   if (active == null || active.toString().isEmpty) {
     throw StateError(
       'This build has no encryption support: PRAGMA cipher returned nothing, '
@@ -31,6 +39,10 @@ void applyKeyAndVerify(Database database, String key) {
     );
   }
 }
+
+/// Asks the database which cipher is active, or null on a build with none.
+Object? _readCipher(Database database) =>
+    database.select('PRAGMA cipher;').singleOrNull?.values.firstOrNull;
 
 /// Escapes [key] for use in `PRAGMA key`.
 ///

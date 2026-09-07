@@ -133,14 +133,26 @@ class SettingsScreen extends StatelessWidget {
             _SectionHeading(l10n.fertileWindowHeading),
             SwitchListTile(
               value: data.fertileWindowOptedIn,
-              onChanged: onFertileWindowChanged == null
+              // Off limits in a mode with no estimate to build one from. The
+              // window is counted back from the predicted period, so with
+              // predictions disabled turning this on changes nothing at all --
+              // and the opt-in two blocks above is hidden for exactly that
+              // reason. A switch that silently does nothing is worse than one
+              // that says why it cannot.
+              onChanged:
+                  onFertileWindowChanged == null ||
+                      !data.cycle.predictionsEnabled
                   ? null
                   : (value) => onFertileWindowChanged!.call(optedIn: value),
               title: Text(l10n.showFertileWindow),
               // The caveat sits beside the switch, before the choice is made,
               // rather than only on the Today screen after it. Section 8 wants
               // it visible; the moment it matters most is here.
-              subtitle: Text(l10n.fertileWindowCaveat),
+              subtitle: Text(
+                data.cycle.predictionsEnabled
+                    ? l10n.fertileWindowCaveat
+                    : l10n.fertileWindowNeedsEstimates,
+              ),
               isThreeLine: true,
             ),
 

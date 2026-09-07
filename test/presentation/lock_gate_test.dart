@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
@@ -74,6 +75,10 @@ void main() {
     }
     await settleDatabase(tester);
   }
+
+  /// The provider container behind the pumped tree.
+  ProviderContainer container(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(LockGate)));
 
   Future<void> sendLifecycle(
     WidgetTester tester,
@@ -194,6 +199,48 @@ void main() {
     });
   });
 
+  group('the setting reaches the gate without a restart', () {
+    testWidgets('turning it off unlocks immediately', (tester) async {
+      await pumpGate(tester, enabled: true);
+      expect(find.text('her entries'), findsOneWidget);
+
+      lock.accepts = false;
+      await background(tester);
+      await foreground(tester);
+      expect(find.byType(LockScreen), findsOneWidget);
+
+      // Not reachable from behind the lock in the real app, but a restore can
+      // change it, and a gate that cached the flag would keep locking for the
+      // rest of the session against a setting that says otherwise.
+      await db.settingsDao.writeAppLockEnabled(enabled: false);
+      container(tester).invalidate(settingsProvider);
+      await settleDatabase(tester);
+
+      expect(find.text('her entries'), findsOneWidget);
+    });
+
+    testWidgets('turning it on locks the next time the app goes away', (
+      tester,
+    ) async {
+      await pumpGate(tester, enabled: false);
+      expect(find.text('her entries'), findsOneWidget);
+
+      await db.settingsDao.writeAppLockEnabled(enabled: true);
+      container(tester).invalidate(settingsProvider);
+      await settleDatabase(tester);
+
+      // Not prompted on the spot: she is looking at settings, and an
+      // unprovoked prompt mid-toggle is jarring. It takes effect where it
+      // matters.
+      expect(find.text('her entries'), findsOneWidget);
+
+      lock.accepts = false;
+      await background(tester);
+      await foreground(tester);
+      expect(find.byType(LockScreen), findsOneWidget);
+    });
+  });
+
   group('the failure modes that matter', () {
     testWidgets('a phone that cannot authenticate opens the app', (
       tester,
@@ -210,6 +257,51 @@ void main() {
 
       expect(find.text('her entries'), findsOneWidget);
       expect(lock.prompts, 0, reason: 'there was nothing to prompt with');
+    });
+
+    testWidgets(
+      'an unreadable settings row opens the app rather than bricking',
+      (tester) async {
+        // SettingsDao throws on a cycle mode this build cannot read -- from a
+        // newer build, or a corrupt row. Staying locked would mean she could
+        // never reach the screen that explains it, or the delete-everything
+        // button. An app that cannot be opened is data that has been erased.
+        await db.settingsDao.writeAppLockEnabled(enabled: true);
+        await db.customStatement(
+          'INSERT INTO settings (key, value) VALUES (?, ?)',
+          ['cycle_mode', 'a_mode_from_the_future'],
+        );
+
+        await pumpWithDatabase(
+          tester,
+          const LockGate(child: Scaffold(body: guarded)),
+          database: db,
+          overrides: overrides(),
+        );
+
+        expect(find.text('her entries'), findsOneWidget);
+      },
+    );
+
+    testWidgets('a refusal does not re-prompt when the sheet hands back focus', (
+      tester,
+    ) async {
+      // The device's own prompt resigns the app active and delivers a resumed
+      // when it closes. Re-prompting on every resume means cancelling raises
+      // another prompt at once, and again, with no way out but force-quitting.
+      lock.accepts = false;
+      await pumpGate(tester, enabled: true);
+      expect(lock.prompts, 1);
+
+      await sendLifecycle(tester, AppLifecycleState.inactive);
+      await sendLifecycle(tester, AppLifecycleState.resumed);
+
+      expect(
+        lock.prompts,
+        1,
+        reason: 'the dismissed sheet re-triggered its own prompt',
+      );
+      expect(find.byType(LockScreen), findsOneWidget);
     });
 
     testWidgets('the lifecycle churn of its own prompt does not loop', (

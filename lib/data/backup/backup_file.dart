@@ -9,6 +9,13 @@ import 'backup_document.dart';
 /// The table a backup file contains. One row, always.
 const backupTableName = 'backup';
 
+/// What an exported backup is called.
+///
+/// Its own extension rather than `.sqlite`: the file is an implementation
+/// detail that happens to be a database, and naming it one invites someone to
+/// open it with a tool that will not work.
+const backupFileExtension = '.period';
+
 /// Writes [document] to [file], encrypted with [passphrase].
 ///
 /// The file is an encrypted SQLite container holding the backup as JSON. The
@@ -69,6 +76,15 @@ BackupDocument readBackupFile(File file, String passphrase) {
     }
 
     if (rows.length != 1) throw const BackupException(BackupProblem.damaged);
+
+    // Checked, not merely stored. Written from the same constant as the
+    // payload's own formatVersion, so the two cannot disagree -- and reading it
+    // here refuses a newer file before any of it is parsed, rather than after.
+    final version = rows.single['format_version'];
+    if (version is! int) throw const BackupException(BackupProblem.damaged);
+    if (version > BackupDocument.currentFormatVersion) {
+      throw const BackupException(BackupProblem.newerFormat);
+    }
 
     final payload = rows.single['payload'];
     if (payload is! String) {

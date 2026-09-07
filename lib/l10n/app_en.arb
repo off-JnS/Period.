@@ -467,5 +467,10 @@
   "@unlockReason": {
     "description": "The sentence the operating system shows in its own authentication prompt. Says nothing about cycles: the prompt appears on a screen anyone nearby can see."
   }
+,
+  "fertileWindowNeedsEstimates": "Needs estimates, which are off in this mode. The window is counted back from a predicted period, so there is nothing to show.",
+  "@fertileWindowNeedsEstimates": {
+    "description": "Replaces the fertile window caveat in a mode where predictions are off. Explains why the switch cannot be used rather than leaving it silently inert."
+  }
 
 }
