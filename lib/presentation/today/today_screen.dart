@@ -36,6 +36,19 @@ class TodayViewData {
 
   /// Whether to offer the "might be worth mentioning to a doctor" hint.
   final bool showDoctorHint;
+
+  /// How many days past her typical length this cycle has run, or null when it
+  /// has not, or when there is no typical length to compare against.
+  ///
+  /// Being late is the most common reason to open this screen, and the ring
+  /// alone conveys it only through colour. Section 9 requires a shape or a
+  /// label as well, so this drives a sentence rather than only an arc.
+  int? get daysPastTypicalLength {
+    final day = cycleDay;
+    final typical = typicalCycleLength;
+    if (day == null || typical == null || day <= typical) return null;
+    return day - typical;
+  }
 }
 
 /// The app's home: where the user is in her cycle, and what is estimated next.
@@ -60,6 +73,7 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final data = widget.data;
 
     return Scaffold(
@@ -83,6 +97,18 @@ class _TodayScreenState extends State<TodayScreen> {
                 expectedLength: data.typicalCycleLength,
               ),
             ),
+            if (data.daysPastTypicalLength case final late?) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: Text(
+                  l10n.laterThanUsual(late, data.typicalCycleLength!),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             _PredictionSection(prediction: data.prediction),
             if (data.fertileWindow case final window?) ...[

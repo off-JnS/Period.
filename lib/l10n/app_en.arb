@@ -8,10 +8,6 @@
   "@todayTitle": {
     "description": "Title of the Today screen, the app's home."
   },
-  "nothingLoggedYet": "Nothing logged yet.",
-  "@nothingLoggedYet": {
-    "description": "Shown on the Today screen before the user has recorded anything at all."
-  },
   "cycleDay": "Day {day}",
   "@cycleDay": {
     "description": "The current day of the cycle, shown in the middle of the ring. Kept very short because it sits inside a circle.",
@@ -176,12 +172,88 @@
   "@cancel": {
     "description": "Closes the logging sheet without saving."
   },
-  "nothingRecordedYet": "Nothing recorded for this day yet",
-  "@nothingRecordedYet": {
-    "description": "Shown in the logging sheet when the day has no entry."
-  },
   "entrySaved": "Saved",
   "@entrySaved": {
     "description": "Brief confirmation after an entry is stored."
+  },
+  "couldNotOpenData": "Period. could not open your data",
+  "@couldNotOpenData": {
+    "description": "Shown when the database fails to open. States the fact without speculating about the cause or promising the data is safe, because at this point the app does not know either."
+  },
+  "couldNotOpenDataDetail": "This can happen if the app was interrupted. Your entries are still on this device.",
+  "@couldNotOpenDataDetail": {
+    "description": "Reassurance under the error heading. Says the file is still present, which is true and is the thing a user actually fears, without claiming it can be read."
+  },
+  "tryAgain": "Try again",
+  "@tryAgain": {
+    "description": "Retries opening the data after a failure."
+  },
+  "undo": "Undo",
+  "@undo": {
+    "description": "Reverses the change just made, offered beside the save confirmation."
+  },
+  "laterThanUsual": "{days, plural, =1{1 day} other{{days} days}} later than your usual {typical}",
+  "@laterThanUsual": {
+    "description": "Shown under the ring when the current cycle has run past the user's typical length. An observation about her own entries, never a warning and never a suggestion that something is wrong.",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "typical": {
+        "type": "int"
+      }
+    }
+  },
+  "calendarTitle": "Calendar",
+  "@calendarTitle": {
+    "description": "Title of the calendar screen."
+  },
+  "navToday": "Today",
+  "@navToday": {
+    "description": "Label of the Today tab in the bottom navigation bar. Deliberately separate from todayTitle: a tab label has less room than a screen title and may need to be shortened in a language where the title cannot be."
+  },
+  "navCalendar": "Calendar",
+  "@navCalendar": {
+    "description": "Label of the Calendar tab in the bottom navigation bar."
+  },
+  "previousMonth": "Previous month",
+  "@previousMonth": {
+    "description": "Spoken label for the button that moves the calendar back one month."
+  },
+  "nextMonth": "Next month",
+  "@nextMonth": {
+    "description": "Spoken label for the button that moves the calendar forward one month."
+  },
+  "legendPeriodStart": "Period start",
+  "@legendPeriodStart": {
+    "description": "Names the filled marker in the calendar legend. Every calendar state is named in words as well as drawn, because meaning must never rest on colour alone."
+  },
+  "legendLogged": "Logged",
+  "@legendLogged": {
+    "description": "Names the dot marking a day with an entry."
+  },
+  "legendEstimated": "Estimated period",
+  "@legendEstimated": {
+    "description": "Names the outlined marker for days inside the predicted window."
+  },
+  "dayAccessibility": "{date}{markers}",
+  "@dayAccessibility": {
+    "description": "Spoken description of one calendar day: the date, then whatever is true of it. Screen readers get nothing from a coloured circle.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "markers": {
+        "type": "String"
+      }
+    }
+  },
+  "nothingLoggedThisMonth": "Nothing logged this month",
+  "@nothingLoggedThisMonth": {
+    "description": "Shown under an empty calendar month, so a blank grid does not read as a broken screen."
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Names the current day in the calendar legend and in spoken day descriptions."
   }
 }

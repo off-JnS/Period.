@@ -59,6 +59,27 @@ final dayEntryProvider = FutureProvider.family<DayEntry?, CycleDate>(
   (ref, date) => ref.watch(databaseProvider).logDao.entryOn(date),
 );
 
+/// Every day with an entry between the two dates, inclusive.
+///
+/// A set rather than a list: the calendar asks "is this day logged?" once per
+/// cell, forty-two times a month, and a linear scan per cell would be the only
+/// slow thing on the screen.
+///
+/// Keyed by a record, so two screens showing the same range share one read and
+/// a different range is a different entry. Records compare structurally and
+/// [CycleDate] implements `==`, so this needs no key type of its own.
+final loggedDaysProvider =
+    FutureProvider.family<Set<CycleDate>, (CycleDate, CycleDate)>((
+      ref,
+      range,
+    ) async {
+      final entries = await ref
+          .watch(databaseProvider)
+          .logDao
+          .entriesBetween(range.$1, range.$2);
+      return {for (final entry in entries) entry.date};
+    });
+
 /// Everything the Today screen shows, derived from the stored period starts.
 ///
 /// All of it computed on read, per section 4 — nothing here is stored, so a

@@ -140,6 +140,19 @@ void main() {
     );
   });
 
+  testWidgets('running past the usual length', (tester) async {
+    // The ring alone shows this in a second colour; section 9 needs words too.
+    await expectGolden(
+      tester,
+      TodayViewData(
+        cycleDay: 34,
+        typicalCycleLength: 28,
+        prediction: predicted,
+      ),
+      'late',
+    );
+  });
+
   testWidgets('dark mode', (tester) async {
     await expectGolden(
       tester,

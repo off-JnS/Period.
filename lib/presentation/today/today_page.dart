@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../data_error.dart';
+import '../log_day.dart';
 import '../providers.dart';
-import 'log_entry_sheet.dart';
 import 'today_screen.dart';
 
 /// The Today screen connected to the database.
@@ -27,47 +28,14 @@ class TodayPage extends ConsumerWidget {
       ),
       error: (error, stack) => Scaffold(
         appBar: AppBar(title: Text(l10n.todayTitle)),
-        body: Center(child: Text('$error')),
+        body: DataErrorPanel(
+          onRetry: () => ref.invalidate(periodStartsProvider),
+        ),
       ),
-      data: (view) =>
-          TodayScreen(data: view, onLogToday: () => _log(context, ref)),
-    );
-  }
-
-  Future<void> _log(BuildContext context, WidgetRef ref) async {
-    final today = ref.read(clockProvider).today();
-    final database = ref.read(databaseProvider);
-    final existing = await database.logDao.entryOn(today);
-    final starts = await database.logDao.allPeriodStarts();
-
-    if (!context.mounted) return;
-
-    final result = await showModalBottomSheet<LoggedDay>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => LogEntrySheet(
-        date: today,
-        existing: existing,
-        isPeriodStart: starts.contains(today),
+      data: (view) => TodayScreen(
+        data: view,
+        onLogToday: () => logDay(context, ref, ref.read(clockProvider).today()),
       ),
     );
-    if (result == null) return;
-
-    await database.logDao.saveEntry(result.entry);
-    // Marking is separate from the entry: section 4 makes period starts the
-    // source of truth for cycle boundaries, so this is what actually moves the
-    // prediction. Unmarking has to work too -- a mis-tap should be correctable.
-    if (result.isPeriodStart) {
-      await database.logDao.addPeriodStart(today);
-    } else {
-      await database.logDao.removePeriodStart(today);
-    }
-
-    // Re-read. Everything on the screen is derived on read from these dates
-    // (section 4), so this one invalidation refreshes the cycle day, the
-    // estimate, the fertile window and the hint together, with no cache to keep
-    // in step.
-    ref.invalidate(periodStartsProvider);
   }
 }
