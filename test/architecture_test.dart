@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -140,6 +141,59 @@ void main() {
         reason:
             'if a build breaks because something wants INTERNET, remove the '
             'dependency rather than the permission',
+      );
+    });
+
+    test('no dependency injects a permission into the release manifest', () {
+      // The check above reads only this app's own manifest, and a dependency
+      // can add a permission of its own during Android's manifest merge --
+      // which that check would never see. Section 6 makes the absence of
+      // INTERNET the thing that keeps the no-network promise verifiable, so
+      // the plugins have to be looked at too.
+      final config = File('.dart_tool/package_config.json');
+      expect(
+        config.existsSync(),
+        isTrue,
+        reason: 'run flutter pub get before this suite',
+      );
+
+      final packages =
+          (jsonDecode(config.readAsStringSync())
+                  as Map<String, Object?>)['packages']!
+              as List<Object?>;
+
+      final offenders = <String>[];
+      for (final entry in packages.cast<Map<String, Object?>>()) {
+        // Two things bite here, and both make this check silently pass while
+        // looking at nothing. A rootUri has no trailing slash, so resolving
+        // against it drops the package directory; and it may be relative, in
+        // which case it is relative to package_config.json rather than to the
+        // working directory.
+        final rawRoot = entry['rootUri']! as String;
+        final root = config.absolute.uri.resolve(
+          rawRoot.endsWith('/') ? rawRoot : '$rawRoot/',
+        );
+        final manifest = File.fromUri(
+          root.resolve('android/src/main/AndroidManifest.xml'),
+        );
+        if (!manifest.existsSync()) continue;
+
+        final declared = RegExp(r'android\.permission\.[A-Z_]+')
+            .allMatches(manifest.readAsStringSync())
+            .map((m) => m[0]!)
+            .toSet();
+        if (declared.isNotEmpty) {
+          offenders.add('${entry['name']}: ${declared.join(', ')}');
+        }
+      }
+
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'a dependency declares an Android permission this app never asked '
+            'for. If it is INTERNET, remove the dependency rather than the '
+            'permission; anything else needs a deliberate decision.',
       );
     });
 

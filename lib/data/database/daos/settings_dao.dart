@@ -59,6 +59,27 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
+  /// Every stored row, exactly as written.
+  ///
+  /// Raw rather than the typed [StoredSettings], so a backup carries settings
+  /// this build has never heard of and a later version added. Nothing here
+  /// interprets a value, which is why this cannot throw the way
+  /// [readSettings] deliberately does.
+  Future<Map<String, String>> readAll() async {
+    final rows = await select(settings).get();
+    return {for (final row in rows) row.key: row.value};
+  }
+
+  /// Replaces every stored row with [values].
+  Future<void> replaceAll(Map<String, String> values) async {
+    await transaction(() async {
+      await delete(settings).go();
+      for (final pair in values.entries) {
+        await _write(pair.key, pair.value);
+      }
+    });
+  }
+
   /// Stores the cycle mode and its opt-in.
   Future<void> writeCycleSettings(CycleSettings value) async {
     await transaction(() async {

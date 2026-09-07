@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/presentation/settings/passphrase_dialog.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 
 import '../support/widgets.dart';
@@ -24,6 +25,8 @@ void main() {
         onPredictionsOptInChanged: ({required optedIn}) {},
         onFertileWindowChanged: ({required optedIn}) {},
         onDeleteEverything: () {},
+        onExportBackup: () {},
+        onRestoreBackup: () {},
       ),
       locale: locale,
       brightness: brightness,
@@ -77,22 +80,73 @@ void main() {
     await expectGolden(tester, natural, 'large_text', textScale: 2);
   });
 
-  testWidgets('the confirmation before deleting', (tester) async {
+  Future<void> expectDialogGolden(
+    WidgetTester tester,
+    String tap,
+    String name,
+  ) async {
     await pumpApp(
       tester,
       SettingsScreen(
         data: natural,
         onModeChanged: (_) {},
         onDeleteEverything: () {},
+        onExportBackup: () {},
+        onRestoreBackup: () {},
       ),
       surface: const Size(400, 1100),
     );
-    await tester.tap(find.text('Delete all data'));
+    await tester.tap(find.text(tap));
     await tester.pumpAndSettle();
 
     await expectLater(
       find.byType(AlertDialog),
-      matchesGoldenFile('goldens/settings_delete_confirm.png'),
+      matchesGoldenFile('goldens/settings_$name.png'),
+    );
+  }
+
+  testWidgets('the confirmation before deleting', (tester) async {
+    await expectDialogGolden(tester, 'Delete all data', 'delete_confirm');
+  });
+
+  testWidgets('choosing a backup passphrase', (tester) async {
+    // The screen where the app tells her the one thing she must not forget.
+    await pumpApp(
+      tester,
+      const PassphraseDialogHarness(confirming: true),
+      surface: const Size(400, 700),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(AlertDialog),
+      matchesGoldenFile('goldens/settings_passphrase_new.png'),
     );
   });
+
+  testWidgets('entering a passphrase to restore', (tester) async {
+    await pumpApp(
+      tester,
+      const PassphraseDialogHarness(confirming: false),
+      surface: const Size(400, 700),
+    );
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(AlertDialog),
+      matchesGoldenFile('goldens/settings_passphrase_enter.png'),
+    );
+  });
+}
+
+/// Shows [PassphraseDialog] on its own, so it can be photographed without
+/// driving the whole export flow to reach it.
+class PassphraseDialogHarness extends StatelessWidget {
+  /// Creates the harness.
+  const PassphraseDialogHarness({required this.confirming, super.key});
+
+  /// Passed straight through.
+  final bool confirming;
+
+  @override
+  Widget build(BuildContext context) =>
+      Scaffold(body: PassphraseDialog(confirming: confirming));
 }

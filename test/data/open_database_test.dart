@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:period/data/database/open_database.dart';
+import 'package:period/data/database/encryption.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
@@ -15,6 +15,11 @@ import 'package:test/test.dart';
 ///
 /// The only check worth trusting is the one below: write a file with a key,
 /// then try to read it without one.
+///
+/// The guard itself now lives in encryption.dart, shared with the backup
+/// export. This file keeps its name because CLAUDE.md section 6 names it as
+/// one of the two things standing between this app and shipping a plaintext
+/// database again.
 void main() {
   late Directory dir;
   late String path;

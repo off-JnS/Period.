@@ -75,5 +75,27 @@
   "deleteAllDataConfirmBody": "Alle Daten, Einträge, Symptome und Einstellungen werden gelöscht, und die App beginnt von vorn wie neu installiert. Das lässt sich nicht rückgängig machen: Es gibt nirgendwo eine Sicherung.",
   "deleteEverything": "Alles löschen",
   "everythingDeleted": "Alles gelöscht"
+,
+  "backupHeading": "Sicherung",
+  "backupExplanation": "Es gibt keine Cloud und kein Konto. Eine Sicherungsdatei ist damit die einzige Kopie, die den Verlust dieses Geräts übersteht. Sie wird mit einem Passwort geschützt, das du festlegst.",
+  "exportBackup": "Sicherung erstellen",
+  "restoreBackup": "Aus einer Sicherung wiederherstellen",
+  "choosePassphraseTitle": "Passwort festlegen",
+  "choosePassphraseBody": "Die Sicherung wird mit diesem Passwort geschützt und lässt sich ohne es nicht öffnen. Niemand kann es wiederherstellen, auch diese App nicht. Schreib es dir sicher auf.",
+  "enterPassphraseTitle": "Passwort eingeben",
+  "passphraseLabel": "Passwort",
+  "passphraseAgainLabel": "Noch einmal eingeben",
+  "passphraseTooShort": "Mindestens {count} Zeichen",
+  "passphraseMismatch": "Die Eingaben stimmen nicht überein",
+  "replaceEverythingTitle": "Alles ersetzen?",
+  "replaceEverythingBody": "Beim Wiederherstellen wird alles in der App durch den Inhalt der Sicherung ersetzt. Alles, was seit dieser Sicherung eingetragen wurde, geht verloren.",
+  "replaceAction": "Ersetzen",
+  "backupCreated": "Sicherung bereit zum Speichern",
+  "backupRestored": "Sicherung wiederhergestellt",
+  "backupCouldNotOpen": "Mit diesem Passwort ließ sich die Datei nicht öffnen. Prüfe das Passwort und ob es sich um eine Period-Sicherung handelt.",
+  "backupNotABackup": "Diese Datei ist keine Period-Sicherung.",
+  "backupNewerVersion": "Diese Sicherung stammt aus einer neueren Version der App. Aktualisiere die App und versuche es erneut.",
+  "backupDamaged": "Diese Sicherung ist beschädigt und lässt sich nicht lesen.",
+  "backupFailed": "Die Sicherung konnte nicht erstellt werden."
 
 }

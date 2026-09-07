@@ -344,5 +344,95 @@
   "@everythingDeleted": {
     "description": "Confirmation shown after the data is erased."
   }
+,
+  "backupHeading": "Backup",
+  "@backupHeading": {
+    "description": "Heading above export and restore in settings."
+  },
+  "backupExplanation": "There is no cloud and no account, so a backup file is the only copy that survives losing this phone. It is locked with a passphrase you choose.",
+  "@backupExplanation": {
+    "description": "Explains why a backup matters here and that it is encrypted. States the absence of a cloud as fact, not as a limitation."
+  },
+  "exportBackup": "Export a backup",
+  "@exportBackup": {
+    "description": "Starts making a backup file."
+  },
+  "restoreBackup": "Restore from a backup",
+  "@restoreBackup": {
+    "description": "Starts restoring from a backup file."
+  },
+  "choosePassphraseTitle": "Choose a passphrase",
+  "@choosePassphraseTitle": {
+    "description": "Title of the dialogue where a new backup passphrase is set."
+  },
+  "choosePassphraseBody": "The backup is locked with this passphrase and cannot be opened without it. Nobody can recover it for you, not even this app. Write it down somewhere safe.",
+  "@choosePassphraseBody": {
+    "description": "Said before she types, not after. The consequence of forgetting is total and permanent, so it is stated plainly rather than softened."
+  },
+  "enterPassphraseTitle": "Enter the passphrase",
+  "@enterPassphraseTitle": {
+    "description": "Title of the dialogue asking for the passphrase of a backup being restored."
+  },
+  "passphraseLabel": "Passphrase",
+  "@passphraseLabel": {
+    "description": "Label of the passphrase field."
+  },
+  "passphraseAgainLabel": "Type it again",
+  "@passphraseAgainLabel": {
+    "description": "Label of the confirmation field, so a typo does not become an unopenable backup."
+  },
+  "passphraseTooShort": "At least {count} characters",
+  "@passphraseTooShort": {
+    "description": "Shown when the chosen passphrase is too short.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passphraseMismatch": "These do not match",
+  "@passphraseMismatch": {
+    "description": "Shown when the two passphrase fields differ."
+  },
+  "replaceEverythingTitle": "Replace everything?",
+  "@replaceEverythingTitle": {
+    "description": "Title of the confirmation before a restore."
+  },
+  "replaceEverythingBody": "Restoring replaces everything currently in the app with the contents of the backup. Anything logged since that backup was made will be gone.",
+  "@replaceEverythingBody": {
+    "description": "Says what replace means before it happens. Restoring is not additive and pretending otherwise would lose entries silently."
+  },
+  "replaceAction": "Replace",
+  "@replaceAction": {
+    "description": "The confirming button before a restore."
+  },
+  "backupCreated": "Backup ready to save",
+  "@backupCreated": {
+    "description": "Shown once the file is made and handed to the share sheet. Deliberately not \"saved\": the app does not know where she put it."
+  },
+  "backupRestored": "Backup restored",
+  "@backupRestored": {
+    "description": "Confirmation after a successful restore."
+  },
+  "backupCouldNotOpen": "That passphrase did not open this file. Check the passphrase, and that this is a Period backup.",
+  "@backupCouldNotOpen": {
+    "description": "A wrong passphrase and a file that was never a backup are indistinguishable to SQLite, so this names both rather than guessing at one."
+  },
+  "backupNotABackup": "This file is not a Period backup.",
+  "@backupNotABackup": {
+    "description": "The file opened but holds no backup."
+  },
+  "backupNewerVersion": "This backup was made by a newer version of the app. Update, then try again.",
+  "@backupNewerVersion": {
+    "description": "Refusing is deliberate: a partial restore of health data is worse than none."
+  },
+  "backupDamaged": "This backup is damaged and cannot be read.",
+  "@backupDamaged": {
+    "description": "Readable, but the contents do not make sense."
+  },
+  "backupFailed": "The backup could not be made.",
+  "@backupFailed": {
+    "description": "Shown if writing the file fails, e.g. no space left."
+  }
 
 }

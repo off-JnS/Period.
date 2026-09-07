@@ -90,6 +90,36 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
     ];
   }
 
+  /// Every logged day, oldest first.
+  ///
+  /// Dates are collected from both tables, not just [DayEntries]. A day can
+  /// carry symptoms and no entry row -- [entryOn] already treats that as a
+  /// logged day -- and a backup that read only the entries would drop those
+  /// days silently, which is the exact failure an export exists to prevent.
+  Future<List<DayEntry>> allEntries() async {
+    final rows = await select(dayEntries).get();
+    final symptomRows = await select(daySymptoms).get();
+
+    final byDate = {for (final row in rows) row.date: row};
+    final symptomsByDate = <CycleDate, Set<Symptom>>{};
+    for (final row in symptomRows) {
+      (symptomsByDate[row.date] ??= {}).add(Symptom(key: row.symptomKey));
+    }
+
+    final dates = {...byDate.keys, ...symptomsByDate.keys}.toList()
+      ..sort((a, b) => a.compareTo(b));
+
+    return [
+      for (final date in dates)
+        DayEntry(
+          date: date,
+          flow: byDate[date]?.flow,
+          note: byDate[date]?.note,
+          symptoms: symptomsByDate[date] ?? const {},
+        ),
+    ];
+  }
+
   /// Writes [entry], replacing whatever was logged on that day.
   ///
   /// The entry and its symptoms are written in one transaction, so a day is

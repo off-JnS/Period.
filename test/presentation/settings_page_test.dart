@@ -218,10 +218,12 @@ void main() {
   });
 
   group('deleting everything', () {
-    Future<void> confirmDelete(WidgetTester tester) async {
-      // Below the fold once the navigation bar takes its share of the height.
-      // Scoped to the settings list: inside the shell every tab is mounted, so
-      // there is more than one scrollable on screen.
+    /// Scrolls the delete row into view and taps it.
+    ///
+    /// It sits at the foot of a list that has grown, and a ListView does not
+    /// build what is below the fold. Scoped to the settings list because inside
+    /// the shell every tab is mounted and there is more than one scrollable.
+    Future<void> openDeleteDialog(WidgetTester tester) async {
       await tester.dragUntilVisible(
         find.text('Delete all data'),
         find.descendant(
@@ -233,6 +235,10 @@ void main() {
       await settleDatabase(tester);
       await tester.tap(find.text('Delete all data'));
       await settleDatabase(tester);
+    }
+
+    Future<void> confirmDelete(WidgetTester tester) async {
+      await openDeleteDialog(tester);
       await tester.tap(find.text('Delete everything'));
       await settleDatabase(tester);
     }
@@ -293,8 +299,7 @@ void main() {
       await givenEnoughHistory();
       await pumpSettings(tester);
 
-      await tester.tap(find.text('Delete all data'));
-      await settleDatabase(tester);
+      await openDeleteDialog(tester);
       await tester.tap(find.text('Cancel'));
       await settleDatabase(tester);
 

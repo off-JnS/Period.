@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:period/data/database/encryption.dart';
 import 'package:period/data/database_key_store.dart';
 
 class _MockSecureStorage extends Mock implements FlutterSecureStorage {}

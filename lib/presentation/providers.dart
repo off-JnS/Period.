@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/backup/backup_service.dart';
+import '../data/backup/backup_transfer.dart';
 import '../data/database/daos/settings_dao.dart';
 import '../data/database/database.dart';
 import '../data/system_clock.dart';
@@ -27,6 +29,20 @@ final databaseProvider = Provider<AppDatabase>(
 
 /// Today's date. The single place the app asks what day it is.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
+
+/// How a backup file leaves the app and comes back.
+///
+/// The only part of the backup that touches a platform plugin, so it is behind
+/// a seam that tests override -- the export and import flows are checked
+/// end to end without a share sheet or a file picker.
+final backupTransferProvider = Provider<BackupTransfer>(
+  (ref) => const SystemBackupTransfer(),
+);
+
+/// Makes and restores backups.
+final backupServiceProvider = Provider<BackupService>(
+  (ref) => BackupService(ref.watch(databaseProvider)),
+);
 
 /// The user's preferences, read from the database.
 ///

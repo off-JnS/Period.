@@ -5,6 +5,7 @@ import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
 import 'package:period/presentation/calendar/month_grid.dart';
+import 'package:period/presentation/settings/passphrase_dialog.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/log_entry_sheet.dart';
 import 'package:period/presentation/today/today_screen.dart';
@@ -121,6 +122,8 @@ void main() {
       onPredictionsOptInChanged: ({required optedIn}) {},
       onFertileWindowChanged: ({required optedIn}) {},
       onDeleteEverything: () {},
+      onExportBackup: () {},
+      onRestoreBackup: () {},
     );
 
     testWidgets('light', (tester) async {
@@ -142,6 +145,22 @@ void main() {
 
     testWidgets('dark', (tester) async {
       await expectAccessibleInDark(tester, screen(const SettingsViewData()));
+    });
+  });
+
+  group('the passphrase dialogue', () {
+    testWidgets('choosing one', (tester) async {
+      await expectAccessible(
+        tester,
+        const Scaffold(body: PassphraseDialog(confirming: true)),
+      );
+    });
+
+    testWidgets('entering one', (tester) async {
+      await expectAccessible(
+        tester,
+        const Scaffold(body: PassphraseDialog(confirming: false)),
+      );
     });
   });
 

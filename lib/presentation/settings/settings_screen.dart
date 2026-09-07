@@ -36,6 +36,8 @@ class SettingsScreen extends StatelessWidget {
     this.onPredictionsOptInChanged,
     this.onFertileWindowChanged,
     this.onDeleteEverything,
+    this.onExportBackup,
+    this.onRestoreBackup,
     super.key,
   });
 
@@ -53,6 +55,12 @@ class SettingsScreen extends StatelessWidget {
 
   /// Called once she has confirmed erasing everything.
   final VoidCallback? onDeleteEverything;
+
+  /// Called to make a backup file.
+  final VoidCallback? onExportBackup;
+
+  /// Called to restore from a backup file.
+  final VoidCallback? onRestoreBackup;
 
   @override
   Widget build(BuildContext context) {
@@ -119,6 +127,21 @@ class SettingsScreen extends StatelessWidget {
               // it visible; the moment it matters most is here.
               subtitle: Text(l10n.fertileWindowCaveat),
               isThreeLine: true,
+            ),
+
+            const Divider(height: 24),
+
+            _SectionHeading(l10n.backupHeading),
+            _SectionNote(l10n.backupExplanation),
+            ListTile(
+              leading: const Icon(Icons.save_alt),
+              title: Text(l10n.exportBackup),
+              onTap: onExportBackup,
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_backup_restore),
+              title: Text(l10n.restoreBackup),
+              onTap: onRestoreBackup,
             ),
 
             const Divider(height: 24),

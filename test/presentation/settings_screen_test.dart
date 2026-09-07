@@ -18,6 +18,11 @@ void main() {
   }) async {
     await pumpApp(
       tester,
+      // Tall enough to lay the whole list out. A ListView does not build what
+      // is below the fold, so at the default height these finders would miss
+      // the rows at the bottom and report them as absent rather than offscreen.
+      // The real height is what the goldens check.
+      surface: const Size(400, 1500),
       SettingsScreen(
         data: data,
         onModeChanged: onModeChanged ?? (_) {},
@@ -26,6 +31,8 @@ void main() {
         onFertileWindowChanged:
             onFertileWindowChanged ?? ({required optedIn}) {},
         onDeleteEverything: onDeleteEverything ?? () {},
+        onExportBackup: () {},
+        onRestoreBackup: () {},
       ),
       locale: locale,
     );
