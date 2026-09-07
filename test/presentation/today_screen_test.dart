@@ -218,4 +218,92 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('running late', () {
+    // Section 9: no information by colour alone. The ring draws the overrun in
+    // a second colour, so being late has to be said in words as well -- and
+    // this is the state a user is most likely to have opened the app for.
+    testWidgets('is said in words, not only drawn', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            cycleDay: 34,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+        ),
+      );
+      expect(find.text('6 days later than your usual 28'), findsOneWidget);
+    });
+
+    testWidgets('one day late reads as a day, not 1 days', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            cycleDay: 29,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+        ),
+      );
+      expect(find.text('1 day later than your usual 28'), findsOneWidget);
+    });
+
+    testWidgets('says nothing on the usual length itself', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            cycleDay: 28,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+        ),
+      );
+      expect(find.textContaining('later than'), findsNothing);
+    });
+
+    testWidgets('says nothing without a length to compare against', (
+      tester,
+    ) async {
+      // A user with one cycle has no typical length. Comparing against 28 would
+      // be the industry's mistake, and saying she is late would be inventing it.
+      await pumpApp(
+        tester,
+        TodayScreen(data: TodayViewData(cycleDay: 40, prediction: predicted)),
+      );
+      expect(find.textContaining('later than'), findsNothing);
+    });
+
+    testWidgets('is phrased as an observation, never a warning', (
+      tester,
+    ) async {
+      // Section 8: never a finding, never a claim about her health.
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            cycleDay: 34,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+        ),
+      );
+      final text = tester
+          .widget<Text>(find.textContaining('later than'))
+          .data!
+          .toLowerCase();
+      for (final alarming in [
+        'late!',
+        'overdue',
+        'warning',
+        'abnormal',
+        'missed',
+      ]) {
+        expect(text, isNot(contains(alarming)), reason: 'found "$alarming"');
+      }
+    });
+  });
 }

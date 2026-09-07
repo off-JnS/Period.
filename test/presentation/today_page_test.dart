@@ -180,6 +180,95 @@ void main() {
     expect(await db.logDao.entryOn(aDate(2024, 5, 17)), isNotNull);
   });
 
+  group('feedback after saving', () {
+    testWidgets('confirms the save', (tester) async {
+      // Section: interaction. The sheet closing is not, on its own, evidence
+      // that anything was written.
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+      expect(find.text('Saved'), findsOneWidget);
+    });
+
+    testWidgets('offers undo when a period start was removed', (tester) async {
+      // Removing a start silently changes every estimate on the screen. It is
+      // the one destructive thing this sheet can do, so it gets a way back.
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+      expect(find.text('Day 1'), findsOneWidget);
+
+      await tester.tap(find.text('Log today'));
+      await settleDatabase(tester);
+      await tester.tap(find.byType(Switch));
+      await settleDatabase(tester);
+      await tester.tap(find.text('Save'));
+      await settleDatabase(tester);
+
+      expect(find.text('No cycle yet'), findsOneWidget);
+      expect(find.text('Undo'), findsOneWidget);
+    });
+
+    testWidgets('undo restores the period start', (tester) async {
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+
+      await tester.tap(find.text('Log today'));
+      await settleDatabase(tester);
+      await tester.tap(find.byType(Switch));
+      await settleDatabase(tester);
+      await tester.tap(find.text('Save'));
+      await settleDatabase(tester);
+      expect(find.text('No cycle yet'), findsOneWidget);
+
+      await tester.tap(find.text('Undo'));
+      await settleDatabase(tester);
+
+      expect(find.text('Day 1'), findsOneWidget);
+      expect(await db.logDao.allPeriodStarts(), hasLength(1));
+    });
+
+    testWidgets('offers no undo when nothing was removed', (tester) async {
+      // Undo on an ordinary save would be noise, and would suggest something
+      // destructive happened when it did not.
+      await pumpToday(tester);
+      await tester.tap(find.text('Log today'));
+      await settleDatabase(tester);
+      await tester.tap(find.text('Cramps'));
+      await settleDatabase(tester);
+      await tester.tap(find.text('Save'));
+      await settleDatabase(tester);
+
+      expect(find.text('Saved'), findsOneWidget);
+      expect(find.text('Undo'), findsNothing);
+    });
+  });
+
+  group('when the data cannot be opened', () {
+    testWidgets('explains, and never shows the raw exception', (tester) async {
+      // The likeliest real cause is a failed decrypt. A user seeing that needs
+      // to know her entries are still on the device and that she can retry --
+      // not a SqliteException. Section 8 also puts every visible string in the
+      // ARB files, which a formatted error object can never be.
+      await pumpWithDatabase(
+        tester,
+        const TodayPage(),
+        database: db,
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          clockProvider.overrideWithValue(clock),
+          periodStartsProvider.overrideWith(
+            (ref) =>
+                throw StateError('SqliteException(26): file is not a database'),
+          ),
+        ],
+      );
+
+      expect(find.text('Period. could not open your data'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.textContaining('SqliteException'), findsNothing);
+      expect(find.textContaining('not a database'), findsNothing);
+    });
+  });
+
   test('the clock provider is the only source of today', () {
     // Section 3 allows one DateTime.now(); this keeps the UI honest about it.
     final container = ProviderContainer(
