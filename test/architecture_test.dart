@@ -166,6 +166,66 @@ void main() {
     });
   });
 
+  group('reminders carry no inference (docs/cycle-logic.md section 7)', () {
+    // Section 7's central claim is that a reminder is derived from nothing
+    // about her cycle -- which is why it needs no mode gate, and why it reads
+    // the same during pregnancy as it does on a natural cycle.
+    //
+    // That claim cannot be tested by calling the function. There is no cycle
+    // input to vary, so a runtime test would compute the same answer twice and
+    // pass whatever the code did. It is a statement about what the file is
+    // allowed to touch, so it is checked as one.
+    final reminderFiles = [
+      File('lib/domain/logic/reminder_schedule.dart'),
+      File('lib/domain/models/reminder_schedule.dart'),
+      File('lib/domain/models/reminder_time.dart'),
+    ];
+
+    test('the reminder files exist to be checked', () {
+      // Without this the group passes vacuously if a file is renamed.
+      for (final file in reminderFiles) {
+        expect(file.existsSync(), isTrue, reason: '${file.path} is missing');
+      }
+    });
+
+    test('no reminder file reads anything about the cycle', () {
+      // Comments stripped first: the doc comments explain at length that these
+      // types hold no prediction and no cycle mode, so a substring match on the
+      // prose would pass no matter what the code did. That exact failure has
+      // already happened once in this file, with FLAG_SECURE.
+      const forbidden = <String, String>{
+        'CycleMode': 'a reminder is the same in every mode, so it reads none',
+        'CycleSettings': 'a reminder does not consult the cycle settings',
+        'PeriodPrediction': 'a reminder is never derived from a prediction',
+        'PredictedPeriod': 'a reminder is never derived from a prediction',
+        'predictNextPeriod': 'a reminder is never derived from a prediction',
+        'FertileWindow': 'a reminder is never derived from the fertile window',
+        'Cycle': 'a reminder is not computed from cycles',
+      };
+      final offenders = <String>[];
+      for (final file in reminderFiles) {
+        final lines = codeOnly(file.readAsStringSync()).split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          for (final entry in forbidden.entries) {
+            if (RegExp('\\b${entry.key}\\b').hasMatch(lines[i])) {
+              offenders.add(
+                '${file.path}:${i + 1}: ${entry.key} — ${entry.value}',
+              );
+            }
+          }
+        }
+      }
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'docs/cycle-logic.md section 7 says a reminder carries no '
+            'inference. Changing that means editing the document first, with '
+            'the reasoning. Offending lines:\n${offenders.join('\n')}',
+      );
+    });
+  });
+
   group('screenshot protection (CLAUDE.md section 9)', () {
     // None of this can be executed here. `flutter build ios --no-codesign`
     // proves only that it compiles, and no widget test can ask the operating

@@ -4,6 +4,8 @@ import 'package:period/data/backup/backup_service.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
+import 'package:period/domain/models/reminder_time.dart';
 import 'package:period/domain/models/symptom.dart';
 import 'package:test/test.dart';
 
@@ -183,6 +185,27 @@ void main() {
       await db.settingsDao.readAll(),
       containsPair('some_future_setting', 'whatever'),
     );
+  });
+
+  test('the reminder schedule survives', () async {
+    // The claim this proves is that reminders needed no backup change at all.
+    // They are three rows in a key-value table, and the format already carries
+    // that table raw -- so this is a test of a property rather than of code
+    // written to make it true.
+    await db.settingsDao.writeReminderSchedule(
+      const ReminderSchedule(
+        enabled: true,
+        time: ReminderTime(7, 5),
+        weekdays: {2, 4},
+      ),
+    );
+
+    await exportWipeImport();
+
+    final stored = (await db.settingsDao.readSettings()).reminder;
+    expect(stored.enabled, isTrue);
+    expect(stored.time, const ReminderTime(7, 5));
+    expect(stored.validWeekdays, {2, 4});
   });
 
   test('importing replaces rather than merging', () async {
