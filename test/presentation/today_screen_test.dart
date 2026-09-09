@@ -5,7 +5,7 @@ import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
-import '../support/models.dart';
+import '../support/views.dart';
 import '../support/dates.dart';
 import '../support/widgets.dart';
 

@@ -14,7 +14,7 @@ import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/log_entry_sheet.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
-import '../support/models.dart';
+import '../support/views.dart';
 import '../support/dates.dart';
 import '../support/widgets.dart';
 
