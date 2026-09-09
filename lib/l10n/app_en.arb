@@ -255,5 +255,222 @@
   "today": "Today",
   "@today": {
     "description": "Names the current day in the calendar legend and in spoken day descriptions."
+  },
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the settings screen."
+  },
+  "navSettings": "Settings",
+  "@navSettings": {
+    "description": "Label of the Settings tab in the bottom navigation bar."
+  },
+  "cycleModeHeading": "Your cycle right now",
+  "@cycleModeHeading": {
+    "description": "Heading above the cycle mode choices. Phrased as a current situation rather than an identity, because it changes and the user will come back to change it."
+  },
+  "cycleModeExplanation": "This decides whether estimates make sense. You can change it whenever things change.",
+  "@cycleModeExplanation": {
+    "description": "Explains why the app asks for a cycle mode at all."
+  },
+  "modeNatural": "A natural cycle",
+  "@modeNatural": {
+    "description": "The default mode."
+  },
+  "modeNaturalDetail": "Estimates are based on the dates you record",
+  "@modeNaturalDetail": {
+    "description": "What the natural mode does. Never states an estimate as certainty."
+  },
+  "modeContraception": "Hormonal contraception",
+  "@modeContraception": {
+    "description": "A mode covering the pill, implant, hormonal coil and similar. Named by what the user is using, never by any effect on her body."
+  },
+  "modeContraceptionDetail": "No estimates. A withdrawal bleed follows your regimen rather than a cycle, and some regimens bring no bleed at all",
+  "@modeContraceptionDetail": {
+    "description": "Says what happens and why. Section 10 requires every mode to state why estimates are off rather than silently showing nothing."
+  },
+  "modePregnancy": "Pregnant",
+  "@modePregnancy": {
+    "description": "A mode for pregnancy."
+  },
+  "modePregnancyDetail": "No estimates. Everything you log is still saved",
+  "@modePregnancyDetail": {
+    "description": "Reassures that logging continues to work, because symptom logging matters more here rather than less."
+  },
+  "modePerimenopause": "Perimenopause",
+  "@modePerimenopause": {
+    "description": "A mode for the menopausal transition."
+  },
+  "modePerimenopauseDetail": "No estimates unless you ask for them. Cycle lengths often change a lot, so an estimate can be misleading",
+  "@modePerimenopauseDetail": {
+    "description": "The one mode where the user may turn estimates back on. Explains why they are off by default without naming a condition or making a finding."
+  },
+  "showEstimatesAnyway": "Show estimates anyway",
+  "@showEstimatesAnyway": {
+    "description": "Switch offered only under perimenopause, the one mode that honours it."
+  },
+  "showEstimatesAnywayDetail": "Shown as wide ranges, so the spread is visible rather than smoothed away",
+  "@showEstimatesAnywayDetail": {
+    "description": "Sets the expectation before the user opts in, per section 8: a prediction is never a certainty."
+  },
+  "showFertileWindow": "Show the fertile window estimate",
+  "@showFertileWindow": {
+    "description": "Switch turning on the fertile window section of the Today screen. Off unless asked for."
+  },
+  "yourDataHeading": "Your data",
+  "@yourDataHeading": {
+    "description": "Heading above the data management section of settings."
+  },
+  "dataStaysHere": "Everything you log stays on this device, encrypted. Nothing is sent anywhere, and there is no account.",
+  "@dataStaysHere": {
+    "description": "States the app's central promise where the user can see it. Present tense and factual, not a marketing claim."
+  },
+  "deleteAllData": "Delete all data",
+  "@deleteAllData": {
+    "description": "Opens the confirmation for erasing everything."
+  },
+  "deleteAllDataConfirmTitle": "Delete everything?",
+  "@deleteAllDataConfirmTitle": {
+    "description": "Title of the confirmation dialogue."
+  },
+  "deleteAllDataConfirmBody": "Every date, entry, symptom and setting will be erased, and the app will start over as if newly installed. This cannot be undone: there is no backup anywhere.",
+  "@deleteAllDataConfirmBody": {
+    "description": "Names exactly what goes, including the settings, and that the cycle mode resets with them. Says plainly that there is no recovery, because there is none."
+  },
+  "deleteEverything": "Delete everything",
+  "@deleteEverything": {
+    "description": "The confirming button in the delete dialogue. Repeats the action rather than saying OK, so a mistap on an unread dialogue is less likely."
+  },
+  "everythingDeleted": "Everything deleted",
+  "@everythingDeleted": {
+    "description": "Confirmation shown after the data is erased."
   }
+,
+  "backupHeading": "Backup",
+  "@backupHeading": {
+    "description": "Heading above export and restore in settings."
+  },
+  "backupExplanation": "There is no cloud and no account, so a backup file is the only copy that survives losing this phone. It is locked with a passphrase you choose.",
+  "@backupExplanation": {
+    "description": "Explains why a backup matters here and that it is encrypted. States the absence of a cloud as fact, not as a limitation."
+  },
+  "exportBackup": "Export a backup",
+  "@exportBackup": {
+    "description": "Starts making a backup file."
+  },
+  "restoreBackup": "Restore from a backup",
+  "@restoreBackup": {
+    "description": "Starts restoring from a backup file."
+  },
+  "choosePassphraseTitle": "Choose a passphrase",
+  "@choosePassphraseTitle": {
+    "description": "Title of the dialogue where a new backup passphrase is set."
+  },
+  "choosePassphraseBody": "The backup is locked with this passphrase and cannot be opened without it. Nobody can recover it for you, not even this app. Write it down somewhere safe.",
+  "@choosePassphraseBody": {
+    "description": "Said before she types, not after. The consequence of forgetting is total and permanent, so it is stated plainly rather than softened."
+  },
+  "enterPassphraseTitle": "Enter the passphrase",
+  "@enterPassphraseTitle": {
+    "description": "Title of the dialogue asking for the passphrase of a backup being restored."
+  },
+  "passphraseLabel": "Passphrase",
+  "@passphraseLabel": {
+    "description": "Label of the passphrase field."
+  },
+  "passphraseAgainLabel": "Type it again",
+  "@passphraseAgainLabel": {
+    "description": "Label of the confirmation field, so a typo does not become an unopenable backup."
+  },
+  "passphraseTooShort": "At least {count} characters",
+  "@passphraseTooShort": {
+    "description": "Shown when the chosen passphrase is too short.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "passphraseMismatch": "These do not match",
+  "@passphraseMismatch": {
+    "description": "Shown when the two passphrase fields differ."
+  },
+  "replaceEverythingTitle": "Replace everything?",
+  "@replaceEverythingTitle": {
+    "description": "Title of the confirmation before a restore."
+  },
+  "replaceEverythingBody": "Restoring replaces everything currently in the app with the contents of the backup. Anything logged since that backup was made will be gone.",
+  "@replaceEverythingBody": {
+    "description": "Says what replace means before it happens. Restoring is not additive and pretending otherwise would lose entries silently."
+  },
+  "replaceAction": "Replace",
+  "@replaceAction": {
+    "description": "The confirming button before a restore."
+  },
+  "backupCreated": "Backup ready to save",
+  "@backupCreated": {
+    "description": "Shown once the file is made and handed to the share sheet. Deliberately not \"saved\": the app does not know where she put it."
+  },
+  "backupRestored": "Backup restored",
+  "@backupRestored": {
+    "description": "Confirmation after a successful restore."
+  },
+  "backupCouldNotOpen": "That passphrase did not open this file. Check the passphrase, and that this is a Period backup.",
+  "@backupCouldNotOpen": {
+    "description": "A wrong passphrase and a file that was never a backup are indistinguishable to SQLite, so this names both rather than guessing at one."
+  },
+  "backupNotABackup": "This file is not a Period backup.",
+  "@backupNotABackup": {
+    "description": "The file opened but holds no backup."
+  },
+  "backupNewerVersion": "This backup was made by a newer version of the app. Update, then try again.",
+  "@backupNewerVersion": {
+    "description": "Refusing is deliberate: a partial restore of health data is worse than none."
+  },
+  "backupDamaged": "This backup is damaged and cannot be read.",
+  "@backupDamaged": {
+    "description": "Readable, but the contents do not make sense."
+  },
+  "backupFailed": "The backup could not be made.",
+  "@backupFailed": {
+    "description": "Shown if writing the file fails, e.g. no space left."
+  }
+,
+  "appLockHeading": "Locking",
+  "@appLockHeading": {
+    "description": "Heading above the app lock switch in settings."
+  },
+  "appLockSwitch": "Ask before opening the app",
+  "@appLockSwitch": {
+    "description": "Switch turning on the optional lock. Phrased as what happens rather than as a security claim."
+  },
+  "appLockDetail": "Uses whatever unlocks your phone. If your phone has no lock set, the app opens as usual rather than shutting you out.",
+  "@appLockDetail": {
+    "description": "Two facts she needs before choosing: the app stores no PIN of its own, and it will never trap her out of her own data if the device cannot authenticate."
+  },
+  "appLockUnavailable": "Your phone has no lock set, so this cannot be used yet.",
+  "@appLockUnavailable": {
+    "description": "Shown when the device has neither a biometric enrolled nor a passcode. Explains rather than silently refusing the switch."
+  },
+  "lockedTitle": "Locked",
+  "@lockedTitle": {
+    "description": "Heading on the lock screen. Deliberately says nothing about what the app is for -- it can be read over a shoulder."
+  },
+  "lockedBody": "Unlock to continue.",
+  "@lockedBody": {
+    "description": "The lock screen's only sentence. Neutral for the same reason notification text is."
+  },
+  "unlockAction": "Unlock",
+  "@unlockAction": {
+    "description": "Button that asks the device to authenticate again."
+  },
+  "unlockReason": "Unlock to continue",
+  "@unlockReason": {
+    "description": "The sentence the operating system shows in its own authentication prompt. Says nothing about cycles: the prompt appears on a screen anyone nearby can see."
+  }
+,
+  "fertileWindowNeedsEstimates": "Needs estimates, which are off in this mode. The window is counted back from a predicted period, so there is nothing to show.",
+  "@fertileWindowNeedsEstimates": {
+    "description": "Replaces the fertile window caveat in a mode where predictions are off. Explains why the switch cannot be used rather than leaving it silently inert."
+  }
+
 }

@@ -6,6 +6,7 @@ import 'package:sqlite3/sqlite3.dart';
 
 import '../database_key_store.dart';
 import 'database.dart';
+import 'encryption.dart';
 
 /// The database file name. Kept out of line so the backup path derived from it
 /// in [backUpBeforeMigration] cannot drift away from the real one.
@@ -22,9 +23,9 @@ const databaseFileName = 'period.sqlite';
 /// library through Dart build hooks; the older sqlcipher_flutter_libs approach
 /// does nothing there, which would leave the database in the clear.
 ///
-/// `verifyEncryption` below is what stops that being a silent failure, and
-/// open_database_test.dart proves it end to end by reopening a written file
-/// without the key.
+/// [applyKeyAndVerify] in encryption.dart is what stops that being a silent
+/// failure, and open_database_test.dart proves it end to end by reopening a
+/// written file without the key.
 Future<AppDatabase> openEncryptedDatabase({DatabaseKeyStore? keyStore}) async {
   final directory = await getApplicationDocumentsDirectory();
   final file = File('${directory.path}/$databaseFileName');
@@ -52,26 +53,5 @@ int _readSchemaVersion(File file) {
     return database.userVersion;
   } finally {
     database.close();
-  }
-}
-
-/// Applies [key] to [database] and refuses to continue unless it took effect.
-///
-/// The verification is the important half. An unknown pragma is a silent no-op
-/// in SQLite, so on a plain build `PRAGMA key` succeeds, changes nothing, and
-/// every subsequent query works perfectly against an unencrypted file. Nothing
-/// fails and nothing warns. Checking that the pragma actually returned
-/// something is what turns the worst possible outcome into a crash on launch.
-void applyKeyAndVerify(Database database, String key) {
-  database.execute(pragmaKeyStatement(key));
-
-  final cipher = database.select('PRAGMA cipher;').singleOrNull;
-  final active = cipher?.values.firstOrNull;
-  if (active == null || active.toString().isEmpty) {
-    throw StateError(
-      'This build has no encryption support: PRAGMA cipher returned nothing, '
-      'so PRAGMA key was silently ignored and the database would be written '
-      'in the clear. Check the hooks.user_defines block in pubspec.yaml.',
-    );
   }
 }

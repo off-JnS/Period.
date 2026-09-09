@@ -59,3 +59,26 @@ class DaySymptoms extends Table {
   @override
   Set<Column<Object>> get primaryKey => {date, symptomKey};
 }
+
+/// The user's preferences, as key-value pairs.
+///
+/// Key-value rather than a column per setting, for the reason section 5 gives
+/// for symptoms: a typed row means every new preference is another migration,
+/// and every migration is another chance to destroy data that has no cloud
+/// backup. This table takes new keys forever without touching the schema again.
+///
+/// Values are stored by name, never by enum index, so reordering an enum cannot
+/// silently reinterpret a stored row as something the user never chose. See
+/// [SettingsDao] for how each key is read back, and what happens when a value is
+/// one this build does not recognise.
+@DataClassName('SettingRow')
+class Settings extends Table {
+  /// The setting's stable key, e.g. `cycle_mode`.
+  TextColumn get key => text()();
+
+  /// The stored value, as text.
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}

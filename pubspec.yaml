@@ -37,6 +37,20 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   # Annotations only; the generator is a dev dependency.
   freezed_annotation: ^3.1.0
+  # The optional app lock section 9 asks for. Prompts with the device's own
+  # biometric or passcode; this app never stores a PIN of its own, so there is
+  # no secret here to hold or leak. Allowlisted in section 6. Makes no network
+  # request.
+  local_auth: ^3.0.2
+  # Hands a finished backup to the system share sheet, so the user chooses
+  # where it lands and the app never writes her data anywhere shared on its
+  # own. Allowlisted in section 6. Makes no network request.
+  share_plus: ^12.0.0
+  # Lets her pick a backup file to restore from. The app's own documents
+  # directory is not reachable by a person on either platform, so without this
+  # an exported backup could never come back. Allowlisted in section 6. Makes
+  # no network request.
+  file_picker: ^10.3.9
   # State management. Allowlisted in section 6. Wires the database to the UI
   # without threading objects through constructors, and lets tests and goldens
   # swap in an in-memory database.

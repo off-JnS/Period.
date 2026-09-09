@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -6,6 +7,42 @@ import 'package:test/test.dart';
 /// are remembered. Both describe promises to the user, not house style: the
 /// first keeps cycle days free of timestamps, the second is what makes "this app
 /// makes no network requests" verifiable instead of merely asserted.
+/// Permissions a dependency may declare, each one looked at and accepted.
+///
+/// Not a formality. Every entry widens what a shipped build can do, so a new
+/// permission fails the test above until someone has read what it is for and
+/// written it down here.
+const acknowledgedPermissions = <String, Set<String>>{
+  // Section 9's optional app lock. It lets the app ask Android to run its own
+  // biometric prompt; it grants no access to data, to the network, or to
+  // anything the app could not already reach.
+  'local_auth_android': {'android.permission.USE_BIOMETRIC'},
+};
+
+/// Permissions that can never be acknowledged, because they are the promise.
+///
+/// Section 6 makes the absence of INTERNET what makes "this app makes no
+/// network requests" checkable rather than merely stated.
+const _networkPermissions = <String>{
+  'android.permission.INTERNET',
+  'android.permission.ACCESS_NETWORK_STATE',
+  'android.permission.ACCESS_WIFI_STATE',
+};
+
+/// Source with its `//` comments removed.
+///
+/// Every platform check below was matching prose rather than code: the comments
+/// explaining why FLAG_SECURE matters contain the words "FLAG_SECURE", so
+/// deleting the call left the guard green. A check satisfied by its own
+/// explanation is worse than none, because it is counted as coverage.
+String codeOnly(String source) => source
+    .split('\n')
+    .map((line) {
+      final comment = line.indexOf('//');
+      return comment == -1 ? line : line.substring(0, comment);
+    })
+    .join('\n');
+
 void main() {
   group('domain layer purity (CLAUDE.md sections 2 and 3)', () {
     final domainFiles = Directory('lib/domain')
@@ -124,6 +161,142 @@ void main() {
     });
   });
 
+  group('screenshot protection (CLAUDE.md section 9)', () {
+    // None of this can be executed here. `flutter build ios --no-codesign`
+    // proves only that it compiles, and no widget test can ask the operating
+    // system what it put in the app switcher. What these checks buy is that the
+    // code is present and the right shape -- the same technique that now guards
+    // the two lockout bugs a review found in these exact files, both of which
+    // were invisible to the whole suite and to CI.
+
+    test('Android sets FLAG_SECURE, before the first frame', () {
+      final activity = codeOnly(
+        File('android/app/src/main/kotlin/app/period/MainActivity.kt')
+            .readAsStringSync(),
+      );
+
+      expect(
+        activity,
+        contains('window.setFlags('),
+        reason: 'nothing blanks the app-switcher thumbnail',
+      );
+      expect(activity, contains('WindowManager.LayoutParams.FLAG_SECURE'));
+      // In onCreate rather than later: anywhere else leaves a window between
+      // launch and protection.
+      expect(
+        activity.indexOf('onCreate'),
+        lessThan(activity.indexOf('FLAG_SECURE')),
+        reason: 'FLAG_SECURE must be set in onCreate',
+      );
+    });
+
+    test('iOS covers the window when the app resigns active', () {
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(
+        delegate,
+        contains('override func applicationWillResignActive'),
+        reason: 'nothing covers the window before the snapshot is taken',
+      );
+      expect(
+        delegate,
+        contains('UIBlurEffect'),
+        reason: 'section 9 asks for a blur overlay',
+      );
+    });
+
+    test('iOS hooks resign-active, not did-enter-background', () {
+      // The snapshot is taken as the app resigns active. A cover added in
+      // didEnterBackground arrives after the picture has been taken: it
+      // compiles, runs, looks right in every log, and protects nothing. That
+      // is the exact class of bug this file exists to catch.
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(
+        delegate,
+        isNot(contains('applicationDidEnterBackground')),
+        reason:
+            'covering on didEnterBackground is too late -- the app switcher '
+            'already has its picture',
+      );
+    });
+
+    test('iOS removes the cover again', () {
+      // A cover added and never removed is its own lockout: the app running
+      // normally behind a blur that nothing clears.
+      final delegate = codeOnly(
+        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
+      );
+
+      expect(delegate, contains('override func applicationDidBecomeActive'));
+      expect(
+        delegate,
+        contains('removeFromSuperview'),
+        reason: 'the cover is never taken down',
+      );
+    });
+  });
+
+  group('the app lock cannot lock her out (CLAUDE.md section 9)', () {
+    // Both of these are permanent-lockout bugs, and neither is visible from
+    // Dart: the plugin reports the device as perfectly capable of
+    // authenticating, then fails in a way that looks like a refusal. There is
+    // no backup and no recovery path, so an unopenable app is an erased one.
+    //
+    // Neither is caught by `flutter build ios --no-codesign` or by any widget
+    // test, which is why they are pinned here as text.
+
+    test('the Android activity is a FragmentActivity', () {
+      // local_auth_android refuses anything else and returns an error the Dart
+      // side cannot tell apart from "she declined", so a plain FlutterActivity
+      // means every unlock fails forever.
+      final activity = File(
+        'android/app/src/main/kotlin/app/period/MainActivity.kt',
+      );
+      expect(
+        activity.existsSync(),
+        isTrue,
+        reason: 'the activity has moved; this check must follow it',
+      );
+      expect(
+        codeOnly(activity.readAsStringSync()),
+        contains(': FlutterFragmentActivity'),
+        reason:
+            'local_auth needs a FragmentActivity. With FlutterActivity the app '
+            'lock refuses every unlock and her data is unreachable.',
+      );
+    });
+
+    test('iOS declares why it uses Face ID', () {
+      // iOS terminates the process on the first Face ID prompt when the
+      // purpose string is absent. The lock resolves before any screen is
+      // reachable, so she could never get back into settings to turn it off.
+      final plist = File('ios/Runner/Info.plist').readAsStringSync();
+      expect(
+        plist,
+        contains('NSFaceIDUsageDescription'),
+        reason: 'iOS kills the app on its first Face ID prompt without this',
+      );
+      // Held to the same rule as notification text: it appears on a screen
+      // anyone nearby can read.
+      final reason = RegExp(
+        r'<key>NSFaceIDUsageDescription</key>\s*<string>([^<]*)</string>',
+      ).firstMatch(plist)?.group(1);
+      expect(reason, isNotNull, reason: 'the key has no string beside it');
+      for (final word in ['period', 'cycle', 'fertile', 'pregnan']) {
+        expect(
+          reason!.toLowerCase(),
+          isNot(contains(word)),
+          reason: 'the Face ID prompt must not mention "$word"',
+        );
+      }
+    });
+  });
+
   group('no network (CLAUDE.md section 6)', () {
     test('the release manifest does not request INTERNET', () {
       // src/main is the only manifest merged into a release build, so this is
@@ -140,6 +313,81 @@ void main() {
         reason:
             'if a build breaks because something wants INTERNET, remove the '
             'dependency rather than the permission',
+      );
+    });
+
+    test('no dependency injects a permission into the release manifest', () {
+      // The check above reads only this app's own manifest, and a dependency
+      // can add a permission of its own during Android's manifest merge --
+      // which that check would never see. Section 6 makes the absence of
+      // INTERNET the thing that keeps the no-network promise verifiable, so
+      // the plugins have to be looked at too.
+      //
+      // Two different rules apply. INTERNET can never be acknowledged: it is
+      // the promise. Anything else is a decision someone has to make and
+      // record, which is what acknowledgedPermissions is -- a new permission
+      // fails this test until a person has looked at it and written down why
+      // it is acceptable.
+      final config = File('.dart_tool/package_config.json');
+      expect(
+        config.existsSync(),
+        isTrue,
+        reason: 'run flutter pub get before this suite',
+      );
+
+      final packages =
+          (jsonDecode(config.readAsStringSync())
+                  as Map<String, Object?>)['packages']!
+              as List<Object?>;
+
+      final unacknowledged = <String>[];
+      final networkPermissions = <String>[];
+      for (final entry in packages.cast<Map<String, Object?>>()) {
+        // Two things bite here, and both make this check silently pass while
+        // looking at nothing. A rootUri has no trailing slash, so resolving
+        // against it drops the package directory; and it may be relative, in
+        // which case it is relative to package_config.json rather than to the
+        // working directory.
+        final rawRoot = entry['rootUri']! as String;
+        final root = config.absolute.uri.resolve(
+          rawRoot.endsWith('/') ? rawRoot : '$rawRoot/',
+        );
+        final manifest = File.fromUri(
+          root.resolve('android/src/main/AndroidManifest.xml'),
+        );
+        if (!manifest.existsSync()) continue;
+
+        final name = entry['name']! as String;
+        final declared = RegExp(r'android\.permission\.[A-Z_]+')
+            .allMatches(manifest.readAsStringSync())
+            .map((m) => m[0]!)
+            .toSet();
+
+        for (final permission in declared) {
+          if (_networkPermissions.contains(permission)) {
+            networkPermissions.add('$name: $permission');
+          } else if (!(acknowledgedPermissions[name] ?? const {}).contains(
+            permission,
+          )) {
+            unacknowledged.add('$name: $permission');
+          }
+        }
+      }
+
+      expect(
+        networkPermissions,
+        isEmpty,
+        reason:
+            'a dependency wants network access. Section 6 is explicit: remove '
+            'the dependency rather than the permission.',
+      );
+      expect(
+        unacknowledged,
+        isEmpty,
+        reason:
+            'a dependency declares an Android permission nobody has signed off '
+            'on. Read what it is for, then add it to acknowledgedPermissions '
+            'with a comment -- or drop the dependency.',
       );
     });
 

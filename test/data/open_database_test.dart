@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:period/data/database/open_database.dart';
+import 'package:period/data/database/encryption.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
@@ -15,6 +15,11 @@ import 'package:test/test.dart';
 ///
 /// The only check worth trusting is the one below: write a file with a key,
 /// then try to read it without one.
+///
+/// The guard itself now lives in encryption.dart, shared with the backup
+/// export. This file keeps its name because CLAUDE.md section 6 names it as
+/// one of the two things standing between this app and shipping a plaintext
+/// database again.
 void main() {
   late Directory dir;
   late String path;
@@ -40,6 +45,68 @@ void main() {
       returnsNormally,
       reason: 'check the hooks.user_defines block in pubspec.yaml',
     );
+  });
+
+  group('the guard fires on a build with no encryption', () {
+    // Every other test here proves the database IS encrypted on this build.
+    // None of them proves this function would *notice* a build where the
+    // cipher library was not linked -- and that is the whole reason it exists.
+    // Removing the check entirely left this file green until the cipher read
+    // was made injectable, which is exactly how a guard stops guarding without
+    // anyone finding out.
+    //
+    // This is the failure section 6 says has already happened once: an unknown
+    // pragma is a silent no-op, so PRAGMA key succeeds, changes nothing, and
+    // every query works perfectly against a plaintext file.
+
+    test('nothing back from PRAGMA cipher is refused', () {
+      final database = sqlite3.open(path);
+      addTearDown(database.close);
+
+      expect(
+        () => applyKeyAndVerify(database, key, readCipher: (_) => null),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('an empty answer is refused too', () {
+      final database = sqlite3.open(path);
+      addTearDown(database.close);
+
+      expect(
+        () => applyKeyAndVerify(database, key, readCipher: (_) => ''),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('the message points at the cause rather than the symptom', () {
+      final database = sqlite3.open(path);
+      addTearDown(database.close);
+
+      expect(
+        () => applyKeyAndVerify(database, key, readCipher: (_) => null),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            allOf(
+              contains('written in the clear'),
+              contains('hooks.user_defines'),
+            ),
+          ),
+        ),
+      );
+    });
+
+    test('a real answer is accepted', () {
+      final database = sqlite3.open(path);
+      addTearDown(database.close);
+
+      expect(
+        () => applyKeyAndVerify(database, key, readCipher: (_) => 'aes256cbc'),
+        returnsNormally,
+      );
+    });
   });
 
   test('a written database cannot be read without the key', () {

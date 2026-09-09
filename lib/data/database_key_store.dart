@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -77,21 +76,4 @@ class SecureDatabaseKeyStore implements DatabaseKeyStore {
     );
     return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
-}
-
-/// Escapes [key] for use in `PRAGMA key`.
-///
-/// The key is generated hex so it cannot contain a quote today, but building SQL
-/// by concatenation without escaping is a habit worth not forming, and a future
-/// key format might not be so tidy.
-String pragmaKeyStatement(String key) {
-  final escaped = key.replaceAll("'", "''");
-  return "PRAGMA key = '$escaped'";
-}
-
-/// Never log or serialise the key. This exists to make that explicit at the
-/// call site rather than relying on nobody being curious.
-extension DatabaseKeySafety on String {
-  /// A redacted form safe to appear in an error message.
-  String get redactedKey => '<${utf8.encode(this).length} byte key, redacted>';
 }

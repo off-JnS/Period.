@@ -51,6 +51,13 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      # Rebuilds the old-schema classes the migration test needs, from the JSON
+      # dumps in drift_schemas/ -- which ARE committed and are the source of
+      # truth for what each shipped schema looked like. Section 5 requires that
+      # test, so this step is what lets it run from a clean checkout.
+      - name: Generate migration schemas
+        run: dart run drift_dev schema generate drift_schemas/ test/data/generated/
+
       # Only hand-written sources. git ls-files lists tracked files, and
       # generated output is gitignored, so it is excluded by construction rather
       # than by a pattern that could drift out of date.

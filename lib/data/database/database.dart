@@ -9,13 +9,14 @@ import '../../domain/models/cycle_date.dart';
 import '../../domain/models/day_entry.dart';
 import 'converters.dart';
 import 'daos/log_dao.dart';
+import 'daos/settings_dao.dart';
 import 'tables.dart';
 
 part 'database.g.dart';
 
 /// The on-device database.
 ///
-/// Schema version 1. Read section 5 before changing anything here: there is no
+/// Schema version 2. Read section 5 before changing anything here: there is no
 /// cloud backup and no recovery path, so a broken migration destroys a user's
 /// data permanently. Migrations are additive only, a shipped one is never
 /// edited, and every one needs a test that builds the previous schema, fills it
@@ -25,13 +26,16 @@ part 'database.g.dart';
 /// current phase, cycle day number, fertile window. Section 4 computes all of
 /// them on read from [PeriodStarts], because users retroactively correct start
 /// dates constantly and any stored derivative is stale from that moment on.
-@DriftDatabase(tables: [PeriodStarts, DayEntries, DaySymptoms], daos: [LogDao])
+@DriftDatabase(
+  tables: [PeriodStarts, DayEntries, DaySymptoms, Settings],
+  daos: [LogDao, SettingsDao],
+)
 class AppDatabase extends _$AppDatabase {
   /// Opens the database over [executor].
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -39,15 +43,19 @@ class AppDatabase extends _$AppDatabase {
       await migrator.createAll();
     },
     onUpgrade: (migrator, from, to) async {
-      // Nothing to do yet -- version 1 is the first schema, so this branch is
-      // unreachable today. It is written now, while there is nothing to lose,
-      // rather than under pressure during a real migration.
+      // The file has already been copied to <db>.backup-v<from> by
+      // backUpBeforeMigration before this runs.
       //
-      // Whoever adds the first migration: the file has already been copied to
-      // <db>.backup-v<from> by backUpBeforeMigration before this runs. Add the
-      // step here, never edit an earlier one, and write the round-trip test
-      // section 5 requires before shipping it.
-      throw StateError('No migration from schema $from to $to exists yet');
+      // Each step guards its own version and none of them is an `else`, so a
+      // database several versions behind runs every step in turn rather than
+      // only the last. Never edit a step once it has shipped: someone's phone
+      // still has the schema it was written for. Add a new one below, and the
+      // round-trip test section 5 requires along with it.
+
+      // v2 adds the settings table. Purely additive -- nothing that already
+      // exists is touched, so every row in every other table survives
+      // unchanged.
+      if (from < 2) await migrator.createTable(settings);
     },
   );
 }
