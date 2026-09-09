@@ -216,4 +216,74 @@ void main() {
       Scaffold(body: LogEntrySheet(date: aDate(2024, 4, 15))),
     );
   });
+
+  group('the Today button never covers what it sits over', () {
+    // A floating button is drawn on top of the list, so the list has to end
+    // above it. Today reserves that space as bottom padding, and a number
+    // chosen once by eye is exactly the kind of thing that stops being right
+    // when the text grows, the locale changes, or the button gains a word.
+    //
+    // The thing being protected is the doctor hint's dismiss button, the last
+    // control in the list. Covered, it cannot be tapped, and the hint cannot be
+    // got rid of. Nothing else on the screen would look wrong.
+    //
+    // Checked to 3x because iOS accessibility text sizes go well past the 2x
+    // Android tops out at, and 2x passing says nothing about 3x.
+    final data = TodayViewData(
+      cycleDay: 34,
+      typicalCycleLength: 28,
+      prediction: PredictedPeriod(
+        earliest: aDate(2024, 4, 26),
+        latest: aDate(2024, 4, 30),
+      ),
+      fertileWindow: FertileWindowEstimate(
+        earliest: aDate(2024, 4, 6),
+        latest: aDate(2024, 4, 20),
+      ),
+      showDoctorHint: true,
+    );
+
+    for (final locale in ['en', 'de']) {
+      for (final textScale in [1.0, 2.0, 3.0]) {
+        testWidgets('$locale at ${textScale}x text', (tester) async {
+          await pumpApp(
+            tester,
+            TodayScreen(data: data, onLogToday: () {}),
+            locale: Locale(locale),
+            textScale: textScale,
+          );
+
+          // Scrolled to the very end, which is the only place the two can meet.
+          // A lazily built list reports a maxScrollExtent that grows as more of
+          // it is built, so one jump lands short of the end and every
+          // measurement taken there is wrong -- including, once, the
+          // measurement that said this was broken. Jump until it stops moving.
+          final position = tester
+              .state<ScrollableState>(find.byType(Scrollable))
+              .position;
+          var previous = -1.0;
+          for (var i = 0; i < 20 && position.maxScrollExtent != previous; i++) {
+            previous = position.maxScrollExtent;
+            position.jumpTo(position.maxScrollExtent);
+            await tester.pumpAndSettle();
+          }
+          expect(
+            position.pixels,
+            position.maxScrollExtent,
+            reason: 'the list did not reach its end, so nothing below is true',
+          );
+
+          final button = tester.getRect(find.byType(FloatingActionButton));
+          final dismiss = tester.getRect(find.byType(TextButton).last);
+          expect(
+            dismiss.overlaps(button),
+            isFalse,
+            reason:
+                'the log button covers the dismiss button at ${textScale}x in '
+                '$locale: dismiss $dismiss, button $button',
+          );
+        });
+      }
+    }
+  });
 }
