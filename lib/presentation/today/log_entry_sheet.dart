@@ -4,6 +4,7 @@ import '../../domain/models/cycle_date.dart';
 import '../../domain/models/day_entry.dart';
 import '../../domain/models/symptom.dart';
 import '../../l10n/app_localizations.dart';
+import '../symptom_labels.dart';
 
 /// The symptoms offered in the UI.
 ///
@@ -154,7 +155,7 @@ class _LogEntrySheetState extends State<LogEntrySheet> {
                 children: [
                   for (final key in offeredSymptomKeys)
                     FilterChip(
-                      label: Text(_symptomLabel(l10n, key)),
+                      label: Text(symptomLabel(l10n, key)),
                       selected: _symptomKeys.contains(key),
                       onSelected: (selected) => setState(() {
                         selected
@@ -214,21 +215,6 @@ String _flowLabel(AppLocalizations l10n, FlowIntensity flow) => switch (flow) {
   FlowIntensity.light => l10n.flowLight,
   FlowIntensity.medium => l10n.flowMedium,
   FlowIntensity.heavy => l10n.flowHeavy,
-};
-
-/// Translates a stored symptom key for display.
-///
-/// An unknown key falls back to the key itself rather than crashing: a database
-/// restored from a newer version of the app may contain symptoms this build has
-/// never heard of, and showing something is better than losing her data.
-String _symptomLabel(AppLocalizations l10n, String key) => switch (key) {
-  'cramps' => l10n.symptomCramps,
-  'headache' => l10n.symptomHeadache,
-  'tiredness' => l10n.symptomTiredness,
-  'bloating' => l10n.symptomBloating,
-  'mood_change' => l10n.symptomMoodChange,
-  'back_pain' => l10n.symptomBackPain,
-  _ => key,
 };
 
 String _formatDay(BuildContext context, CycleDate date) =>

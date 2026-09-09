@@ -143,7 +143,12 @@ void main() {
           // to name them.
           if (line.trimLeft().startsWith('//')) continue;
           for (final entry in forbidden.entries) {
-            if (line.contains(entry.key)) {
+            // Whole words. A plain substring match flags any identifier that
+            // merely contains one of these -- periodDurationFrom, say, whose
+            // name comes straight out of docs/cycle-logic.md section 1. This
+            // still catches every real use: Duration(days: 1), a `DateTime?`
+            // field, `.millisecondsSinceEpoch`.
+            if (RegExp('\\b${entry.key}\\b').hasMatch(line)) {
               offenders.add(
                 '${file.path}:${i + 1}: ${entry.key} — ${entry.value}',
               );

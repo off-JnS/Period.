@@ -472,5 +472,93 @@
   "@fertileWindowNeedsEstimates": {
     "description": "Replaces the fertile window caveat in a mode where predictions are off. Explains why the switch cannot be used rather than leaving it silently inert."
   }
+,
+  "analysisTitle": "Your history",
+  "@analysisTitle": {
+    "description": "Title of the analysis screen. Names whose it is and what it is: a record, not an assessment."
+  },
+  "navAnalysis": "History",
+  "@navAnalysis": {
+    "description": "Label of the History tab in the bottom navigation bar."
+  },
+  "typicalCycleLength": "Your typical cycle",
+  "@typicalCycleLength": {
+    "description": "Label above the median cycle length. \"Typical\" and \"your\" rather than \"average\" or \"normal\": it describes her, and says nothing about whether it is usual for anyone else."
+  },
+  "typicalPeriodLength": "Typical period",
+  "@typicalPeriodLength": {
+    "description": "Label for the median period duration."
+  },
+  "daysCount": "{count, plural, =1{1 day} other{{count} days}}",
+  "@daysCount": {
+    "description": "A number of days.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bleedingDays": "{count, plural, =1{1 day bleeding} other{{count} days bleeding}}",
+  "@bleedingDays": {
+    "description": "How many consecutive days of flow were recorded from a period start.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "rangeOfLengths": "Between {shortest} and {longest} days so far",
+  "@rangeOfLengths": {
+    "description": "The shortest and longest cycles recorded. \"So far\" because it is a record of what has happened, not a bound on what will.",
+    "placeholders": {
+      "shortest": {
+        "type": "int"
+      },
+      "longest": {
+        "type": "int"
+      }
+    }
+  },
+  "cyclesRecorded": "cycles recorded",
+  "@cyclesRecorded": {
+    "description": "Caption under the count of completed cycles."
+  },
+  "daysLogged": "days logged",
+  "@daysLogged": {
+    "description": "Caption under the count of days with anything recorded."
+  },
+  "cycleLengthsHeading": "Cycle lengths",
+  "@cycleLengthsHeading": {
+    "description": "Heading above the bar chart."
+  },
+  "cycleByCycleHeading": "Cycle by cycle",
+  "@cycleByCycleHeading": {
+    "description": "Heading above the list that carries the chart's numbers in words."
+  },
+  "symptomsLoggedHeading": "What you log most",
+  "@symptomsLoggedHeading": {
+    "description": "Heading above the symptom tallies. Describes her logging, never suggests a pattern means anything."
+  },
+  "cycleLengthChartDescription": "{count, plural, =1{A chart of 1 cycle length. The same numbers are listed below.} other{A chart of {count} cycle lengths. The same numbers are listed below.}}",
+  "@cycleLengthChartDescription": {
+    "description": "Spoken description of the chart. A chart says nothing to a screen reader, so this points at the list that carries every value.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notEnoughCyclesYet": "Two complete cycles are needed before there is a typical length to show.",
+  "@notEnoughCyclesYet": {
+    "description": "Shown in place of the headline number when there is too little history. States what is missing rather than showing a guess."
+  },
+  "nothingToAnalyseYet": "Nothing logged yet",
+  "@nothingToAnalyseYet": {
+    "description": "Heading of the empty state."
+  },
+  "nothingToAnalyseYetDetail": "Once you have marked a period start or two, what you record will show up here.",
+  "@nothingToAnalyseYetDetail": {
+    "description": "Explains the empty state so a blank screen does not read as broken."
+  }
 
 }
