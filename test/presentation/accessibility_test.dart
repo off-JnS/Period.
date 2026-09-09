@@ -273,9 +273,7 @@ void main() {
             reason: 'the list did not reach its end, so nothing below is true',
           );
 
-          final button = tester.getRect(
-            find.byType(FloatingActionButton),
-          );
+          final button = tester.getRect(find.byType(FloatingActionButton));
           final dismiss = tester.getRect(find.byType(TextButton).last);
           expect(
             dismiss.overlaps(button),
