@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
+import 'analysis/analysis_page.dart';
 import 'calendar/calendar_page.dart';
 import 'settings/settings_page.dart';
 import 'today/today_page.dart';
 
 /// The app's top level: the screens, and the bar that switches between them.
 ///
-/// Section 2 names four presentation areas. Three exist; analysis joins this
-/// list when it arrives, which is why the destinations are a bar rather than a
-/// button on one screen pointing at the other.
+/// Section 2's four presentation areas, all of them now built.
 class AppShell extends StatefulWidget {
   /// Creates the shell.
   const AppShell({super.key});
@@ -32,7 +31,12 @@ class _AppShellState extends State<AppShell> {
       // the correction workflow the calendar exists for tedious.
       body: IndexedStack(
         index: _index,
-        children: const [TodayPage(), CalendarPage(), SettingsPage()],
+        children: const [
+          TodayPage(),
+          CalendarPage(),
+          AnalysisPage(),
+          SettingsPage(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -47,6 +51,11 @@ class _AppShellState extends State<AppShell> {
             icon: const Icon(Icons.calendar_month_outlined),
             selectedIcon: const Icon(Icons.calendar_month),
             label: l10n.navCalendar,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.insights_outlined),
+            selectedIcon: const Icon(Icons.insights),
+            label: l10n.navAnalysis,
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),

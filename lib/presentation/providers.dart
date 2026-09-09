@@ -89,6 +89,14 @@ final dayEntryProvider = FutureProvider.family<DayEntry?, CycleDate>(
   (ref, date) => ref.watch(databaseProvider).logDao.entryOn(date),
 );
 
+/// Every logged day, oldest first.
+///
+/// The whole history rather than a range: the analysis screen summarises all of
+/// it, and a user with years of entries still has only a few thousand rows.
+final allEntriesProvider = FutureProvider<List<DayEntry>>(
+  (ref) => ref.watch(databaseProvider).logDao.allEntries(),
+);
+
 /// Every day with an entry between the two dates, inclusive.
 ///
 /// A set rather than a list: the calendar asks "is this day logged?" once per

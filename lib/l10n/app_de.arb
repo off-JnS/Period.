@@ -108,5 +108,22 @@
   "unlockReason": "Zum Fortfahren entsperren"
 ,
   "fertileWindowNeedsEstimates": "Benötigt Schätzungen, die in diesem Modus aus sind. Das Zeitfenster wird von einer geschätzten Periode zurückgerechnet, es gibt also nichts anzuzeigen."
+,
+  "analysisTitle": "Dein Verlauf",
+  "navAnalysis": "Verlauf",
+  "typicalCycleLength": "Dein typischer Zyklus",
+  "typicalPeriodLength": "Typische Periode",
+  "daysCount": "{count, plural, =1{1 Tag} other{{count} Tage}}",
+  "bleedingDays": "{count, plural, =1{1 Tag Blutung} other{{count} Tage Blutung}}",
+  "rangeOfLengths": "Bisher zwischen {shortest} und {longest} Tagen",
+  "cyclesRecorded": "Zyklen erfasst",
+  "daysLogged": "Tage eingetragen",
+  "cycleLengthsHeading": "Zykluslängen",
+  "cycleByCycleHeading": "Zyklus für Zyklus",
+  "symptomsLoggedHeading": "Was du am häufigsten einträgst",
+  "cycleLengthChartDescription": "{count, plural, =1{Ein Diagramm mit 1 Zykluslänge. Dieselben Zahlen stehen darunter.} other{Ein Diagramm mit {count} Zykluslängen. Dieselben Zahlen stehen darunter.}}",
+  "notEnoughCyclesYet": "Für eine typische Länge braucht es zwei abgeschlossene Zyklen.",
+  "nothingToAnalyseYet": "Noch nichts eingetragen",
+  "nothingToAnalyseYetDetail": "Sobald du einen Periodenbeginn eingetragen hast, erscheint hier, was du erfasst."
 
 }

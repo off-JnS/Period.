@@ -4,6 +4,9 @@ import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
+import 'package:period/domain/logic/logged_summary.dart';
+import 'package:period/domain/models/symptom.dart';
+import 'package:period/presentation/analysis/analysis_screen.dart';
 import 'package:period/presentation/calendar/month_grid.dart';
 import 'package:period/presentation/lock/lock_screen.dart';
 import 'package:period/presentation/settings/passphrase_dialog.dart';
@@ -147,6 +150,40 @@ void main() {
 
     testWidgets('dark', (tester) async {
       await expectAccessibleInDark(tester, screen(const SettingsViewData()));
+    });
+  });
+
+  group('the history screen', () {
+    final history = AnalysisViewData(
+      cycles: [
+        for (var i = 0; i < 4; i++)
+          CycleSummary(
+            startedOn: DateTime(2024, 1 + i, 3),
+            lengthInDays: 27 + i,
+            periodDays: 4,
+          ),
+      ],
+      symptoms: const [SymptomTally(symptom: Symptom(key: 'cramps'), days: 9)],
+      daysLogged: 20,
+      typicalLength: 28,
+      shortestLength: 27,
+      longestLength: 30,
+      typicalPeriodDays: 4,
+    );
+
+    testWidgets('light', (tester) async {
+      await expectAccessible(tester, AnalysisScreen(data: history));
+    });
+
+    testWidgets('empty', (tester) async {
+      await expectAccessible(
+        tester,
+        const AnalysisScreen(data: AnalysisViewData()),
+      );
+    });
+
+    testWidgets('dark', (tester) async {
+      await expectAccessibleInDark(tester, AnalysisScreen(data: history));
     });
   });
 
