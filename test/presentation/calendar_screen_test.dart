@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_date.dart';
@@ -292,5 +293,64 @@ void main() {
       find.bySemanticsLabel('3. April 2024, Periodenbeginn'),
       findsWidgets,
     );
+  });
+
+  group('the month keeps its year at any text size', () {
+    // The month moved into the app bar, between two icon buttons, which is a
+    // far tighter box than the full-width row it replaced. On a 320px phone at
+    // 200% text "September 2024" wants 216px and is given 184, so without a
+    // second line the year is what gets dropped -- and the year is the half
+    // that matters when paging across January.
+    //
+    // Checked rather than clamped: the comment on the day grid promises that
+    // everything outside it, the month included, still scales all the way.
+    for (final month in [9, 11, 12]) {
+      for (final width in [320.0, 400.0]) {
+        testWidgets('month $month at 200% on ${width.toInt()}px', (
+          tester,
+        ) async {
+          final day = aDate(2024, month, 15);
+          await pumpApp(
+            tester,
+            CalendarScreen(
+              data: data(now: day),
+              grid: MonthGrid.of(day, firstWeekday: 1),
+              onSelectDay: (_) {},
+            ),
+            locale: const Locale('de'),
+            textScale: 2,
+            surface: Size(width, 900),
+          );
+
+          final title = find.descendant(
+            of: find.byType(AppBar),
+            matching: find.byType(Text),
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(title.first);
+          expect(
+            paragraph.didExceedMaxLines,
+            isFalse,
+            reason:
+                'the month title is truncated at 200% text on '
+                '${width.toInt()}px',
+          );
+
+          // Both halves are needed and only this catches the second. Letting
+          // the text take a second line without growing the bar to hold it
+          // puts the title at -9..65 inside a 0..56 bar: it spills out of both
+          // ends and is clipped, and nothing throws. A test that only asked
+          // whether the paragraph was truncated passed that happily.
+          final bar = tester.getRect(find.byType(AppBar));
+          final rect = tester.getRect(title.first);
+          expect(
+            rect.top >= bar.top && rect.bottom <= bar.bottom,
+            isTrue,
+            reason:
+                'the month title is drawn outside the app bar at 200% text on '
+                '${width.toInt()}px: title $rect, bar $bar',
+          );
+        });
+      }
+    }
   });
 }

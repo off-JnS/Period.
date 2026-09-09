@@ -14,6 +14,7 @@ import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/log_entry_sheet.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
+import '../support/models.dart';
 import '../support/dates.dart';
 import '../support/widgets.dart';
 
@@ -82,9 +83,7 @@ void main() {
     testWidgets('a fresh install', (tester) async {
       await expectAccessible(
         tester,
-        screen(
-          const TodayViewData(prediction: NotEnoughCycles(have: 0, need: 2)),
-        ),
+        screen(aTodayView(prediction: NotEnoughCycles(have: 0, need: 2))),
       );
     });
 
@@ -92,7 +91,7 @@ void main() {
       await expectAccessible(
         tester,
         screen(
-          TodayViewData(
+          aTodayView(
             cycleDay: 17,
             typicalCycleLength: 28,
             prediction: PredictedPeriod(
@@ -112,9 +111,7 @@ void main() {
     testWidgets('dark', (tester) async {
       await expectAccessibleInDark(
         tester,
-        screen(
-          const TodayViewData(prediction: NotEnoughCycles(have: 0, need: 2)),
-        ),
+        screen(aTodayView(prediction: NotEnoughCycles(have: 0, need: 2))),
       );
     });
   });
@@ -229,7 +226,7 @@ void main() {
     //
     // Checked to 3x because iOS accessibility text sizes go well past the 2x
     // Android tops out at, and 2x passing says nothing about 3x.
-    final data = TodayViewData(
+    final data = aTodayView(
       cycleDay: 34,
       typicalCycleLength: 28,
       prediction: PredictedPeriod(

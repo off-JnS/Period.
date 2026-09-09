@@ -156,6 +156,7 @@ TodayViewData _todayFrom(
   final eligible = eligibleForStatistics(cyclesFrom(starts));
 
   return TodayViewData(
+    today: today,
     cycleDay: cycleDayOn(today, starts),
     typicalCycleLength: _typicalLength(eligible),
     prediction: prediction,

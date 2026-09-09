@@ -15,12 +15,20 @@ import 'cycle_day_ring.dart';
 class TodayViewData {
   /// Creates the view data.
   const TodayViewData({
+    required this.today,
     required this.prediction,
     this.cycleDay,
     this.typicalCycleLength,
     this.fertileWindow,
     this.showDoctorHint = false,
   });
+
+  /// The calendar day it is now.
+  ///
+  /// Shown in the app bar, where the screen's name used to be. The tab
+  /// directly below already says "Today", so repeating it bought nothing; the
+  /// date is the one thing this screen never told her.
+  final CycleDate today;
 
   /// The current cycle day, or null when nothing has been logged.
   final int? cycleDay;
@@ -77,7 +85,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final data = widget.data;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.todayTitle)),
+      appBar: AppBar(title: Text(formatTodayHeading(context, data.today))),
       floatingActionButton: widget.onLogToday == null
           ? null
           : FloatingActionButton.extended(
@@ -312,6 +320,20 @@ class _InfoCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Formats today's date for the app bar, in the reader's locale.
+///
+/// Fuller than [_formatDay]: this one is the heading, so it carries the weekday
+/// as well. Shared with `today_page.dart`, which needs the same heading while
+/// the screen is still loading and when it has failed.
+///
+/// A [DateTime] purely as an argument to the formatter, never stored and never
+/// returned, exactly as in [_formatDay].
+String formatTodayHeading(BuildContext context, CycleDate date) {
+  final locale = Localizations.localeOf(context).toLanguageTag();
+  return DateFormat.MMMMEEEEd(locale)
+      .format(DateTime(date.year, date.month, date.day));
 }
 
 /// Formats one day for display in the reader's locale.

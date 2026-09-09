@@ -87,45 +87,45 @@ class CalendarScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.calendarTitle)),
+      // The month, not the word "Calendar". The tab directly below already says
+      // that, so the bar said nothing and the month -- the only part of this
+      // screen that changes -- was a smaller heading underneath it. Moving the
+      // arrows up with it removes a whole row from a screen that scrolls.
+      appBar: AppBar(
+        // Grows with the text, so the title can take a second line instead of
+        // losing its end. A bar with two icon buttons in it is a much tighter
+        // box than the full-width row this replaced: at 200% text on a 320px
+        // phone "September 2024" wants 216px and would be given 184, and the
+        // year is what gets cut. The grid below clamps rather than wraps
+        // because seven columns of digits cannot do this; the month can, and
+        // the comment there promises it still scales all the way.
+        toolbarHeight: MediaQuery.textScalerOf(context).scale(kToolbarHeight),
+        // The label goes on the icon, not only in the tooltip: a tooltip is
+        // announced when it is shown, and on a touch device it never is, so
+        // these two would reach a screen reader as unnamed buttons. They are
+        // the only way to move through the calendar.
+        leading: IconButton(
+          onPressed: onPreviousMonth,
+          icon: Icon(Icons.chevron_left, semanticLabel: l10n.previousMonth),
+          tooltip: l10n.previousMonth,
+        ),
+        title: Text(
+          DateFormat.yMMMM(locale)
+              .format(DateTime(grid.month.year, grid.month.month)),
+          maxLines: 2,
+        ),
+        actions: [
+          IconButton(
+            onPressed: onNextMonth,
+            icon: Icon(Icons.chevron_right, semanticLabel: l10n.nextMonth),
+            tooltip: l10n.nextMonth,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           children: [
-            Row(
-              children: [
-                // The label goes on the icon, not only in the tooltip: a
-                // tooltip is announced when it is shown, and on a touch device
-                // it never is, so these two would reach a screen reader as
-                // unnamed buttons. They are the only way to move through the
-                // calendar.
-                IconButton(
-                  onPressed: onPreviousMonth,
-                  icon: Icon(
-                    Icons.chevron_left,
-                    semanticLabel: l10n.previousMonth,
-                  ),
-                  tooltip: l10n.previousMonth,
-                ),
-                Expanded(
-                  child: Text(
-                    DateFormat.yMMMM(locale)
-                        .format(DateTime(grid.month.year, grid.month.month)),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  onPressed: onNextMonth,
-                  icon: Icon(
-                    Icons.chevron_right,
-                    semanticLabel: l10n.nextMonth,
-                  ),
-                  tooltip: l10n.nextMonth,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
             // Seven columns of digits is the one part of this screen that
             // cannot absorb unlimited text scaling: past about 1.3 the numbers
             // are wider than a seventh of a phone and get cut off, which is
