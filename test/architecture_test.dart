@@ -19,6 +19,38 @@ const acknowledgedPermissions = <String, Set<String>>{
   'local_auth_android': {'android.permission.USE_BIOMETRIC'},
 };
 
+/// Which packages list [name] among their dependencies.
+///
+/// Only used to name the culprit in a failure. Tracing this by hand is the
+/// slow part of answering "why is this in my build at all".
+List<String> _runtimeDependentsOf(
+  String name,
+  List<Map<String, dynamic>> packages,
+) => [
+  for (final package in packages)
+    if ((package['dependencies'] as List<dynamic>).contains(name))
+      package['name'] as String,
+];
+
+/// Packages section 6 forbids without exception.
+///
+/// One copy, checked twice: once against the names written in `pubspec.yaml`,
+/// and once against everything a shipped build actually pulls in. Two lists
+/// would drift, and the one that drifted would be the one nobody was reading.
+const bannedNetworkPackages = <String>{
+  'http',
+  'dio',
+  'web_socket_channel',
+  'grpc',
+  'firebase_core',
+  'firebase_analytics',
+  'firebase_crashlytics',
+  'sentry',
+  'sentry_flutter',
+  'purchases_flutter',
+  'google_mobile_ads',
+};
+
 /// Permissions that can never be acknowledged, because they are the promise.
 ///
 /// Section 6 makes the absence of INTERNET what makes "this app makes no
@@ -484,23 +516,85 @@ void main() {
         reason: 'failed to parse the dependencies block',
       );
 
-      const banned = {
-        'http',
-        'dio',
-        'web_socket_channel',
-        'grpc',
-        'firebase_core',
-        'firebase_analytics',
-        'firebase_crashlytics',
-        'sentry',
-        'sentry_flutter',
-        'purchases_flutter',
-        'google_mobile_ads',
-      };
       expect(
-        runtimeDependencies.toSet().intersection(banned),
+        runtimeDependencies.toSet().intersection(bannedNetworkPackages),
         isEmpty,
         reason: 'CLAUDE.md section 6 forbids these without exception',
+      );
+    });
+
+    test('nor is anything a runtime dependency drags in', () {
+      // The check above reads the names written in pubspec.yaml, which is the
+      // right error message for someone adding `http` by hand and no help at
+      // all if share_plus starts depending on it. This one asks what a shipped
+      // build actually contains.
+      //
+      // It matters most on iOS. Android fails closed either way, because the
+      // release manifest declares no INTERNET and the permission scan above is
+      // genuinely transitive -- but iOS has no equivalent gate, so on that
+      // platform nothing else would stop a transitive HTTP client.
+      //
+      // `web_socket_channel` is in pubspec.lock and is on the banned list, and
+      // that is fine: it arrives through build_runner and test, both dev
+      // dependencies, so it never ships. Distinguishing the two is the whole
+      // job here, which is why the dev/runtime split is asserted below rather
+      // than assumed.
+      final result = Process.runSync('dart', ['pub', 'deps', '--json']);
+      expect(
+        result.exitCode,
+        0,
+        reason:
+            'dart pub deps failed, so this guard checked nothing:\n'
+            '${result.stderr}',
+      );
+
+      final graph = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final packages = (graph['packages'] as List<dynamic>)
+          .cast<Map<String, dynamic>>();
+      final byName = {
+        for (final package in packages) package['name'] as String: package,
+      };
+
+      /// Everything reachable from the direct (non-dev) dependencies.
+      final shipped = <String>{};
+      final pending = [
+        for (final package in packages)
+          if (package['kind'] == 'direct') package['name'] as String,
+      ];
+      while (pending.isNotEmpty) {
+        final name = pending.removeLast();
+        if (!shipped.add(name)) continue;
+        final package = byName[name];
+        if (package == null) continue;
+        pending.addAll((package['dependencies'] as List<dynamic>).cast());
+      }
+
+      expect(
+        shipped,
+        isNotEmpty,
+        reason: 'the walk found nothing, so the check below is vacuous',
+      );
+      expect(
+        shipped.length,
+        lessThan(byName.length),
+        reason:
+            'every resolved package ended up in the shipped set, so dev '
+            'dependencies leaked in and this is no longer checking anything '
+            'about what ships',
+      );
+
+      final offenders = shipped.intersection(bannedNetworkPackages);
+      final trail = [
+        for (final offender in offenders)
+          '$offender, pulled in by '
+              '${_runtimeDependentsOf(offender, packages).join(' and ')}',
+      ].join('; ');
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'CLAUDE.md section 6 forbids these without exception, and a '
+            'shipped build reaches them: $trail',
       );
     });
   });
