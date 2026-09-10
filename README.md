@@ -19,8 +19,18 @@ The promise is meant to be checkable rather than taken on trust:
 
 ## State
 
-Early. This is the foundation only: the layer structure, the calendar-day type
-and the clock. There is no cycle logic, no database and no real UI yet.
+Built, and unreleased. Four screens — Today, Calendar, History, Settings — over
+an encrypted database, with cycle statistics and predictions, the three cycle
+modes where predictions are off, an encrypted backup, an optional app lock,
+screenshot protection, and German and English throughout.
+
+**Nothing has ever run on a phone.** Not on a device, not on an emulator. The
+logic is well tested and the platform integration is not tested at all, because
+nothing here can test it. `docs/verification.md` says exactly which is which,
+and is worth reading before trusting any of the above.
+
+Notifications are the one requirement still unbuilt: the scheduling logic and
+its rules exist, the plugin does not.
 
 ## Layout
 
@@ -73,7 +83,8 @@ one, and checks the plaintext is not on disk. Encryption is selected by the
 touching it, because getting it wrong fails silently.
 
 Those tests run on Linux. Confirming the same holds on a real iPhone or Android
-device is still outstanding.
+device is still outstanding — as is everything else that needs a phone.
+`docs/verification.md` is the full account of what is proven and what is not.
 
 `CLAUDE.md` holds the rules for this repository and is worth reading before
 changing anything — particularly the sections on dates, migrations and the
