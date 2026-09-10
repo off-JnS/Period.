@@ -15,11 +15,14 @@ Future<void> main() async {
   // Opened once, here, rather than lazily inside a provider: it is async and
   // touches the filesystem and the keystore, and a failure to decrypt should
   // stop the app rather than surface as a broken screen.
-  final database = await openEncryptedDatabase();
+  final opened = await openEncryptedDatabase();
 
   runApp(
     ProviderScope(
-      overrides: [databaseProvider.overrideWithValue(database)],
+      overrides: [
+        databaseProvider.overrideWithValue(opened.database),
+        documentsDirectoryProvider.overrideWithValue(opened.documents),
+      ],
       child: const PeriodApp(),
     ),
   );

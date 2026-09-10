@@ -7,6 +7,7 @@ import '../../data/backup/backup_document.dart';
 import '../../data/backup/backup_file.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
+import '../../data/erase_everything.dart';
 import '../../l10n/app_localizations.dart';
 import '../data_error.dart';
 import '../providers.dart';
@@ -215,11 +216,16 @@ class SettingsPage extends ConsumerWidget {
 
   Future<void> _deleteEverything(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
-    await ref.read(databaseProvider).logDao.deleteEverything();
+    await eraseEverything(
+      ref.read(databaseProvider),
+      documents: ref.read(documentsDirectoryProvider),
+    );
 
-    // Everything, including the settings rows -- so the app comes back as a
+    // Everything, including the settings rows, the migration copies beside the
+    // database and the freed pages inside it -- so the app comes back as a
     // fresh install, which is what the confirmation promised and what someone
-    // deleting under pressure needs it to mean.
+    // deleting under pressure needs it to mean. Dropping the rows alone left
+    // her dates in both of those places.
     _refresh(ref);
 
     if (!context.mounted) return;

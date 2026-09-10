@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,16 +25,20 @@ import '../support/widgets.dart';
 /// what "it is reachable now" means.
 void main() {
   late AppDatabase db;
+  late Directory documents;
   late FixedClock clock;
 
   setUp(() {
     db = aDatabase();
+    documents = Directory.systemTemp.createTempSync('period_documents');
+    addTearDown(() => documents.deleteSync(recursive: true));
     clock = FixedClock(aDate(2024, 5, 17));
   });
 
   List<Override> overrides() => [
     databaseProvider.overrideWithValue(db),
     clockProvider.overrideWithValue(clock),
+    documentsDirectoryProvider.overrideWithValue(documents),
   ];
 
   Future<void> pumpSettings(WidgetTester tester) async {
@@ -258,6 +264,24 @@ void main() {
       expect(await db.logDao.allPeriodStarts(), isEmpty);
       expect(await db.logDao.entryOn(aDate(2024, 5, 16)), isNull);
       expect(find.text('Everything deleted'), findsOneWidget);
+    });
+
+    testWidgets('takes the migration copies beside the database too', (
+      tester,
+    ) async {
+      // The screen has to call the erase, not just empty the tables. Dropping
+      // rows was all it did, and section 5's `<db>.backup-v<n>` copies sat
+      // beside the database holding the same entries -- which is not the fresh
+      // install the confirmation promises.
+      await givenEnoughHistory();
+      final copy = File('${documents.path}/$databaseFileName.backup-v1')
+        ..writeAsStringSync('her entries, from before the last migration');
+
+      await pumpSettings(tester);
+      await confirmDelete(tester);
+
+      expect(copy.existsSync(), isFalse);
+      expect(migrationBackupsIn(documents), isEmpty);
     });
 
     testWidgets('takes the cycle mode with it, back to a fresh install', (

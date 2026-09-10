@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/app_lock.dart';
@@ -25,6 +27,18 @@ import 'today/today_screen.dart';
 final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError(
     'Override databaseProvider with an opened AppDatabase.',
+  ),
+);
+
+/// The directory the database and its migration copies live in.
+///
+/// Overridden the same way and for the same reasons as [databaseProvider]:
+/// asking the platform for it is asynchronous, and a default would have tests
+/// reaching into a real documents directory. Section 9's delete needs it,
+/// because deleting her data means deleting the copies of it too.
+final documentsDirectoryProvider = Provider<Directory>(
+  (ref) => throw UnimplementedError(
+    'Override documentsDirectoryProvider with the app documents directory.',
   ),
 );
 

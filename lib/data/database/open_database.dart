@@ -2,15 +2,10 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/sqlite3.dart';
 
 import '../database_key_store.dart';
 import 'database.dart';
 import 'encryption.dart';
-
-/// The database file name. Kept out of line so the backup path derived from it
-/// in [backUpBeforeMigration] cannot drift away from the real one.
-const databaseFileName = 'period.sqlite';
 
 /// Opens the on-device database, encrypted with SQLCipher.
 ///
@@ -26,9 +21,15 @@ const databaseFileName = 'period.sqlite';
 /// [applyKeyAndVerify] in encryption.dart is what stops that being a silent
 /// failure, and open_database_test.dart proves it end to end by reopening a
 /// written file without the key.
-Future<AppDatabase> openEncryptedDatabase({DatabaseKeyStore? keyStore}) async {
+Future<OpenedDatabase> openEncryptedDatabase({
+  DatabaseKeyStore? keyStore,
+}) async {
   final directory = await getApplicationDocumentsDirectory();
   final file = File('${directory.path}/$databaseFileName');
+
+  // The key is read first because the backup below needs it. Reading the
+  // schema version means reading the database, and the database is encrypted.
+  final key = await (keyStore ?? SecureDatabaseKeyStore()).readOrCreateKey();
 
   // Section 5: copy the file before any migration touches it. Runs here rather
   // than inside the migration because by then a transaction is already open and
@@ -36,22 +37,32 @@ Future<AppDatabase> openEncryptedDatabase({DatabaseKeyStore? keyStore}) async {
   await backUpBeforeMigration(
     file,
     AppDatabase(NativeDatabase.memory()).schemaVersion,
-    readSchemaVersion: _readSchemaVersion,
+    readSchemaVersion: (file) => readSchemaVersionOf(file.path, key: key),
   );
 
-  final key = await (keyStore ?? SecureDatabaseKeyStore()).readOrCreateKey();
-
-  return AppDatabase(
-    NativeDatabase(file, setup: (database) => applyKeyAndVerify(database, key)),
+  return OpenedDatabase(
+    database: AppDatabase(
+      NativeDatabase(
+        file,
+        setup: (database) => applyKeyAndVerify(database, key),
+      ),
+    ),
+    documents: directory,
   );
 }
 
-/// Reads the drift schema version already written into [file].
-int _readSchemaVersion(File file) {
-  final database = sqlite3.open(file.path);
-  try {
-    return database.userVersion;
-  } finally {
-    database.close();
-  }
+/// An opened database and the directory it lives in.
+///
+/// The directory is returned rather than asked for again, so that section 9's
+/// delete removes the migration copies from the same place section 5 wrote
+/// them, instead of from wherever a second lookup happened to point.
+class OpenedDatabase {
+  /// Creates the pair.
+  const OpenedDatabase({required this.database, required this.documents});
+
+  /// The opened, decrypted database.
+  final AppDatabase database;
+
+  /// The directory holding the database file and its `.backup-v<n>` copies.
+  final Directory documents;
 }

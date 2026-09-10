@@ -19,8 +19,15 @@ abstract class DatabaseKeyStore {
 
   /// Forgets the key.
   ///
-  /// Only meaningful alongside deleting the database itself -- section 9's
-  /// "delete all data" -- since without the key the file is unreadable anyway.
+  /// **Nothing calls this.** Section 9's "delete all data" deliberately does
+  /// not: the database is still open and in use afterwards, and a key that no
+  /// longer opens it would take the app down along with the data. See
+  /// `eraseEverything`, which empties the rows, vacuums the freed pages and
+  /// removes the migration copies instead.
+  ///
+  /// It stays because rotating the key -- generating a new one and re-encrypting
+  /// -- is a reasonable thing to want, and that would start here. Read this as
+  /// an unused affordance rather than as a protection that is wired up.
   Future<void> deleteKey();
 }
 

@@ -24,6 +24,7 @@ import '../support/widgets.dart';
 /// the encryption, the file on disk, the transaction -- is the code that ships.
 void main() {
   late AppDatabase db;
+  late Directory documents;
   late Directory dir;
   late FakeBackupTransfer transfer;
 
@@ -31,6 +32,8 @@ void main() {
 
   setUp(() {
     db = aDatabase();
+    documents = Directory.systemTemp.createTempSync('period_documents');
+    addTearDown(() => documents.deleteSync(recursive: true));
     dir = Directory.systemTemp.createTempSync('period_backup_flow');
     transfer = FakeBackupTransfer(dir);
   });
@@ -41,6 +44,7 @@ void main() {
     databaseProvider.overrideWithValue(db),
     clockProvider.overrideWithValue(FixedClock(aDate(2024, 5, 17))),
     backupTransferProvider.overrideWithValue(transfer),
+    documentsDirectoryProvider.overrideWithValue(documents),
   ];
 
   Future<void> pumpSettings(WidgetTester tester) async {

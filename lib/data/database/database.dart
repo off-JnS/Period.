@@ -60,6 +60,25 @@ class AppDatabase extends _$AppDatabase {
   );
 }
 
+/// The database file name. Kept out of line so the backup paths derived from it
+/// cannot drift away from the real one.
+const databaseFileName = 'period.sqlite';
+
+/// The migration copies [backUpBeforeMigration] leaves in [documents].
+///
+/// Named by prefix rather than by version, because the point of asking is to
+/// find every one of them without knowing which versions this phone has been
+/// through.
+Iterable<File> migrationBackupsIn(Directory documents) sync* {
+  if (!documents.existsSync()) return;
+  for (final entry in documents.listSync()) {
+    final name = entry.path.split(Platform.pathSeparator).last;
+    if (entry is File && name.startsWith('$databaseFileName.backup-v')) {
+      yield entry;
+    }
+  }
+}
+
 /// Copies the database to `<db>.backup-v<version>` before a migration runs.
 ///
 /// Section 5 requires this. It happens before the file is handed to drift, not

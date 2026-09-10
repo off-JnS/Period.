@@ -55,7 +55,41 @@ String pragmaKeyStatement(String key) {
 
 /// Never log or serialise a key or a passphrase. This exists to make that
 /// explicit at the call site rather than relying on nobody being curious.
+///
+/// Nothing uses it today, and that is the right state of affairs: there is no
+/// logging anywhere in `lib/`, so there is no call site to redact. It is here
+/// for the first one that appears.
 extension DatabaseKeySafety on String {
   /// A redacted form safe to appear in an error message.
   String get redactedKey => '<${utf8.encode(this).length} byte key, redacted>';
+}
+
+/// Reads the drift schema version written into the database at [path].
+///
+/// Applies [key] first, and that is the whole point. Without it this threw
+/// `SqliteException(26): file is not a database` on every launch -- the file is
+/// encrypted, so its header is ciphertext like everything else.
+/// `backUpBeforeMigration` treats a failed read as "do not touch it" and
+/// returns null, so section 5's copy-before-migration was silently never made.
+/// The first real migration would have run with no recovery path, on an app
+/// that by design has no cloud backup.
+///
+/// It stayed invisible because every test of `backUpBeforeMigration` stubs the
+/// read out. `migration_backup_test.dart` now also drives this against a real
+/// encrypted file.
+///
+/// Lives here rather than in `open_database.dart` so that it stays reachable
+/// without dragging in `path_provider`, and because reading through a key is
+/// this file's subject.
+///
+/// A wrong key throws rather than reading as version 0, which matters: 0 means
+/// "fresh file, no backup needed" and would skip the copy just as quietly.
+int readSchemaVersionOf(String path, {required String key}) {
+  final database = sqlite3.open(path);
+  try {
+    applyKeyAndVerify(database, key);
+    return database.userVersion;
+  } finally {
+    database.close();
+  }
 }
