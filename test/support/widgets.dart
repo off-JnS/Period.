@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/l10n/app_localizations.dart';
+import 'package:period/presentation/theme.dart';
 
 /// Wraps [child] in the localisations and theme the app provides, so a widget
 /// under test sees what it sees in the real app.
@@ -21,7 +22,9 @@ Widget appHarness(
     GlobalCupertinoLocalizations.delegate,
   ],
   supportedLocales: AppLocalizations.supportedLocales,
-  theme: ThemeData(useMaterial3: true, brightness: brightness),
+  // The app's own theme, not one built here. A harness that defines its own is
+  // how the dark goldens came to picture an appearance the app did not have.
+  theme: appTheme(brightness: brightness),
   home: child,
 );
 
@@ -35,6 +38,7 @@ Future<void> pumpApp(
   Locale locale = const Locale('en'),
   Brightness brightness = Brightness.light,
   double textScale = 1,
+  bool alwaysUse24HourFormat = false,
   Size surface = const Size(400, 900),
   List<Override> overrides = const [],
 }) async {
@@ -45,7 +49,12 @@ Future<void> pumpApp(
     ProviderScope(
       overrides: overrides,
       child: MediaQuery(
-        data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+        data: MediaQueryData(
+          textScaler: TextScaler.linear(textScale),
+          // The phone's own clock setting, which is separate from the locale:
+          // an English speaker can and does set a 24-hour clock.
+          alwaysUse24HourFormat: alwaysUse24HourFormat,
+        ),
         child: appHarness(child, locale: locale, brightness: brightness),
       ),
     ),

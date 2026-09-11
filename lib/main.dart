@@ -11,6 +11,7 @@ import 'l10n/app_localizations.dart';
 import 'presentation/app_shell.dart';
 import 'presentation/lock/lock_gate.dart';
 import 'presentation/providers.dart';
+import 'presentation/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -111,7 +112,15 @@ class PeriodApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      theme: ThemeData(useMaterial3: true),
+      // Both appearances, from the one place that defines them, so a golden
+      // renders what the app renders. themeMode is left at its default, which
+      // follows the device: there is no in-app appearance switch, because that
+      // would be a second place to change a setting the system already owns.
+      //
+      // Until this was here the app was light in every condition, while six
+      // dark goldens rendered a theme it never built.
+      theme: appLightTheme,
+      darkTheme: appDarkTheme,
       // The gate, not the shell. While locked it replaces the app rather
       // than covering it, so nothing of hers is built behind the lock.
       home: const LockGate(child: AppShell()),
