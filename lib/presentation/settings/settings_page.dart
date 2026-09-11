@@ -7,6 +7,7 @@ import '../../data/backup/backup_document.dart';
 import '../../data/backup/backup_file.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
+import '../../domain/models/reminder_schedule.dart';
 import '../../data/erase_everything.dart';
 import '../../l10n/app_localizations.dart';
 import '../data_error.dart';
@@ -40,6 +41,7 @@ class SettingsPage extends ConsumerWidget {
           cycle: stored.cycle,
           fertileWindowOptedIn: stored.fertileWindowOptedIn,
           appLockEnabled: stored.appLockEnabled,
+          reminder: stored.reminder,
         ),
         lockAvailable: ref.watch(lockAvailableProvider).value ?? false,
         onModeChanged: (mode) => _saveCycle(
@@ -67,6 +69,12 @@ class SettingsPage extends ConsumerWidget {
               .writeAppLockEnabled(enabled: enabled);
           ref.invalidate(settingsProvider);
         },
+        onReminderChanged: (schedule) => _saveReminder(
+          context,
+          ref,
+          schedule,
+          wasEnabled: stored.reminder.enabled,
+        ),
         onDeleteEverything: () => _deleteEverything(context, ref),
         onExportBackup: () => _export(context, ref),
         onRestoreBackup: () => _restore(context, ref),
@@ -84,6 +92,45 @@ class SettingsPage extends ConsumerWidget {
     // One invalidation refreshes the mode here and the estimate on every other
     // screen together: nothing derived is stored, so there is no cache to keep
     // in step (section 4).
+    ref.invalidate(settingsProvider);
+  }
+
+  /// Stores the reminder schedule and makes what is scheduled match it.
+  ///
+  /// The permission is asked for here, at the moment she turns reminders on,
+  /// and never at launch -- a notification prompt on first open, before she has
+  /// asked for anything, is the one everyone refuses.
+  Future<void> _saveReminder(
+    BuildContext context,
+    WidgetRef ref,
+    ReminderSchedule schedule, {
+    required bool wasEnabled,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final reminders = ref.read(remindersProvider);
+    final clock = ref.read(clockProvider);
+    final database = ref.read(databaseProvider);
+
+    // Only when it is being switched on, and only when it was off before.
+    // Asking again on every change to the time would be its own nuisance, and
+    // on iOS the prompt is shown once ever regardless.
+    final turningOn = schedule.enabled && !wasEnabled;
+    if (turningOn && !await reminders.requestPermission()) {
+      // Refused. The switch stays off rather than springing back with no
+      // explanation, and nothing is written: a stored "on" that can never show
+      // anything is a setting that lies.
+      if (context.mounted) _say(context, l10n.reminderPermissionRefused);
+      return;
+    }
+
+    await database.settingsDao.writeReminderSchedule(schedule);
+    await reminders.applySchedule(
+      schedule,
+      today: clock.today(),
+      now: clock.timeOfDay(),
+      title: l10n.reminderNotificationTitle,
+      body: l10n.reminderNotificationBody,
+    );
     ref.invalidate(settingsProvider);
   }
 

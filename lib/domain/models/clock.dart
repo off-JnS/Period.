@@ -1,4 +1,5 @@
 import 'cycle_date.dart';
+import 'reminder_time.dart';
 
 /// Supplies today's calendar day.
 ///
@@ -13,4 +14,16 @@ import 'cycle_date.dart';
 abstract class Clock {
   /// The calendar day it is now, wherever the device currently is.
   CycleDate today();
+
+  /// The time of day it is now, on the wall clock the user is looking at.
+  ///
+  /// Here rather than read wherever it is wanted, for the same reason [today]
+  /// is: it is the other half of the single permitted `DateTime.now()`. Only
+  /// the reminder needs it, and only to decide whether today's reminder time
+  /// has already gone by -- see `nextReminder`.
+  ///
+  /// A [ReminderTime], not a [DateTime] and not a Flutter [TimeOfDay]: hours
+  /// and minutes with no date, no offset and no zone, so nothing here can carry
+  /// a timestamp into the domain.
+  ReminderTime timeOfDay();
 }

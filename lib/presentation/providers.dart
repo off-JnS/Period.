@@ -7,6 +7,7 @@ import '../data/backup/backup_service.dart';
 import '../data/backup/backup_transfer.dart';
 import '../data/database/daos/settings_dao.dart';
 import '../data/database/database.dart';
+import '../data/reminders.dart';
 import '../data/system_clock.dart';
 import '../domain/logic/cycle_analysis.dart';
 import '../domain/logic/fertile_window.dart';
@@ -51,6 +52,20 @@ final clockProvider = Provider<Clock>((ref) => const SystemClock());
 /// without a device -- including the case that matters most, where the device
 /// cannot authenticate at all.
 final appLockProvider = Provider<AppLock>((ref) => DeviceAppLock());
+
+/// Schedules section 9's log reminder.
+///
+/// Behind a seam for the same reason as the lock above: it is the only thing
+/// that reaches the notification plugin, so the settings flow and the
+/// skip-if-already-logged rule are both testable with no device and nothing
+/// scheduled. Overridden with a fake everywhere in the test suite.
+///
+/// Deliberately not a default that silently does nothing on an unsupported
+/// platform -- a reminder that is never scheduled should be visible as such,
+/// not as a switch that moves and achieves nothing.
+final remindersProvider = Provider<Reminders>(
+  (ref) => LocalNotificationReminders(),
+);
 
 /// Whether this device can authenticate at all.
 ///

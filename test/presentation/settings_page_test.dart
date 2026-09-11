@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_time.dart';
 import 'package:period/presentation/app_shell.dart';
 import 'package:period/presentation/providers.dart';
 import 'package:period/presentation/settings/settings_page.dart';
@@ -14,6 +15,7 @@ import '../support/database.dart';
 import '../support/dates.dart';
 import '../support/fixed_clock.dart';
 import '../support/models.dart';
+import '../support/reminders.dart';
 import '../support/widgets.dart';
 
 /// Settings against a real database, and the loop this slice exists to close.
@@ -27,18 +29,21 @@ void main() {
   late AppDatabase db;
   late Directory documents;
   late FixedClock clock;
+  late FakeReminders reminders;
 
   setUp(() {
     db = aDatabase();
     documents = Directory.systemTemp.createTempSync('period_documents');
     addTearDown(() => documents.deleteSync(recursive: true));
     clock = FixedClock(aDate(2024, 5, 17));
+    reminders = FakeReminders();
   });
 
   List<Override> overrides() => [
     databaseProvider.overrideWithValue(db),
     clockProvider.overrideWithValue(clock),
     documentsDirectoryProvider.overrideWithValue(documents),
+    remindersProvider.overrideWithValue(reminders),
   ];
 
   Future<void> pumpSettings(WidgetTester tester) async {
@@ -223,6 +228,132 @@ void main() {
     });
   });
 
+  group('the log reminder', () {
+    /// Scrolls the reminder switch into view and taps it.
+    Future<void> toggleReminder(WidgetTester tester) async {
+      await tester.dragUntilVisible(
+        find.text('Remind me to log'),
+        find.descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(ListView),
+        ),
+        const Offset(0, -100),
+      );
+      await settleDatabase(tester);
+      await tester.tap(find.text('Remind me to log'));
+      await settleDatabase(tester);
+    }
+
+    testWidgets('asks the operating system before turning it on', (
+      tester,
+    ) async {
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      expect(reminders.permissionRequests, 1);
+      expect((await db.settingsDao.readSettings()).reminder.enabled, isTrue);
+    });
+
+    testWidgets('a refusal stores nothing and schedules nothing', (
+      tester,
+    ) async {
+      // The switch has to stay off. A stored "on" that can never show anything
+      // is a setting that lies, and she would have no way to tell.
+      reminders.granted = false;
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      expect((await db.settingsDao.readSettings()).reminder.enabled, isFalse);
+      expect(reminders.applied, isEmpty);
+      expect(find.textContaining('Notifications are turned off'), findsOne);
+    });
+
+    testWidgets('schedules from the clock, not from a stored timestamp', (
+      tester,
+    ) async {
+      clock.date = aDate(2024, 5, 17);
+      clock.time = const ReminderTime(9, 0);
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      final applied = reminders.lastApplied!;
+      expect(applied.today, aDate(2024, 5, 17));
+      expect(applied.now, const ReminderTime(9, 0));
+    });
+
+    testWidgets('the notification text says nothing about a cycle', (
+      tester,
+    ) async {
+      // Section 9. This is the one string in the app a stranger holding her
+      // phone can read without unlocking it.
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      final applied = reminders.lastApplied!;
+      for (final word in [
+        'cycle',
+        'period',
+        'fertile',
+        'ovulation',
+        'log',
+        'day',
+      ]) {
+        expect(
+          '${applied.title} ${applied.body}'.toLowerCase(),
+          isNot(contains(word)),
+          reason: '"$word" would be readable on a locked screen',
+        );
+      }
+    });
+
+    testWidgets('turning it off again does not ask a second time', (
+      tester,
+    ) async {
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+      await toggleReminder(tester);
+
+      expect(reminders.permissionRequests, 1);
+      expect((await db.settingsDao.readSettings()).reminder.enabled, isFalse);
+      // Still applied, so whatever was scheduled is cleared rather than left
+      // firing after she switched it off.
+      expect(reminders.lastApplied!.schedule.enabled, isFalse);
+    });
+
+    testWidgets('deselecting a weekday stores it and reschedules', (
+      tester,
+    ) async {
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      // Every day is selected by default, so the first tap removes one.
+      await tester.tap(find.widgetWithText(FilterChip, 'Wed'));
+      await settleDatabase(tester);
+
+      expect((await db.settingsDao.readSettings()).reminder.weekdays, {
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+      });
+      expect(reminders.lastApplied!.schedule.weekdays, {1, 2, 4, 5, 6, 7});
+    });
+
+    testWidgets('the weekday chooser is not colour alone', (tester) async {
+      // Section 9. A screen reader gets the day and its state in words, and a
+      // sighted user gets a checkmark as well as a fill.
+      await pumpSettings(tester);
+      await toggleReminder(tester);
+
+      expect(find.bySemanticsLabel('Wednesday, selected'), findsOne);
+      await tester.tap(find.widgetWithText(FilterChip, 'Wed'));
+      await settleDatabase(tester);
+      expect(find.bySemanticsLabel('Wednesday, not selected'), findsOne);
+    });
+  });
+
   group('deleting everything', () {
     /// Scrolls the delete row into view and taps it.
     ///
@@ -297,6 +428,18 @@ void main() {
       expect(
         (await db.settingsDao.readSettings()).cycle.mode,
         CycleMode.natural,
+      );
+      // Back to the top first. The list is lazy and long enough that the mode
+      // picker is no longer built after scrolling down to the delete tile, so
+      // without this the finder reports nothing and the test fails describing a
+      // bug that is not there.
+      await tester.dragUntilVisible(
+        find.byType(RadioGroup<CycleMode>),
+        find.descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(ListView),
+        ),
+        const Offset(0, 100),
       );
       expect(
         tester

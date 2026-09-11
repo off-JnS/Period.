@@ -232,6 +232,11 @@ void main() {
       File('lib/domain/logic/reminder_schedule.dart'),
       File('lib/domain/models/reminder_schedule.dart'),
       File('lib/domain/models/reminder_time.dart'),
+      // The data layer's half. It turns a schedule into scheduled
+      // notifications, and it is the file most likely to acquire a "while we
+      // are here, remind her the day before her period is due" -- which is the
+      // inference section 7 rules out, and which no runtime test would catch.
+      File('lib/data/reminders.dart'),
     ];
 
     test('the reminder files exist to be checked', () {
@@ -616,6 +621,57 @@ void main() {
         reason:
             'CLAUDE.md section 6 forbids these without exception, and a '
             'shipped build reaches them: $trail',
+      );
+    });
+  });
+
+  group('the system clock (CLAUDE.md section 3)', () {
+    // Section 3 allows `DateTime.now()` in exactly one place, and the README
+    // says so on its front page. There are now two, and the second is a real
+    // exception rather than a slip -- so it is written down here, with what it
+    // is for, and a third one fails this test.
+    const permitted = <String, String>{
+      'lib/data/system_clock.dart':
+          'the Clock abstraction section 3 names. Reads the local year, month, '
+          'day, hour and minute, and discards the instant.',
+      'lib/data/reminders.dart':
+          'the device UTC offset, used to resolve a reminder to an instant. '
+          'Not a calendar day and never stored, so no CycleDate can carry '
+          'it -- see the comment there for why no package supplies it.',
+    };
+
+    test('the permitted files still exist', () {
+      // Without this the scan below passes vacuously once a file is renamed.
+      for (final path in permitted.keys) {
+        expect(File(path).existsSync(), isTrue, reason: '$path is missing');
+      }
+    });
+
+    test('nothing else reads the system clock', () {
+      final offenders = <String>[];
+      for (final file in Directory('lib').listSync(recursive: true)) {
+        if (file is! File || !file.path.endsWith('.dart')) continue;
+        // Generated code is not written by hand and is not ours to police.
+        if (file.path.endsWith('.g.dart')) continue;
+        if (file.path.endsWith('.freezed.dart')) continue;
+        if (permitted.containsKey(file.path)) continue;
+
+        // Comments stripped first. Several files explain at length that they
+        // take the date as a parameter *instead* of calling DateTime.now(),
+        // and a substring match on that prose would fail them for saying so.
+        if (codeOnly(file.readAsStringSync()).contains('DateTime.now(')) {
+          offenders.add(file.path);
+        }
+      }
+
+      expect(
+        offenders,
+        isEmpty,
+        reason:
+            'section 3 keeps the system clock in one place. Take the date as a '
+            'parameter and let the caller pass clock.today(), or -- if this '
+            'really is a third exception -- add it to `permitted` above with '
+            'what it is for.',
       );
     });
   });
