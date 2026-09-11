@@ -60,6 +60,25 @@ dependencies:
   # without threading objects through constructors, and lets tests and goldens
   # swap in an in-memory database.
   flutter_riverpod: ^3.0.3
+  # Section 9's log reminder. Allowlisted in section 6, and pinned to an exact
+  # version rather than a caret range for a reason that is not style:
+  #
+  # flutter_local_notifications 19.0.0 and later depend on timezone ^0.10.0,
+  # and timezone 0.10.0 was the release that added `http` to its own
+  # dependencies. Section 6 forbids http without exception, and every later
+  # version of the plugin -- including each federated piece -- pins timezone
+  # ^0.10.0 or above, so there is no combination above 18.0.0 that keeps it
+  # out. 18.0.0 is the last release that pins timezone ^0.9.0.
+  #
+  # So this cannot be upgraded, and an upgrade will not fail quietly:
+  # architecture_test.dart walks what a shipped build actually pulls in and
+  # will name http and what dragged it in. If that test fails after an
+  # upgrade, revert the upgrade -- do not add http to the allowed list.
+  flutter_local_notifications: 18.0.0
+  # Required by the plugin above to schedule against a wall clock. Held below
+  # 0.10.0 for the same reason, which is why this is written out rather than
+  # left to come along transitively: a caret here would be an invitation.
+  timezone: ^0.9.0
 
 dev_dependencies:
   flutter_test:

@@ -17,6 +17,27 @@ const acknowledgedPermissions = <String, Set<String>>{
   // biometric prompt; it grants no access to data, to the network, or to
   // anything the app could not already reach.
   'local_auth_android': {'android.permission.USE_BIOMETRIC'},
+
+  // Section 9's log reminder.
+  //
+  // POST_NOTIFICATIONS is the Android 13+ runtime permission for showing a
+  // notification at all. She is asked for it only when she turns reminders on,
+  // and a refusal leaves the switch off rather than silently pretending.
+  //
+  // VIBRATE lets a notification buzz. It reads nothing and sends nothing; the
+  // plugin declares it unconditionally, so it arrives whether or not this app
+  // ever asks for a vibration.
+  //
+  // Neither grants access to data, to the network, or to anything the app
+  // could not already reach. Note what is NOT here: the plugin's scheduled
+  // notifications are posted with AndroidScheduleMode.inexactAllowWhileIdle,
+  // which needs no SCHEDULE_EXACT_ALARM and no USE_EXACT_ALARM. A log reminder
+  // does not need to be punctual to the second, and an exact-alarm permission
+  // is one Play audits and users are asked to grant by hand.
+  'flutter_local_notifications': {
+    'android.permission.POST_NOTIFICATIONS',
+    'android.permission.VIBRATE',
+  },
 };
 
 /// Which packages list [name] among their dependencies.
