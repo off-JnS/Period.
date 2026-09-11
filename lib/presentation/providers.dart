@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/app_lock.dart';
@@ -5,6 +7,7 @@ import '../data/backup/backup_service.dart';
 import '../data/backup/backup_transfer.dart';
 import '../data/database/daos/settings_dao.dart';
 import '../data/database/database.dart';
+import '../data/reminders.dart';
 import '../data/system_clock.dart';
 import '../domain/logic/cycle_analysis.dart';
 import '../domain/logic/fertile_window.dart';
@@ -28,6 +31,18 @@ final databaseProvider = Provider<AppDatabase>(
   ),
 );
 
+/// The directory the database and its migration copies live in.
+///
+/// Overridden the same way and for the same reasons as [databaseProvider]:
+/// asking the platform for it is asynchronous, and a default would have tests
+/// reaching into a real documents directory. Section 9's delete needs it,
+/// because deleting her data means deleting the copies of it too.
+final documentsDirectoryProvider = Provider<Directory>(
+  (ref) => throw UnimplementedError(
+    'Override documentsDirectoryProvider with the app documents directory.',
+  ),
+);
+
 /// Today's date. The single place the app asks what day it is.
 final clockProvider = Provider<Clock>((ref) => const SystemClock());
 
@@ -37,6 +52,34 @@ final clockProvider = Provider<Clock>((ref) => const SystemClock());
 /// without a device -- including the case that matters most, where the device
 /// cannot authenticate at all.
 final appLockProvider = Provider<AppLock>((ref) => DeviceAppLock());
+
+/// Schedules section 9's log reminder.
+///
+/// Behind a seam for the same reason as the lock above: it is the only thing
+/// that reaches the notification plugin, so the settings flow and the
+/// skip-if-already-logged rule are both testable with no device and nothing
+/// scheduled. Overridden with a fake everywhere in the test suite.
+///
+/// Deliberately not a default that silently does nothing on an unsupported
+/// platform -- a reminder that is never scheduled should be visible as such,
+/// not as a switch that moves and achieves nothing.
+final remindersProvider = Provider<Reminders>(
+  (ref) => LocalNotificationReminders(),
+);
+
+/// Whether the operating system will currently show a notification.
+///
+/// Read like [lockAvailableProvider], and shown in settings for the same
+/// reason: a switch that is on while the system blocks it explains nothing, and
+/// the reminder that never arrives looks like the app is broken rather than
+/// like a permission she can restore.
+///
+/// Invalidated on resume by the settings page, because the answer changes while
+/// the app is in the background -- which is exactly when she goes to system
+/// settings to change it.
+final remindersAllowedProvider = FutureProvider<bool>(
+  (ref) => ref.watch(remindersProvider).hasPermission(),
+);
 
 /// Whether this device can authenticate at all.
 ///
@@ -156,6 +199,7 @@ TodayViewData _todayFrom(
   final eligible = eligibleForStatistics(cyclesFrom(starts));
 
   return TodayViewData(
+    today: today,
     cycleDay: cycleDayOn(today, starts),
     typicalCycleLength: _typicalLength(eligible),
     prediction: prediction,

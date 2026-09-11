@@ -1,5 +1,6 @@
 import '../domain/models/clock.dart';
 import '../domain/models/cycle_date.dart';
+import '../domain/models/reminder_time.dart';
 
 /// The only place in the app that reads the system clock.
 ///
@@ -20,5 +21,13 @@ class SystemClock implements Clock {
   CycleDate today() {
     final now = DateTime.now();
     return CycleDate(now.year, now.month, now.day);
+  }
+
+  @override
+  ReminderTime timeOfDay() {
+    final now = DateTime.now();
+    // Hour and minute, local, and nothing else. The seconds, the date and the
+    // offset are all discarded here rather than carried further.
+    return ReminderTime(now.hour, now.minute);
   }
 }

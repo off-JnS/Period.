@@ -559,6 +559,75 @@
   "nothingToAnalyseYetDetail": "Once you have marked a period start or two, what you record will show up here.",
   "@nothingToAnalyseYetDetail": {
     "description": "Explains the empty state so a blank screen does not read as broken."
+  },
+  "reminderHeading": "Reminders",
+  "@reminderHeading": {
+    "description": "Heading above the log reminder settings."
+  },
+  "reminderExplanation": "A reminder to open the app and log. It is set by you and says nothing about your cycle \u2014 not on your lock screen, and not anywhere else.",
+  "@reminderExplanation": {
+    "description": "Note under the reminder heading. Says two things before she chooses: the reminder is hers to set rather than derived from anything, and it leaks nothing on a lock screen."
+  },
+  "reminderSwitch": "Remind me to log",
+  "@reminderSwitch": {
+    "description": "The switch that turns the reminder on."
+  },
+  "reminderDetail": "Skipped on days you have already logged something.",
+  "@reminderDetail": {
+    "description": "Subtitle of the reminder switch. Explains why a reminder does not always arrive, so a missing one does not read as broken."
+  },
+  "reminderPermissionRefused": "Notifications are turned off for this app. You can allow them in your device settings.",
+  "@reminderPermissionRefused": {
+    "description": "Shown when she turns the reminder on and the operating system refuses the permission. Says where to change it rather than leaving the switch to spring back with no explanation."
+  },
+  "reminderTimeLabel": "Time",
+  "@reminderTimeLabel": {
+    "description": "Row that opens the time picker."
+  },
+  "reminderDaysLabel": "Days",
+  "@reminderDaysLabel": {
+    "description": "Label above the weekday chooser."
+  },
+  "reminderNoDaysChosen": "No days are selected, so no reminder will arrive.",
+  "@reminderNoDaysChosen": {
+    "description": "Shown when the reminder is on and every weekday is deselected. That state is deliberately distinct from off, and without this the switch looks broken."
+  },
+  "reminderDaySelected": "{day}, selected",
+  "@reminderDaySelected": {
+    "description": "Spoken description of a chosen weekday. The chooser shows one letter, which several weekdays share and which says nothing aloud.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderDayNotSelected": "{day}, not selected",
+  "@reminderDayNotSelected": {
+    "description": "Spoken description of a weekday that is not chosen. Paired with reminderDaySelected so selection is never conveyed by colour alone, per section 9.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderNotificationTitle": "Reminder",
+  "@reminderNotificationTitle": {
+    "description": "The notification's title. Section 9 requires it to be neutral: it names nothing about a cycle, a phase, a symptom or a date, because it is readable on a locked screen by anyone holding the phone."
+  },
+  "reminderNotificationBody": "Open when you have a moment.",
+  "@reminderNotificationBody": {
+    "description": "The notification's body. Neutral for the same reason as the title, and deliberately says nothing about what there is to do."
+  },
+  "reminderChannelName": "Reminders",
+  "@reminderChannelName": {
+    "description": "The name of the Android notification channel, shown in the system's own notification settings for this app."
+  },
+  "reminderChannelDescription": "The reminder you set yourself.",
+  "@reminderChannelDescription": {
+    "description": "The Android notification channel's description, shown in the system settings beside its name."
+  },
+  "reminderBlockedBySystem": "Reminders are on here, but notifications are switched off for this app on your phone, so none will arrive. You can turn them back on in your phone's settings.",
+  "@reminderBlockedBySystem": {
+    "description": "Shown only when her reminder is switched on AND the operating system is blocking notifications. Both halves matter: a permission that was never asked for is not the same as one that was taken away, and only this combination means a reminder she asked for cannot arrive."
   }
-
 }

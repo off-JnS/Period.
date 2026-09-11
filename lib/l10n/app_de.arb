@@ -124,6 +124,20 @@
   "cycleLengthChartDescription": "{count, plural, =1{Ein Diagramm mit 1 Zykluslänge. Dieselben Zahlen stehen darunter.} other{Ein Diagramm mit {count} Zykluslängen. Dieselben Zahlen stehen darunter.}}",
   "notEnoughCyclesYet": "Für eine typische Länge braucht es zwei abgeschlossene Zyklen.",
   "nothingToAnalyseYet": "Noch nichts eingetragen",
-  "nothingToAnalyseYetDetail": "Sobald du einen Periodenbeginn eingetragen hast, erscheint hier, was du erfasst."
-
+  "nothingToAnalyseYetDetail": "Sobald du einen Periodenbeginn eingetragen hast, erscheint hier, was du erfasst.",
+  "reminderHeading": "Erinnerungen",
+  "reminderExplanation": "Eine Erinnerung, die App zu \u00f6ffnen und etwas einzutragen. Du legst sie selbst fest, und sie verr\u00e4t nichts \u00fcber deinen Zyklus \u2014 weder auf dem Sperrbildschirm noch sonst wo.",
+  "reminderSwitch": "An das Eintragen erinnern",
+  "reminderDetail": "Entf\u00e4llt an Tagen, an denen du schon etwas eingetragen hast.",
+  "reminderPermissionRefused": "Mitteilungen sind f\u00fcr diese App ausgeschaltet. Du kannst sie in den Einstellungen deines Ger\u00e4ts erlauben.",
+  "reminderTimeLabel": "Uhrzeit",
+  "reminderDaysLabel": "Tage",
+  "reminderNoDaysChosen": "Es ist kein Tag ausgew\u00e4hlt, also kommt keine Erinnerung.",
+  "reminderDaySelected": "{day}, ausgew\u00e4hlt",
+  "reminderDayNotSelected": "{day}, nicht ausgew\u00e4hlt",
+  "reminderNotificationTitle": "Erinnerung",
+  "reminderNotificationBody": "\u00d6ffne die App, wenn du einen Moment hast.",
+  "reminderChannelName": "Erinnerungen",
+  "reminderChannelDescription": "Die Erinnerung, die du selbst festgelegt hast.",
+  "reminderBlockedBySystem": "Erinnerungen sind hier eingeschaltet, aber Mitteilungen sind f\u00fcr diese App auf deinem Handy deaktiviert \u2014 es kommt also keine an. Du kannst sie in den Einstellungen deines Handys wieder erlauben."
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/day_entry.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
 import 'package:period/presentation/calendar/calendar_page.dart';
 import 'package:period/presentation/providers.dart';
 
@@ -9,6 +10,7 @@ import '../support/database.dart';
 import '../support/dates.dart';
 import '../support/fixed_clock.dart';
 import '../support/models.dart';
+import '../support/reminders.dart';
 import '../support/widgets.dart';
 
 /// The calendar against a real database.
@@ -20,10 +22,12 @@ import '../support/widgets.dart';
 void main() {
   late AppDatabase db;
   late FixedClock clock;
+  late FakeReminders reminders;
 
   setUp(() {
     db = aDatabase();
     clock = FixedClock(aDate(2024, 5, 17));
+    reminders = FakeReminders();
   });
   // No tearDown closing the database: pumpWithDatabase closes it in the right
   // order relative to unmounting the widget tree.
@@ -36,6 +40,7 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
         clockProvider.overrideWithValue(clock),
+        remindersProvider.overrideWithValue(reminders),
       ],
     );
   }
@@ -238,5 +243,32 @@ void main() {
       findsOneWidget,
     );
     expect(find.bySemanticsLabel('June 12, 2024'), findsOneWidget);
+  });
+
+  group('a reminder tonight', () {
+    testWidgets('survives a correction to an earlier day', (tester) async {
+      // Correcting last Friday says nothing about whether tonight's reminder is
+      // still wanted. Dropping it would silently lose one she never asked to
+      // lose, and she would have no way to know why it stopped arriving.
+      await db.settingsDao.writeReminderSchedule(
+        const ReminderSchedule(enabled: true),
+      );
+      await pumpCalendar(tester);
+      await log(tester, 'May 3, 2024');
+
+      expect(reminders.skipped, isEmpty);
+    });
+
+    testWidgets('is dropped when today itself is logged here', (tester) async {
+      // The same screen, the same action, a different day: today's entry does
+      // make tonight's reminder unnecessary, wherever it was logged from.
+      await db.settingsDao.writeReminderSchedule(
+        const ReminderSchedule(enabled: true),
+      );
+      await pumpCalendar(tester);
+      await log(tester, 'May 17, 2024, Today');
+
+      expect(reminders.skipped, [aDate(2024, 5, 17)]);
+    });
   });
 }

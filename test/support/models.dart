@@ -9,6 +9,12 @@ import 'dates.dart';
 /// are varying and inherit the rest, so adding a field to a model does not mean
 /// editing every test that happens to construct one.
 
+/// Domain models only, and nothing that reaches Flutter. `test/domain` imports
+/// this file and CI runs those on the plain Dart VM to prove CLAUDE.md section
+/// 2 -- so a single presentation import here stops every domain test from
+/// loading, while `flutter test` carries on passing. Builders for presentation
+/// view data live in `views.dart`.
+
 /// A symptom with a stable key.
 Symptom aSymptom({String key = 'cramps'}) => Symptom(key: key);
 

@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/clock.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
 import 'package:period/presentation/providers.dart';
 import 'package:period/presentation/today/today_page.dart';
 
 import '../support/database.dart';
 import '../support/dates.dart';
 import '../support/fixed_clock.dart';
+import '../support/reminders.dart';
 import '../support/widgets.dart';
 
 /// The whole loop, against a real database.
@@ -20,10 +22,12 @@ import '../support/widgets.dart';
 void main() {
   late AppDatabase db;
   late FixedClock clock;
+  late FakeReminders reminders;
 
   setUp(() {
     db = aDatabase();
     clock = FixedClock(aDate(2024, 5, 17));
+    reminders = FakeReminders();
   });
   // No tearDown closing the database: pumpWithDatabase closes it in the right
   // order relative to unmounting the widget tree.
@@ -36,6 +40,7 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
         clockProvider.overrideWithValue(clock),
+        remindersProvider.overrideWithValue(reminders),
       ],
     );
   }
@@ -239,6 +244,47 @@ void main() {
 
       expect(find.text('Saved'), findsOneWidget);
       expect(find.text('Undo'), findsNothing);
+    });
+  });
+
+  group('a reminder she no longer needs', () {
+    /// Reminders on, every day, so today is always a reminder day.
+    Future<void> givenDailyReminder() => db.settingsDao.writeReminderSchedule(
+      const ReminderSchedule(enabled: true),
+    );
+
+    testWidgets('logging today drops it', (tester) async {
+      // docs/cycle-logic.md section 7: a reminder to do a thing already done is
+      // noise, and noise is what gets an app's notifications switched off
+      // entirely -- taking the useful ones with it.
+      await givenDailyReminder();
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+
+      expect(reminders.skipped, [aDate(2024, 5, 17)]);
+    });
+
+    // Logging an earlier day must NOT drop tonight's reminder. That case lives
+    // in calendar_page_test.dart, because this screen can only ever log today.
+
+    testWidgets('nothing is dropped when reminders are off', (tester) async {
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+
+      expect(reminders.skipped, isEmpty);
+    });
+
+    testWidgets('nothing is dropped on a weekday she did not choose', (
+      tester,
+    ) async {
+      // 2024-05-17 is a Friday, which is 5; this schedule is Mondays only.
+      await db.settingsDao.writeReminderSchedule(
+        const ReminderSchedule(enabled: true, weekdays: {1}),
+      );
+      await pumpToday(tester);
+      await logPeriodStart(tester);
+
+      expect(reminders.skipped, isEmpty);
     });
   });
 

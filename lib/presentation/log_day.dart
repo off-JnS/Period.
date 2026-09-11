@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/logic/reminder_schedule.dart';
 import '../domain/models/cycle_date.dart';
 import '../l10n/app_localizations.dart';
 import 'providers.dart';
@@ -49,6 +50,8 @@ Future<void> logDay(BuildContext context, WidgetRef ref, CycleDate date) async {
   // route back from a mistap.
   final undoable = wasPeriodStart && !result.isPeriodStart;
 
+  await _dropTodaysReminder(l10n, ref, date);
+
   _refresh(ref);
 
   if (!context.mounted) return;
@@ -72,6 +75,51 @@ Future<void> logDay(BuildContext context, WidgetRef ref, CycleDate date) async {
             : null,
       ),
     );
+}
+
+/// Drops a reminder that [date] has just made unnecessary.
+///
+/// docs/cycle-logic.md section 7: a reminder to do a thing already done is
+/// noise, and an app that generates noise gets its notifications switched off
+/// entirely, taking the useful ones with it.
+///
+/// Only for today. A correction to last Tuesday says nothing about whether
+/// tonight's reminder is still wanted, and cancelling on one would silently
+/// drop a reminder she never asked to lose.
+///
+/// [shouldRemindOn] is asked rather than reimplemented, so the rule has one
+/// definition and it is the tested one.
+///
+/// Takes the localisations rather than a [BuildContext]: the strings are needed
+/// after two awaits, and a context is not safe to read across those.
+Future<void> _dropTodaysReminder(
+  AppLocalizations l10n,
+  WidgetRef ref,
+  CycleDate date,
+) async {
+  final clock = ref.read(clockProvider);
+  if (date != clock.today()) return;
+
+  final schedule =
+      (await ref.read(databaseProvider).settingsDao.readSettings()).reminder;
+
+  // Asked with nothing logged, which is the only question worth asking here:
+  // *was* a reminder wanted on this day? Passing the day as logged instead
+  // always answers false -- for a day already logged, but equally for reminders
+  // being off and for a weekday she never chose -- so it would drop a reminder
+  // in two cases where there is nothing to drop.
+  if (!shouldRemindOn(schedule: schedule, date: date, loggedDays: const {})) {
+    return;
+  }
+
+  await ref
+      .read(remindersProvider)
+      .skipToday(
+        schedule,
+        today: date,
+        title: l10n.reminderNotificationTitle,
+        body: l10n.reminderNotificationBody,
+      );
 }
 
 /// Re-reads everything a save can have changed.

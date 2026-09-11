@@ -5,6 +5,7 @@ import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
+import '../support/views.dart';
 import '../support/dates.dart';
 import '../support/widgets.dart';
 
@@ -19,7 +20,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -35,7 +36,7 @@ void main() {
     testWidgets('always carries the qualifying wording', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: TodayViewData(prediction: predicted, cycleDay: 22)),
+        TodayScreen(data: aTodayView(prediction: predicted, cycleDay: 22)),
       );
       expect(find.text('Estimated, based on your entries'), findsOneWidget);
     });
@@ -47,8 +48,8 @@ void main() {
     testWidgets('not enough cycles asks for what it needs', (tester) async {
       await pumpApp(
         tester,
-        const TodayScreen(
-          data: TodayViewData(prediction: NotEnoughCycles(have: 1, need: 2)),
+        TodayScreen(
+          data: aTodayView(prediction: NotEnoughCycles(have: 1, need: 2)),
         ),
       );
       expect(find.textContaining('one more period'), findsOneWidget);
@@ -59,9 +60,7 @@ void main() {
     ) async {
       await pumpApp(
         tester,
-        const TodayScreen(
-          data: TodayViewData(prediction: CyclesTooVariable(9)),
-        ),
+        TodayScreen(data: aTodayView(prediction: CyclesTooVariable(9))),
       );
       expect(find.textContaining('vary too much'), findsOneWidget);
     });
@@ -77,7 +76,7 @@ void main() {
         await pumpApp(
           tester,
           TodayScreen(
-            data: TodayViewData(prediction: PredictionsDisabled(entry.key)),
+            data: aTodayView(prediction: PredictionsDisabled(entry.key)),
           ),
         );
         expect(
@@ -98,7 +97,7 @@ void main() {
     testWidgets('is absent unless one was estimated', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: TodayViewData(prediction: predicted)),
+        TodayScreen(data: aTodayView(prediction: predicted)),
       );
       expect(find.text('Estimated fertile window'), findsNothing);
     });
@@ -109,7 +108,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(prediction: predicted, fertileWindow: fertile),
+          data: aTodayView(prediction: predicted, fertileWindow: fertile),
         ),
       );
       expect(
@@ -123,7 +122,7 @@ void main() {
     testWidgets('is absent by default', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: TodayViewData(prediction: predicted)),
+        TodayScreen(data: aTodayView(prediction: predicted)),
       );
       expect(find.textContaining('worth mentioning'), findsNothing);
     });
@@ -134,7 +133,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(prediction: predicted, showDoctorHint: true),
+          data: aTodayView(prediction: predicted, showDoctorHint: true),
         ),
       );
       final hint = tester.widget<Text>(find.textContaining('worth mentioning'));
@@ -148,7 +147,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(prediction: predicted, showDoctorHint: true),
+          data: aTodayView(prediction: predicted, showDoctorHint: true),
         ),
       );
       await tester.tap(find.text('Dismiss'));
@@ -162,8 +161,8 @@ void main() {
       // An arc conveys nothing to a screen reader.
       await pumpApp(
         tester,
-        const TodayScreen(
-          data: TodayViewData(
+        TodayScreen(
+          data: aTodayView(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: NotEnoughCycles(have: 0, need: 2),
@@ -177,7 +176,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -199,20 +198,24 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: const TodayViewData(
+          data: aTodayView(
             prediction: PredictionsDisabled(CycleMode.perimenopause),
           ),
         ),
         locale: const Locale('de'),
       );
       expect(tester.takeException(), isNull);
-      expect(find.text('Heute'), findsOneWidget);
+      // Was find.text('Heute') -- the app bar's old title, used as a stand-in
+      // for "German rendered". The bar carries the date now, so this asserts
+      // the same thing against something German that is still on the screen:
+      // a weekday and a month name no English build would produce.
+      expect(find.text('Freitag, 17. Mai'), findsOneWidget);
     });
 
     testWidgets('renders in dark mode', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: TodayViewData(prediction: predicted, cycleDay: 22)),
+        TodayScreen(data: aTodayView(prediction: predicted, cycleDay: 22)),
         brightness: Brightness.dark,
       );
       expect(tester.takeException(), isNull);
@@ -227,7 +230,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 34,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -241,7 +244,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 29,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -255,7 +258,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 28,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -272,7 +275,7 @@ void main() {
       // be the industry's mistake, and saying she is late would be inventing it.
       await pumpApp(
         tester,
-        TodayScreen(data: TodayViewData(cycleDay: 40, prediction: predicted)),
+        TodayScreen(data: aTodayView(cycleDay: 40, prediction: predicted)),
       );
       expect(find.textContaining('later than'), findsNothing);
     });
@@ -284,7 +287,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: TodayViewData(
+          data: aTodayView(
             cycleDay: 34,
             typicalCycleLength: 28,
             prediction: predicted,

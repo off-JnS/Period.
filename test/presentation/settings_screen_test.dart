@@ -1,6 +1,9 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 
 import '../support/widgets.dart';
@@ -15,11 +18,15 @@ void main() {
     void Function({required bool optedIn})? onFertileWindowChanged,
     VoidCallback? onDeleteEverything,
     void Function({required bool enabled})? onAppLockChanged,
+    void Function(ReminderSchedule)? onReminderChanged,
     bool lockAvailable = true,
+    bool remindersAllowed = true,
+    bool alwaysUse24HourFormat = false,
     Locale locale = const Locale('en'),
   }) async {
     await pumpApp(
       tester,
+      alwaysUse24HourFormat: alwaysUse24HourFormat,
       // Tall enough to lay the whole list out. A ListView does not build what
       // is below the fold, so at the default height these finders would miss
       // the rows at the bottom and report them as absent rather than offscreen.
@@ -37,6 +44,8 @@ void main() {
         onRestoreBackup: () {},
         onAppLockChanged: onAppLockChanged ?? ({required enabled}) {},
         lockAvailable: lockAvailable,
+        remindersAllowed: remindersAllowed,
+        onReminderChanged: onReminderChanged ?? (_) {},
       ),
       locale: locale,
     );
@@ -330,5 +339,165 @@ void main() {
     expect(find.text('Einstellungen'), findsOneWidget);
     expect(find.text('Schwanger'), findsOneWidget);
     expect(find.text('Alle Daten löschen'), findsOneWidget);
+  });
+
+  group('the reminder', () {
+    const daily = SettingsViewData(reminder: ReminderSchedule(enabled: true));
+
+    testWidgets('shows nothing but the switch while it is off', (tester) async {
+      await pumpSettings(tester);
+      expect(find.text('Remind me to log'), findsOneWidget);
+      // No time, no days. Controls for a reminder that does not exist would be
+      // settings that change nothing.
+      expect(find.text('Time'), findsNothing);
+      expect(find.byType(FilterChip), findsNothing);
+    });
+
+    testWidgets('shows the time and the days once it is on', (tester) async {
+      await pumpSettings(tester, data: daily);
+      expect(find.text('Time'), findsOneWidget);
+      expect(find.byType(FilterChip), findsNWidgets(7));
+    });
+
+    group('the clock she reads it on', () {
+      testWidgets('a 12-hour phone sees 8:00 PM', (tester) async {
+        await pumpSettings(tester, data: daily);
+        expect(find.text('8:00 PM'), findsOneWidget);
+      });
+
+      testWidgets('a 24-hour phone sees 20:00', (tester) async {
+        // The phone's setting, not the locale's. showTimePicker reads this, so
+        // a row that ignored it would show her back something different from
+        // what she just picked in the dial.
+        await pumpSettings(tester, data: daily, alwaysUse24HourFormat: true);
+        expect(find.text('20:00'), findsOneWidget);
+        expect(find.text('8:00 PM'), findsNothing);
+      });
+
+      testWidgets('German writes a 24-hour clock either way', (tester) async {
+        // Which is why German hid the bug above for as long as it did.
+        await pumpSettings(tester, data: daily, locale: const Locale('de'));
+        expect(find.text('20:00'), findsOneWidget);
+      });
+    });
+
+    group('when nothing will arrive', () {
+      testWidgets('says so when she has deselected every day', (tester) async {
+        await pumpSettings(
+          tester,
+          data: const SettingsViewData(
+            reminder: ReminderSchedule(enabled: true, weekdays: {}),
+          ),
+        );
+        expect(find.textContaining('No days are selected'), findsOneWidget);
+      });
+
+      testWidgets('says so when the system is blocking notifications', (
+        tester,
+      ) async {
+        await pumpSettings(tester, data: daily, remindersAllowed: false);
+        expect(
+          find.textContaining('notifications are switched off'),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('stays quiet about a permission never asked for', (
+        tester,
+      ) async {
+        // A fresh install has no permission either, and saying it is blocked
+        // would be wrong -- and would talk her out of turning it on.
+        await pumpSettings(
+          tester,
+          data: const SettingsViewData(),
+          remindersAllowed: false,
+        );
+        expect(
+          find.textContaining('notifications are switched off'),
+          findsNothing,
+        );
+      });
+
+      testWidgets('warns in colour and in shape, never colour alone', (
+        tester,
+      ) async {
+        await pumpSettings(tester, data: daily, remindersAllowed: false);
+        expect(find.byIcon(Icons.info_outline), findsOneWidget);
+      });
+    });
+
+    group('the weekday chooser', () {
+      testWidgets('speaks the full day and its state', (tester) async {
+        // One or two letters say nothing aloud, and several weekdays share
+        // them.
+        await pumpSettings(tester, data: daily);
+        expect(find.bySemanticsLabel('Wednesday, selected'), findsOne);
+      });
+
+      testWidgets('carries the selected flag, not just the words', (
+        tester,
+      ) async {
+        // Wrapping a FilterChip with excludeSemantics throws away the
+        // `selected` flag the chip sets for itself. Without it a screen reader
+        // has a plain button whose state is buried in prose, and toggling it
+        // announces no change of state at all.
+        await pumpSettings(
+          tester,
+          data: const SettingsViewData(
+            reminder: ReminderSchedule(enabled: true, weekdays: {3}),
+          ),
+        );
+
+        // A tristate, and the distinction matters: `none` means the flag was
+        // never set at all, which is what excluding the chip's own semantics
+        // without replacing this left behind.
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('Wednesday, selected'))
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue,
+        );
+        expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('Thursday, not selected'))
+              .flagsCollection
+              .isSelected,
+          Tristate.isFalse,
+        );
+      });
+
+      testWidgets('reports the day she tapped', (tester) async {
+        ReminderSchedule? saved;
+        await pumpSettings(
+          tester,
+          data: daily,
+          onReminderChanged: (schedule) => saved = schedule,
+        );
+
+        await tester.tap(find.widgetWithText(FilterChip, 'Wed'));
+        await tester.pumpAndSettle();
+
+        expect(saved!.weekdays, {1, 2, 4, 5, 6, 7});
+      });
+
+      testWidgets('German starts the week on Monday', (tester) async {
+        await pumpSettings(tester, data: daily, locale: const Locale('de'));
+        final chips = tester
+            .widgetList<FilterChip>(find.byType(FilterChip))
+            .map((chip) => (chip.label as Text).data)
+            .toList();
+        expect(chips.first, 'Mo');
+      });
+
+      testWidgets('English starts the week on Sunday', (tester) async {
+        await pumpSettings(tester, data: daily);
+        final chips = tester
+            .widgetList<FilterChip>(find.byType(FilterChip))
+            .map((chip) => (chip.label as Text).data)
+            .toList();
+        expect(chips.first, 'Sun');
+      });
+    });
   });
 }

@@ -1,4 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Section 9's log reminder needs this, and the receiver below, or every
+         scheduled reminder is silently lost the first time the phone restarts.
+         Android drops pending alarms across a reboot; the plugin's receiver
+         re-registers them, and it only runs if both of these are declared.
+
+         Deliberately NOT accompanied by SCHEDULE_EXACT_ALARM or
+         USE_EXACT_ALARM. Reminders are posted with
+         AndroidScheduleMode.inexactAllowWhileIdle, which still fires in Doze
+         but lets Android choose the moment. A reminder to log is not worth a
+         permission that Play audits and that the user has to grant by hand.
+
+         Note what this is not: RECEIVE_BOOT_COMPLETED grants no network
+         access, reads nothing, and sends nothing. Section 6's INTERNET rule is
+         untouched, and architecture_test.dart still asserts that. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -25,6 +40,19 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Re-registers the reminders after a reboot. Without it the
+             permission above is declared and nothing listens for the
+             broadcast, which fails exactly as silently as not declaring it. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

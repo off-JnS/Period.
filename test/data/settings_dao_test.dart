@@ -1,6 +1,8 @@
 import 'package:period/data/database/daos/settings_dao.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
+import 'package:period/domain/models/reminder_time.dart';
 import 'package:test/test.dart';
 
 import '../support/database.dart';
@@ -137,6 +139,95 @@ void main() {
         (await db.settingsDao.readSettings()).fertileWindowOptedIn,
         isFalse,
       );
+    });
+  });
+
+  group('the reminder schedule', () {
+    Future<void> storeRaw(String key, String value) => db.customStatement(
+      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      [key, value],
+    );
+
+    test('a fresh install has reminders off, every day, at 20:00', () async {
+      // Off is what matters. The time and the days are only what a picker
+      // would open on, and neither means anything until she turns it on.
+      final stored = (await db.settingsDao.readSettings()).reminder;
+
+      expect(stored.enabled, isFalse);
+      expect(stored.time, const ReminderTime(20, 0));
+      expect(stored.validWeekdays, {1, 2, 3, 4, 5, 6, 7});
+    });
+
+    test('round trips what she chose', () async {
+      const schedule = ReminderSchedule(
+        enabled: true,
+        time: ReminderTime(7, 5),
+        weekdays: {2, 4},
+      );
+
+      await db.settingsDao.writeReminderSchedule(schedule);
+      final stored = (await db.settingsDao.readSettings()).reminder;
+
+      expect(stored.enabled, isTrue);
+      expect(stored.time, const ReminderTime(7, 5));
+      expect(stored.validWeekdays, {2, 4});
+    });
+
+    test('stores the weekdays sorted, and drops the impossible ones', () async {
+      // The insertion order here is deliberately neither sorted nor its
+      // reverse: {3, 7, 1} would still read as '1,3,7' if the list were merely
+      // reversed, and this test would pass against code that never sorted at
+      // all. It was written that way first, and a mutation caught it.
+      await db.settingsDao.writeReminderSchedule(
+        const ReminderSchedule(enabled: true, weekdays: {3, 9, 7, 0, 1}),
+      );
+
+      final raw = await db.settingsDao.readAll();
+      expect(raw[SettingKeys.reminderWeekdays], '1,3,7');
+    });
+
+    test('an unreadable time falls back rather than throwing', () async {
+      // Lenient, like the opt-in flags and unlike the cycle mode. The worst it
+      // can do is remind her at an hour she did not pick; it cannot turn on
+      // something she turned off, which is what makes an unreadable mode throw.
+      await storeRaw(SettingKeys.reminderTime, 'half past eight');
+
+      expect(
+        (await db.settingsDao.readSettings()).reminder.time,
+        const ReminderTime(20, 0),
+      );
+    });
+
+    test('an unreadable weekday list means nothing fires', () async {
+      // The safe direction for an opt-in: less than she asked for, never a
+      // notification on a day she never chose.
+      await storeRaw(SettingKeys.reminderWeekdays, 'weekends,maybe');
+
+      expect(
+        (await db.settingsDao.readSettings()).reminder.validWeekdays,
+        isEmpty,
+      );
+    });
+
+    test('deselecting every day is honoured, not treated as unset', () async {
+      // Absent means she has never chosen and defaults to daily. An empty
+      // stored value means she deliberately cleared them, and reverting that to
+      // daily would hand her back seven notifications she just removed.
+      await storeRaw(SettingKeys.reminderWeekdays, '');
+
+      expect(
+        (await db.settingsDao.readSettings()).reminder.validWeekdays,
+        isEmpty,
+      );
+    });
+
+    test('a partly unreadable list keeps the days that are real', () async {
+      await storeRaw(SettingKeys.reminderWeekdays, '1,x,5');
+
+      expect((await db.settingsDao.readSettings()).reminder.validWeekdays, {
+        1,
+        5,
+      });
     });
   });
 }

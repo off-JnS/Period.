@@ -224,7 +224,93 @@ still be shown in any mode. Anything predictive may not.
 
 ---
 
-## 7. Non-goals
+## 7. Reminders (§9)
+
+A reminder is a nudge to **log**, at a time and on days the user chose herself.
+
+**A reminder carries no inference.** It is not derived from a prediction, a
+phase, a cycle day or a cycle length. Nothing about when it fires depends on
+anything this document computes.
+
+That is the load-bearing statement in this section, and everything else follows
+from it:
+
+- It is why reminders need **no mode gate**. §6 turns predictions off for
+  hormonal contraception, pregnancy and perimenopause; reminders behave
+  identically in every mode, including those, because there is nothing
+  predictive in them to turn off. A pregnant user who asked to be reminded to
+  log on Tuesdays gets reminded on Tuesdays.
+- It is why this section needs no citation. The basis is a product decision, not
+  a finding: a reminder that said anything about her cycle would be an
+  inference, and §7 of CLAUDE.md forbids stating one as certainty while §9
+  forbids putting cycle content on a lock screen. A reminder that says nothing
+  cannot be wrong about her.
+
+**The notification text is neutral**, per §9 of CLAUDE.md: a title of
+"Reminder" and a body that says only that the app is worth opening. It names no
+cycle, no day, no symptom and no prediction. A person who picks up her unlocked
+phone in front of someone else learns nothing from it, and neither does anyone
+reading over her shoulder. The cost is real and accepted: she has to open the
+app to know what the reminder was for.
+
+The body exists because a notification with an empty one reads as a bug on both
+platforms, not because there is anything to say. It is held to the same rule as
+the title, and `settings_page_test.dart` asserts that neither contains any of
+the words that would give her away.
+
+**A reminder is skipped when that day is already logged.** A reminder to do a
+thing already done is noise, and an app that generates noise gets its
+notifications turned off entirely — taking the useful ones with them.
+
+### Scheduling across a clock change
+
+A reminder is stored, and computed, as **a calendar day plus a wall-clock
+time**. It is never stored as an instant, and the next occurrence is never
+computed by advancing the previous one.
+
+This matters at a daylight-saving boundary. Adding twenty-four hours to the last
+fire time moves a 20:00 reminder to 19:00 or 21:00 and leaves it there. §3 of
+CLAUDE.md already forbids `Duration` arithmetic on calendar days for the same
+reason; this is the case where the consequence is visible to the user every day
+until she gives up on it.
+
+The domain therefore answers *which day and what wall time*, and resolving that
+to an instant is the platform layer's job, done fresh for each scheduling
+against the timezone in force at that moment.
+
+**How well that is actually done, as built.** Recurrence is handed to the
+operating system in wall-clock terms — a notification that repeats on an hour
+and a minute, or on a weekday, an hour and a minute — so every firing after the
+first follows the wall clock across a clock change without this app doing
+anything. On iOS that is a calendar trigger and is correct by construction.
+
+The *first* firing is not that strong. Resolving a day and a time to an instant
+needs to know when the clocks change, which needs the device's IANA timezone
+name, which needs a package §6 of CLAUDE.md does not allow. So the first firing
+is resolved against the UTC offset in force when it is scheduled. If the clocks
+change between scheduling and that first firing, it arrives an hour early or
+late, once, and every later one is correct.
+
+The bound is deliberate and worth stating plainly: **it can be wrong by an hour,
+never by a day, and it can never move anything in the database.** A notification
+writes nothing. The shift §3 of CLAUDE.md exists to prevent — an entry silently
+landing on the wrong calendar day — is not reachable from here.
+
+Closing the remaining hour needs five lines of platform code, not a package, and
+is written down in `lib/data/reminders.dart` where it would go.
+
+### Non-goal
+
+**No reminder derived from a predicted window** — nothing that says, or implies
+by its timing, that a period is due. That would be an inference, and would drag
+every constraint in §6 back into a feature deliberately built without them.
+
+Changing this means editing this section first, with the reasoning, per §11 of
+CLAUDE.md. It must not arrive as a quiet change in code.
+
+---
+
+## 8. Non-goals
 
 Stated explicitly so they are inherited rather than rediscovered:
 

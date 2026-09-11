@@ -197,6 +197,14 @@ class _Stat extends StatelessWidget {
   }
 }
 
+/// How many days apart the chart's horizontal lines and left-hand labels are.
+///
+/// Seven, so the unit is a week and one of the lines lands on 28 -- the number
+/// everyone has been told a cycle is. It is a landmark to read the bars
+/// against, not a target: docs/cycle-logic.md section 0 is explicit that only
+/// about 13% of cycles are 28 days, and nothing here marks it as normal.
+const _axisIntervalDays = 7.0;
+
 /// One bar per completed cycle.
 ///
 /// A single series, so there is no categorical palette to validate and no
@@ -229,14 +237,45 @@ class _CycleLengthChart extends StatelessWidget {
         child: BarChart(
           BarChartData(
             maxY: (tallest + 4).toDouble(),
-            // Recessive: the data is the ink, the frame is not.
-            gridData: const FlGridData(show: false),
+            // Recessive: the data is the ink, the frame is not. The grid is
+            // horizontal only and one shade off the surface, and it is solid --
+            // a dashed grid reads as a projection or a threshold when it is
+            // only a grid.
+            gridData: FlGridData(
+              drawVerticalLine: false,
+              horizontalInterval: _axisIntervalDays,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: theme.colorScheme.outlineVariant,
+                strokeWidth: 1,
+              ),
+            ),
             borderData: FlBorderData(show: false),
+            // No tooltip. On a touch device it would need a tap to appear, and
+            // every value is already written out in the list below the chart,
+            // which is also what a screen reader is given.
             barTouchData: BarTouchData(enabled: false),
             titlesData: FlTitlesData(
               topTitles: const AxisTitles(),
               rightTitles: const AxisTitles(),
-              leftTitles: const AxisTitles(),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: _axisIntervalDays,
+                  // Scaled for the same reason the bottom strip is: a fixed
+                  // width clips the numbers at a larger text size.
+                  reservedSize: MediaQuery.textScalerOf(context).scale(28),
+                  getTitlesWidget: (value, meta) => Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Text(
+                      '${value.toInt()}',
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
