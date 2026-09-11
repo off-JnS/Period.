@@ -67,6 +67,20 @@ final remindersProvider = Provider<Reminders>(
   (ref) => LocalNotificationReminders(),
 );
 
+/// Whether the operating system will currently show a notification.
+///
+/// Read like [lockAvailableProvider], and shown in settings for the same
+/// reason: a switch that is on while the system blocks it explains nothing, and
+/// the reminder that never arrives looks like the app is broken rather than
+/// like a permission she can restore.
+///
+/// Invalidated on resume by the settings page, because the answer changes while
+/// the app is in the background -- which is exactly when she goes to system
+/// settings to change it.
+final remindersAllowedProvider = FutureProvider<bool>(
+  (ref) => ref.watch(remindersProvider).hasPermission(),
+);
+
 /// Whether this device can authenticate at all.
 ///
 /// Read once and shown in settings, so the switch can explain itself rather

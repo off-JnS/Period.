@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_schedule.dart';
 import 'package:period/domain/models/reminder_time.dart';
 import 'package:period/presentation/app_shell.dart';
 import 'package:period/presentation/providers.dart';
@@ -351,6 +352,90 @@ void main() {
       await tester.tap(find.widgetWithText(FilterChip, 'Wed'));
       await settleDatabase(tester);
       expect(find.bySemanticsLabel('Wednesday, not selected'), findsOne);
+    });
+  });
+
+  group('when the system is blocking notifications', () {
+    /// Scrolls the reminder section into view.
+    Future<void> revealReminder(WidgetTester tester) async {
+      await tester.dragUntilVisible(
+        find.text('Remind me to log'),
+        find.descendant(
+          of: find.byType(SettingsScreen),
+          matching: find.byType(ListView),
+        ),
+        const Offset(0, -100),
+      );
+      await settleDatabase(tester);
+    }
+
+    Future<void> givenReminderOn() => db.settingsDao.writeReminderSchedule(
+      const ReminderSchedule(enabled: true),
+    );
+
+    testWidgets('says so rather than letting her wonder', (tester) async {
+      await givenReminderOn();
+      reminders.permitted = false;
+
+      await pumpSettings(tester);
+      await revealReminder(tester);
+
+      expect(
+        find.textContaining('notifications are switched off'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says nothing when the system is allowing them', (
+      tester,
+    ) async {
+      await givenReminderOn();
+      await pumpSettings(tester);
+      await revealReminder(tester);
+
+      expect(
+        find.textContaining('notifications are switched off'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('checks again on the way back into the app', (tester) async {
+      // The whole point of the resume hook. She reads the warning, goes to her
+      // phone's settings, allows notifications and comes back. The shell keeps
+      // every tab mounted, so without this the answer read at launch would
+      // stand for the rest of the session and the warning would outlive the
+      // problem it describes.
+      await givenReminderOn();
+      reminders.permitted = false;
+
+      await pumpSettings(tester);
+      await revealReminder(tester);
+      expect(
+        find.textContaining('notifications are switched off'),
+        findsOneWidget,
+      );
+
+      reminders.permitted = true;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settleDatabase(tester);
+
+      expect(
+        find.textContaining('notifications are switched off'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('does not ask on the way out', (tester) async {
+      await givenReminderOn();
+      await pumpSettings(tester);
+      await revealReminder(tester);
+
+      final before = reminders.permissionChecks;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await settleDatabase(tester);
+
+      // Answering a question about a phone she is no longer looking at.
+      expect(reminders.permissionChecks, before);
     });
   });
 

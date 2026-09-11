@@ -41,11 +41,21 @@ class AppliedSchedule {
 /// docs/verification.md.
 class FakeReminders implements Reminders {
   /// Creates reminders that grant permission, unless told otherwise.
-  FakeReminders({this.granted = true});
+  FakeReminders({this.granted = true, bool? permitted})
+    : permitted = permitted ?? granted;
 
   /// What [requestPermission] answers. False models a user, or an operating
   /// system, refusing notifications.
   bool granted;
+
+  /// What [hasPermission] answers.
+  ///
+  /// Defaults to [granted], because the two agree in every case but the one
+  /// worth testing: a permission granted once and revoked later.
+  bool permitted;
+
+  /// How many times the current permission was checked.
+  int permissionChecks = 0;
 
   /// How many times permission was asked for.
   int permissionRequests = 0;
@@ -66,6 +76,12 @@ class FakeReminders implements Reminders {
   Future<bool> requestPermission() async {
     permissionRequests++;
     return granted;
+  }
+
+  @override
+  Future<bool> hasPermission() async {
+    permissionChecks++;
+    return permitted;
   }
 
   @override

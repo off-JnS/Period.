@@ -625,5 +625,9 @@
   "reminderChannelDescription": "The reminder you set yourself.",
   "@reminderChannelDescription": {
     "description": "The Android notification channel's description, shown in the system settings beside its name."
+  },
+  "reminderBlockedBySystem": "Reminders are on here, but notifications are switched off for this app on your phone, so none will arrive. You can turn them back on in your phone's settings.",
+  "@reminderBlockedBySystem": {
+    "description": "Shown only when her reminder is switched on AND the operating system is blocking notifications. Both halves matter: a permission that was never asked for is not the same as one that was taken away, and only this combination means a reminder she asked for cannot arrive."
   }
 }

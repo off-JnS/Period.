@@ -53,6 +53,7 @@ class SettingsScreen extends StatelessWidget {
     this.onAppLockChanged,
     this.onReminderChanged,
     this.lockAvailable = true,
+    this.remindersAllowed = true,
     super.key,
   });
 
@@ -64,6 +65,13 @@ class SettingsScreen extends StatelessWidget {
   /// False when there is no biometric enrolled and no passcode set. The switch
   /// says so rather than silently refusing to move.
   final bool lockAvailable;
+
+  /// Whether the operating system will currently show a notification.
+  ///
+  /// Only consulted while [SettingsViewData.reminder] is enabled. On a fresh
+  /// install this is false because she has never been asked, which is a
+  /// different thing from blocked and must not be reported as one.
+  final bool remindersAllowed;
 
   /// Called with the mode the user chose.
   final void Function(CycleMode mode)? onModeChanged;
@@ -213,10 +221,10 @@ class SettingsScreen extends StatelessWidget {
                 leading: const Icon(Icons.schedule),
                 title: Text(l10n.reminderTimeLabel),
                 trailing: Text(
-                  // Formatted by the locale, not by toHhMm(): that is the
-                  // storage format, and a 12-hour locale should not be shown
-                  // "20:00". Section 3 keeps the wall clock out of the domain,
-                  // so the conversion to something displayable happens here.
+                  // Formatted by the locale and the device, not by toHhMm():
+                  // that is the storage format. Section 3 keeps the wall clock
+                  // out of the domain, so turning it into something readable
+                  // happens here -- see _formatTime for what that involves.
                   _formatTime(context, data.reminder.time),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
@@ -239,35 +247,18 @@ class SettingsScreen extends StatelessWidget {
                         data.reminder.copyWith(weekdays: weekdays),
                       ),
               ),
+              // The system is blocking it. Said here rather than left to be
+              // discovered by a reminder that never comes -- and said only in
+              // this combination, because "not granted" on a fresh install
+              // means she has not been asked yet, not that anything is wrong.
+              if (!remindersAllowed)
+                _ReminderWarning(l10n.reminderBlockedBySystem),
+
               // On, and nothing will ever fire. Distinct from off, and the one
               // state where saying nothing would look like a bug rather than a
               // choice she made.
               if (data.reminder.validWeekdays.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // An icon as well as the colour. Section 9: no state is
-                      // ever carried by colour alone.
-                      Icon(
-                        Icons.info_outline,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.reminderNoDaysChosen,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _ReminderWarning(l10n.reminderNoDaysChosen),
               const SizedBox(height: 8),
             ],
 
@@ -344,14 +335,21 @@ class SettingsScreen extends StatelessWidget {
     if (confirmed ?? false) onDeleteEverything?.call();
   }
 
-  /// The chosen time, as this locale writes a time of day.
+  /// The chosen time, as this locale and this phone write a time of day.
   ///
   /// Through [MaterialLocalizations] rather than [ReminderTime.toHhMm], which
-  /// is the storage format: a locale on a 12-hour clock should see "8:00 PM",
-  /// and the system's own 24-hour setting should be honoured.
+  /// is the storage format: a locale on a 12-hour clock should see "8:00 PM".
+  ///
+  /// `alwaysUse24HourFormat` looks optional and is not. It defaults to false,
+  /// while [showTimePicker] reads the device's own 24-hour setting -- so left
+  /// at the default, an English user whose phone is set to 24-hour time would
+  /// pick 20:00 in the dial and read "8:00 PM" back on this row. German hid
+  /// that for a while, because its locale writes a 24-hour clock either way.
   String _formatTime(BuildContext context, ReminderTime time) =>
-      MaterialLocalizations.of(context)
-          .formatTimeOfDay(TimeOfDay(hour: time.hour, minute: time.minute));
+      MaterialLocalizations.of(context).formatTimeOfDay(
+        TimeOfDay(hour: time.hour, minute: time.minute),
+        alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+      );
 
   /// Opens the system time picker and reports what she chose.
   ///
@@ -425,6 +423,13 @@ class _WeekdayChooser extends StatelessWidget {
                       ? l10n.reminderDaySelected(full.format(date))
                       : l10n.reminderDayNotSelected(full.format(date)),
                   excludeSemantics: true,
+                  // Both, and `selected` is the one that matters. Excluding the
+                  // chip's own semantics to replace its short label also throws
+                  // away the `selected` flag it sets, leaving a plain button
+                  // whose state lives only in the words above -- so a screen
+                  // reader would not announce the state *changing* on a tap,
+                  // and nothing but prose would say it is selectable at all.
+                  selected: isSelected,
                   button: true,
                   child: FilterChip(
                     label: Text(short.format(date)),
@@ -439,6 +444,44 @@ class _WeekdayChooser extends StatelessWidget {
                 );
               },
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A reason no reminder will arrive.
+///
+/// Both cases it serves look identical to the user -- the switch is on and
+/// nothing comes -- so they are said the same way, and neither is left to be
+/// inferred from silence.
+///
+/// An icon as well as the colour. Section 9: no state is ever carried by colour
+/// alone, which matters most here, where the whole content is a warning.
+class _ReminderWarning extends StatelessWidget {
+  const _ReminderWarning(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: theme.colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
         ],
       ),
     );

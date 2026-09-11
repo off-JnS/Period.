@@ -97,11 +97,13 @@ void main() {
     String name, {
     Locale locale = const Locale('en'),
     double textScale = 1,
+    bool remindersAllowed = true,
     Size surface = const Size(400, 1800),
   }) async {
     await pumpApp(
       tester,
       SettingsScreen(
+        remindersAllowed: remindersAllowed,
         data: SettingsViewData(reminder: reminder),
         onModeChanged: (_) {},
         onPredictionsOptInChanged: ({required optedIn}) {},
@@ -157,6 +159,19 @@ void main() {
       tester,
       const ReminderSchedule(enabled: true, weekdays: {}),
       'reminder_no_days',
+    );
+  });
+
+  testWidgets('the reminder the system is blocking', (tester) async {
+    // She asked for it and the phone will not deliver it. The picture is worth
+    // having because this is the state a user actually complains about, and
+    // because it is the only one where the app has to explain something that
+    // is not its own doing.
+    await expectReminderGolden(
+      tester,
+      const ReminderSchedule(enabled: true),
+      'reminder_blocked',
+      remindersAllowed: false,
     );
   });
 

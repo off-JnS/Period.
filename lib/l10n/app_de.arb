@@ -138,5 +138,6 @@
   "reminderNotificationTitle": "Erinnerung",
   "reminderNotificationBody": "\u00d6ffne die App, wenn du einen Moment hast.",
   "reminderChannelName": "Erinnerungen",
-  "reminderChannelDescription": "Die Erinnerung, die du selbst festgelegt hast."
+  "reminderChannelDescription": "Die Erinnerung, die du selbst festgelegt hast.",
+  "reminderBlockedBySystem": "Erinnerungen sind hier eingeschaltet, aber Mitteilungen sind f\u00fcr diese App auf deinem Handy deaktiviert \u2014 es kommt also keine an. Du kannst sie in den Einstellungen deines Handys wieder erlauben."
 }

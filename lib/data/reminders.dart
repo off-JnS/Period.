@@ -26,6 +26,20 @@ abstract class Reminders {
   /// anything, is the prompt everyone refuses.
   Future<bool> requestPermission();
 
+  /// Whether the operating system will currently show a notification.
+  ///
+  /// Asked without prompting. A permission granted once does not stay granted:
+  /// she can revoke it in system settings, and Android revokes it on its own
+  /// for apps left unused for a few months. Either way nothing tells the app --
+  /// the reminder simply stops arriving, and the switch in settings goes on
+  /// saying it is on.
+  ///
+  /// Only meaningful alongside her own setting. On a fresh install this is
+  /// false because she has never been asked, which is not the same as blocked;
+  /// see [SettingsScreen], which only says anything when her reminder is on and
+  /// this is false.
+  Future<bool> hasPermission();
+
   /// Makes what is scheduled match [schedule], replacing whatever was there.
   ///
   /// [today] and [now] locate the first firing of each day; everything after
@@ -138,6 +152,27 @@ class LocalNotificationReminders implements Reminders {
 
     // A platform with neither. Nothing will be shown, and saying so is better
     // than reporting a success that produces no notification.
+    return false;
+  }
+
+  @override
+  Future<bool> hasPermission() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android != null) {
+      return await android.areNotificationsEnabled() ?? false;
+    }
+
+    final ios = _plugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    if (ios != null) {
+      return (await ios.checkPermissions())?.isEnabled ?? false;
+    }
+
     return false;
   }
 

@@ -4,9 +4,9 @@ CLAUDE.md section 11 ends every task with "state plainly what you did NOT do or
 test". This is that, for the app as a whole rather than for one change, because
 the answer has stopped fitting in a commit message.
 
-It exists for one reason above the others: **this project has found two bugs
-that were silent for its entire history, and both were in code the test suite
-covered.** A number like "661 tests passing" says less than it appears to. What
+It exists for one reason above the others: **this project has found three bugs
+that were silent for its entire history, and all three were in code the test
+suite covered.** A number like "684 tests passing" says less than it appears to. What
 follows is meant to say more.
 
 Read it as a map of where to be suspicious, not as a list of defects. Everything
@@ -24,13 +24,13 @@ emulator, not once. Everything below follows from that.
 
 ## What is actually proven
 
-**661 tests.** Not one number but three kinds, which fail for different reasons:
+**684 tests.** Not one number but three kinds, which fail for different reasons:
 
 | Kind | Count | What it proves |
 |---|---|---|
 | Domain logic on the plain Dart VM | 207 | The cycle logic is right, *and* that `lib/domain` reaches no Flutter — `dart test` cannot resolve `package:flutter`, so an import there fails this and nothing else |
-| Widget and integration tests | the rest of 661 | Screens render every state, the database round-trips, the backup survives export → wipe → import |
-| Goldens | 46 images | What a person actually sees, in English and German, light and dark, at 100% and 200% text |
+| Widget and integration tests | the rest of 684 | Screens render every state, the database round-trips, the backup survives export → wipe → import |
+| Goldens | 47 images | What a person actually sees, in English and German, light and dark, at 100% and 200% text |
 
 **Structural guards** in `test/architecture_test.dart` read source and
 configuration rather than behaviour: `lib/domain` imports nothing outside a tiny
@@ -118,6 +118,13 @@ So everything past the seam is unknown, and none of it can be found out here:
 - whether iOS shows the permission prompt, and what a refusal looks like when it
   comes back
 
+A permission *revoked later* is now handled rather than unverified: settings
+asks the system on every resume and says plainly that the reminder cannot
+arrive. Android revokes notifications on its own for apps left unused for a few
+months, so this is a state real users reach without doing anything. What is
+still unverified is whether the system answers that question truthfully on a
+device — the check itself is mocked like everything else here.
+
 The one thing that *is* checked by a test rather than by eye is section 9's
 neutrality: `settings_page_test.dart` reads the title and body actually handed
 to the scheduler and fails if either contains a word that would give her away on
@@ -136,10 +143,10 @@ strength of the comment explaining it.
 
 ---
 
-## Calibration: the two bugs that were silent
+## Calibration: the three bugs that were silent
 
-Both were found by a security review, not by the suite, and both had been wrong
-since they were written.
+None was found by the suite. Two came out of a security review and one out of a
+design review, and all three had been wrong since they were written.
 
 **Section 5's copy-before-migration had never run.** `open_database` read the
 schema version with a plain `sqlite3.open()` and no key. The file is encrypted,
@@ -152,9 +159,22 @@ stubbed the version read out** — the real one was never exercised.
 inside the live database. Invisible because the tests asked whether the tables
 were empty, and they were.
 
-The lesson both carry: **a test that never runs the real thing tells you
+**The app had no dark theme, and six goldens said otherwise.** `main.dart` set
+`theme:` and never `darkTheme:`, so on a phone set to dark the app rendered
+light. The dark goldens passed the whole time because the test harness built a
+dark theme *of its own* — they were pictures of an appearance the app could not
+produce. Invisible because a golden proves what a widget renders under the theme
+it is handed, and nothing checked that the app hands it the same one.
+
+The fix was not the missing line. Both now come from `lib/presentation/theme.dart`,
+so the harness cannot define an appearance the app does not have, and
+`theme_test.dart` asserts the wiring by reading back the brightness a screen
+inside the real `MaterialApp` actually gets.
+
+The lesson all three carry: **a test that never runs the real thing tells you
 nothing, however green it is.** Where this project stubs a seam, treat the code
-behind that seam as untested until something drives it.
+behind that seam as untested until something drives it — and a golden is a stub
+of the theme unless something proves the app supplies it.
 
 ---
 

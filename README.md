@@ -27,7 +27,8 @@ The promise is meant to be checkable rather than taken on trust:
 Built, and unreleased. Four screens — Today, Calendar, History, Settings — over
 an encrypted database, with cycle statistics and predictions, the three cycle
 modes where predictions are off, an encrypted backup, an optional app lock,
-screenshot protection, a log reminder, and German and English throughout.
+screenshot protection, a log reminder, light and dark appearances, and German
+and English throughout.
 
 **Nothing has ever run on a phone.** Not on a device, not on an emulator. The
 logic is well tested and the platform integration is not tested at all, because

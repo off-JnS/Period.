@@ -16,12 +16,46 @@ import 'passphrase_dialog.dart';
 import 'settings_screen.dart';
 
 /// The settings screen connected to the database.
-class SettingsPage extends ConsumerWidget {
+///
+/// Stateful for one reason: the notification permission is the only thing this
+/// screen shows that the *operating system* can change while the app is in the
+/// background -- which is exactly what happens when she follows the warning to
+/// her phone's settings and comes back. The shell keeps every tab mounted in an
+/// IndexedStack, so without a resume hook the answer read at launch would stand
+/// for the rest of the session and the warning would outlive the problem.
+class SettingsPage extends ConsumerStatefulWidget {
   /// Creates the page.
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Only on the way back in. Re-asking as the app leaves would answer a
+    // question about a phone the user is no longer looking at.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(remindersAllowedProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final settings = ref.watch(settingsProvider);
 
@@ -44,6 +78,11 @@ class SettingsPage extends ConsumerWidget {
           reminder: stored.reminder,
         ),
         lockAvailable: ref.watch(lockAvailableProvider).value ?? false,
+        // Defaults to allowed while the check is in flight. The warning it
+        // controls accuses the operating system of blocking her reminder, and
+        // flashing that up for a frame before the answer arrives would be a
+        // worse lie than saying nothing.
+        remindersAllowed: ref.watch(remindersAllowedProvider).value ?? true,
         onModeChanged: (mode) => _saveCycle(
           ref,
           // The opt-in belongs to perimenopause. Carrying it across a mode
