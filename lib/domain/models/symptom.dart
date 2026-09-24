@@ -44,3 +44,46 @@ const offeredSymptomKeys = <String>[
   'acne',
   'troubleSleeping',
 ];
+
+/// Moods offered as chips. Any number may be logged on a day.
+///
+/// Namespaced keys (`mood.…`) in the same keyed table as symptoms: section 5's
+/// rule that new things to log never need a migration covers these too. The
+/// unprefixed keys above are physical symptoms and keep their original keys,
+/// so nothing already stored changes meaning.
+const offeredMoodKeys = <String>[
+  'mood.calm',
+  'mood.happy',
+  'mood.energetic',
+  'mood.sensitive',
+  'mood.sad',
+  'mood.anxious',
+  'mood.irritable',
+  'mood.lowEnergy',
+];
+
+/// Discharge, described. At most one per day.
+///
+/// Recorded as she describes it and never interpreted: nothing in the app
+/// reads these keys to estimate anything (docs/cycle-logic.md §7).
+const offeredDischargeKeys = <String>[
+  'discharge.none',
+  'discharge.dry',
+  'discharge.sticky',
+  'discharge.creamy',
+  'discharge.watery',
+  'discharge.eggWhite',
+];
+
+/// Sex. At most one per day.
+///
+/// A record of what happened, nothing more. Never combined with the fertile
+/// window or any estimate, so the app cannot drift into saying which days are
+/// "safe" (CLAUDE.md §8, docs/cycle-logic.md §7).
+const offeredSexKeys = <String>['sex.none', 'sex.protected', 'sex.unprotected'];
+
+/// The pill was taken that day. Offered in the hormonal contraception mode.
+const pillTakenKey = 'pill.taken';
+
+/// The groups of which at most one key may be logged on a day.
+const singleChoiceGroups = <List<String>>[offeredDischargeKeys, offeredSexKeys];

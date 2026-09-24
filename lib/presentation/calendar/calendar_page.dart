@@ -5,6 +5,7 @@ import '../../data/database/daos/settings_dao.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/clock.dart';
 import '../../domain/models/cycle_date.dart';
+import '../../domain/models/cycle_mode.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../log/log_entry_screen.dart';
@@ -112,6 +113,7 @@ class _CalendarPageState extends State<CalendarPage> {
     final today = widget.clock.today();
     final entry = await widget.logDao.entryOn(date);
     final starts = await widget.logDao.allPeriodStarts();
+    final settings = await widget.settingsDao.cycleSettings();
     if (!mounted) return;
 
     final result = await showLogEntrySheet(
@@ -121,6 +123,7 @@ class _CalendarPageState extends State<CalendarPage> {
         today: today,
         entry: entry,
         isPeriodStart: starts.contains(date),
+        offerPill: settings.mode == CycleMode.hormonalContraception,
       ),
     );
     if (result == null || !mounted) return;

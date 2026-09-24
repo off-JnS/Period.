@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
 import '../support/dates.dart';
+import '../support/models.dart';
 import '../support/widgets.dart';
 
 /// Golden tests for the Today screen, as CLAUDE.md section 7 requires.
@@ -177,6 +179,32 @@ void main() {
       ),
       'large_text',
       textScale: 2,
+    );
+  });
+
+  testWidgets('everything logged today', (tester) async {
+    await expectGolden(
+      tester,
+      TodayViewData(
+        cycleDay: 3,
+        typicalCycleLength: 28,
+        prediction: predicted,
+        isTodayPeriodStart: false,
+        todayEntry: aDayEntry(
+          date: aDate(2024, 5, 17),
+          flow: FlowIntensity.medium,
+          note: 'Long walk helped',
+          symptoms: {
+            aSymptom(key: 'cramps'),
+            aSymptom(key: 'fatigue'),
+            aSymptom(key: 'mood.calm'),
+            aSymptom(key: 'mood.sensitive'),
+            aSymptom(key: 'discharge.creamy'),
+            aSymptom(key: 'sex.protected'),
+          },
+        ),
+      ),
+      'logged_everything',
     );
   });
 }

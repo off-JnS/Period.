@@ -128,6 +128,7 @@ class _TodayPageState extends State<TodayPage> {
     final today = widget.clock.today();
     final entry = await widget.logDao.entryOn(date);
     final starts = await widget.logDao.allPeriodStarts();
+    final settings = await widget.settingsDao.cycleSettings();
     if (!mounted) return;
 
     final result = await showLogEntrySheet(
@@ -137,6 +138,7 @@ class _TodayPageState extends State<TodayPage> {
         today: today,
         entry: entry,
         isPeriodStart: starts.contains(date),
+        offerPill: settings.mode == CycleMode.hormonalContraception,
       ),
     );
     if (result == null || !mounted) return;

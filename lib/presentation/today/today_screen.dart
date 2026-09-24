@@ -318,16 +318,41 @@ class _LoggedTodaySection extends StatelessWidget {
 
     // Symptoms this build has no name for are skipped rather than shown as raw
     // keys; see symptomLabel. The rows stay in the database untouched.
+    final keys = {
+      for (final symptom in current?.symptoms ?? const <Symptom>{}) symptom.key,
+    };
+    // One line per kind, each in its offered order rather than alphabetical,
+    // so moods read as a mood list and not mixed in among symptoms.
+    List<String> named(Iterable<String> offered) => [
+      for (final key in offered)
+        if (keys.contains(key)) ?symptomLabel(l10n, key),
+    ];
+    // Symptoms include keys this build no longer offers but can still name;
+    // keys it cannot name at all are skipped (see symptomLabel).
+    final namespaced = {
+      ...offeredMoodKeys,
+      ...offeredDischargeKeys,
+      ...offeredSexKeys,
+      pillTakenKey,
+    };
     final symptomNames = <String>[
-      for (final symptom in current?.symptoms ?? const <Symptom>{})
-        ?symptomLabel(l10n, symptom.key),
+      for (final key in keys)
+        if (!namespaced.contains(key)) ?symptomLabel(l10n, key),
     ]..sort();
+    final moods = named(offeredMoodKeys);
+    final discharge = named(offeredDischargeKeys);
+    final sex = named(offeredSexKeys);
+    final pill = keys.contains(pillTakenKey);
 
     final hasAnything =
         isPeriodStart ||
         current?.flow != null ||
         (current?.note?.isNotEmpty ?? false) ||
-        symptomNames.isNotEmpty;
+        symptomNames.isNotEmpty ||
+        moods.isNotEmpty ||
+        discharge.isNotEmpty ||
+        sex.isNotEmpty ||
+        pill;
 
     return SectionCard(
       icon: Icons.edit_note_rounded,
@@ -350,6 +375,22 @@ class _LoggedTodaySection extends StatelessWidget {
               ),
             if (symptomNames.isNotEmpty)
               Text(symptomNames.join(', '), style: theme.textTheme.bodyLarge),
+            if (moods.isNotEmpty)
+              Text(
+                l10n.moodSummary(moods.join(', ')),
+                style: theme.textTheme.bodyLarge,
+              ),
+            if (discharge.isNotEmpty)
+              Text(
+                l10n.dischargeSummary(discharge.single),
+                style: theme.textTheme.bodyLarge,
+              ),
+            if (sex.isNotEmpty)
+              Text(
+                l10n.sexSummary(sex.single),
+                style: theme.textTheme.bodyLarge,
+              ),
+            if (pill) Text(l10n.pillTaken, style: theme.textTheme.bodyLarge),
             if (current?.note case final note? when note.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),

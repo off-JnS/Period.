@@ -6,6 +6,7 @@ import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
 import '../support/dates.dart';
+import '../support/models.dart';
 import '../support/widgets.dart';
 
 void main() {
@@ -218,6 +219,41 @@ void main() {
         brightness: Brightness.dark,
       );
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('what was logged today', () {
+    testWidgets('lists each kind on its own line', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            prediction: const NotEnoughCycles(have: 0, need: 2),
+            todayEntry: aDayEntry(
+              date: aDate(2024, 5, 17),
+              symptoms: {
+                aSymptom(key: 'cramps'),
+                aSymptom(key: 'mood.sad'),
+                aSymptom(key: 'mood.calm'),
+                aSymptom(key: 'discharge.creamy'),
+                aSymptom(key: 'sex.protected'),
+                aSymptom(key: 'pill.taken'),
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Pill taken'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Cramps'), findsOneWidget);
+      // In the order offered, not alphabetical.
+      expect(find.text('Mood: Calm, Sad'), findsOneWidget);
+      expect(find.text('Discharge: Creamy'), findsOneWidget);
+      expect(find.text('Sex: Protected'), findsOneWidget);
+      expect(find.text('Pill taken'), findsOneWidget);
     });
   });
 }

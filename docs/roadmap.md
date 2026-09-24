@@ -38,7 +38,7 @@ Order is by how often the feature is used, then by risk. Anything needing a
 schema migration or a change to `docs/cycle-logic.md` says so, because §5 and
 §11 require both to be done carefully and flagged.
 
-### 1. Reminders 🔨 — built, awaiting review
+### 1. Reminders ✅
 
 **What:** two optional local notifications.
 - *Period coming* — a set number of days (1–5) before the first day of the
@@ -72,7 +72,7 @@ kinds are deliberately indistinguishable there.
 **Not in this step:** a pill reminder (part of feature 2's contraception
 logging), snooze, custom notification text.
 
-### 2. More to log ⏳
+### 2. More to log 🔨 — built, awaiting review
 
 **What:** mood, sex (protected / unprotected / none), discharge, and for the
 contraception mode, "pill taken".
@@ -81,8 +81,9 @@ contraception mode, "pill taken".
 columns) — **no migration**. Sex and pill as their own small keyed sets in the
 same table family. Log sheet gains sections; Today's summary lists them.
 
-❓ Wording for "sex" must not drift into contraceptive guidance (§8, §7 of the
-spec). To be drafted and reviewed before any code.
+**Decided 2026-09-25:** sex as *No sex / Protected / Unprotected*, with a note
+beneath that it is never combined with any estimate; moods any number, discharge
+and sex one each (tap again to clear), pill only in the contraception mode.
 
 ### 3. Period length ⏳
 

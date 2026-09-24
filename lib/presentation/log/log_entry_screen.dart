@@ -68,8 +68,14 @@ class LogEntryScreen extends StatefulWidget {
     required this.today,
     this.entry,
     this.isPeriodStart = false,
+    this.offerPill = false,
     super.key,
   });
+
+  /// Whether to show the "pill taken" switch: only in the hormonal
+  /// contraception mode, where it means something. A pill already logged on
+  /// this day is kept either way.
+  final bool offerPill;
 
   /// The day being logged.
   final CycleDate date;
@@ -136,6 +142,23 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
       ..removeListener(_noteChanged)
       ..dispose();
     super.dispose();
+  }
+
+  /// Adds or removes one logged key. Choosing a key in a single-choice group
+  /// (discharge, sex) replaces whatever else in that group was chosen.
+  void _toggle(String key, {required bool selected}) {
+    setState(() {
+      final next = {..._symptomKeys};
+      if (selected) {
+        for (final group in singleChoiceGroups) {
+          if (group.contains(key)) next.removeAll(group);
+        }
+        next.add(key);
+      } else {
+        next.remove(key);
+      }
+      _symptomKeys = next;
+    });
   }
 
   /// Tells the sheet around this screen whether it may be swiped away.
@@ -261,19 +284,65 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               },
             ),
             const SizedBox(height: 28),
-            _SymptomsSection(
+            _ChipsSection(
+              heading: l10n.symptomsHeading,
+              keys: offeredSymptomKeys,
               selectedKeys: _symptomKeys,
               onToggle: (key, selected) {
                 toggled();
-                setState(() {
-                  if (selected) {
-                    _symptomKeys = {..._symptomKeys, key};
-                  } else {
-                    _symptomKeys = {..._symptomKeys}..remove(key);
-                  }
-                });
+                _toggle(key, selected: selected);
               },
             ),
+            const SizedBox(height: 28),
+            _ChipsSection(
+              heading: l10n.moodHeading,
+              keys: offeredMoodKeys,
+              selectedKeys: _symptomKeys,
+              onToggle: (key, selected) {
+                toggled();
+                _toggle(key, selected: selected);
+              },
+            ),
+            const SizedBox(height: 28),
+            _ChipsSection(
+              heading: l10n.dischargeHeading,
+              keys: offeredDischargeKeys,
+              selectedKeys: _symptomKeys,
+              singleChoice: true,
+              footer: l10n.singleChoiceHint,
+              onToggle: (key, selected) {
+                toggled();
+                _toggle(key, selected: selected);
+              },
+            ),
+            const SizedBox(height: 28),
+            _ChipsSection(
+              heading: l10n.sexHeading,
+              keys: offeredSexKeys,
+              selectedKeys: _symptomKeys,
+              singleChoice: true,
+              footer: '${l10n.sexFooter} ${l10n.singleChoiceHint}',
+              onToggle: (key, selected) {
+                toggled();
+                _toggle(key, selected: selected);
+              },
+            ),
+            if (widget.offerPill) ...[
+              const SizedBox(height: 28),
+              _Group(
+                heading: l10n.pillHeading,
+                padding: EdgeInsets.zero,
+                child: SwitchListTile.adaptive(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  value: _symptomKeys.contains(pillTakenKey),
+                  onChanged: (taken) {
+                    toggled();
+                    _toggle(pillTakenKey, selected: taken);
+                  },
+                  title: Text(l10n.pillTaken),
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
             _NoteSection(controller: _note),
             if (_hasSomethingStored) ...[
@@ -502,29 +571,52 @@ class _FlowSection extends StatelessWidget {
   }
 }
 
-class _SymptomsSection extends StatelessWidget {
-  const _SymptomsSection({required this.selectedKeys, required this.onToggle});
+/// A group of chips for keyed things to log: symptoms, moods, discharge, sex.
+///
+/// Multi-choice groups use filter chips; single-choice groups use choice
+/// chips, where tapping the chosen one again clears it, so "not recorded" is
+/// always reachable without a separate chip.
+class _ChipsSection extends StatelessWidget {
+  const _ChipsSection({
+    required this.heading,
+    required this.keys,
+    required this.selectedKeys,
+    required this.onToggle,
+    this.singleChoice = false,
+    this.footer,
+  });
 
+  final String heading;
+  final List<String> keys;
   final Set<String> selectedKeys;
   final void Function(String key, bool selected) onToggle;
+  final bool singleChoice;
+  final String? footer;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
     return _Group(
-      heading: l10n.symptomsHeading,
+      heading: heading,
+      footer: footer,
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
-          for (final key in offeredSymptomKeys)
+          for (final key in keys)
             if (symptomLabel(l10n, key) case final label?)
-              FilterChip(
-                label: Text(label),
-                selected: selectedKeys.contains(key),
-                onSelected: (selected) => onToggle(key, selected),
-              ),
+              singleChoice
+                  ? ChoiceChip(
+                      label: Text(label),
+                      selected: selectedKeys.contains(key),
+                      onSelected: (selected) => onToggle(key, selected),
+                    )
+                  : FilterChip(
+                      label: Text(label),
+                      selected: selectedKeys.contains(key),
+                      onSelected: (selected) => onToggle(key, selected),
+                    ),
         ],
       ),
     );

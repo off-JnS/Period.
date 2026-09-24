@@ -16,6 +16,7 @@ void main() {
     WidgetTester tester, {
     DayEntry? entry,
     bool isPeriodStart = false,
+    bool offerPill = false,
     Locale locale = const Locale('en'),
     required Future<void> Function(WidgetTester tester) act,
   }) async {
@@ -34,6 +35,7 @@ void main() {
                       today: day,
                       entry: entry,
                       isPeriodStart: isPeriodStart,
+                      offerPill: offerPill,
                     ),
                   ),
                 );
@@ -322,6 +324,144 @@ void main() {
         textScale: 2,
       );
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('mood, discharge, sex and the pill', () {
+    Future<void> scrollTo(WidgetTester tester, Finder finder) =>
+        tester.scrollUntilVisible(
+          finder,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+
+    Set<String> keysOf(LogEntryResult? result) => {
+      for (final symptom in (result! as LogEntrySaved).draft.entry.symptoms)
+        symptom.key,
+    };
+
+    testWidgets('offers each as its own section', (tester) async {
+      await pumpAndClose(tester, act: (tester) async {});
+      for (final heading in ['Mood', 'Discharge', 'Sex']) {
+        await scrollTo(tester, find.text(heading));
+        expect(find.text(heading), findsOneWidget);
+      }
+    });
+
+    testWidgets('any number of moods can be saved', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.widgetWithText(FilterChip, 'Calm'));
+          await tester.tap(find.widgetWithText(FilterChip, 'Calm'));
+          await tester.tap(find.widgetWithText(FilterChip, 'Sensitive'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), {'mood.calm', 'mood.sensitive'});
+    });
+
+    testWidgets('discharge keeps only the latest choice', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Creamy'));
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Sticky'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Creamy'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), {'discharge.creamy'});
+    });
+
+    testWidgets('tapping the chosen one again clears it', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        entry: aDayEntry(
+          date: day,
+          symptoms: {aSymptom(key: 'sex.protected')},
+        ),
+        act: (tester) async {
+          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Protected'));
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Protected'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), isEmpty);
+    });
+
+    testWidgets('choosing in one group leaves the others alone', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        entry: aDayEntry(
+          date: day,
+          symptoms: {
+            aSymptom(key: 'cramps'),
+            aSymptom(key: 'mood.sad'),
+          },
+        ),
+        act: (tester) async {
+          await scrollTo(
+            tester,
+            find.widgetWithText(ChoiceChip, 'Unprotected'),
+          );
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Unprotected'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), {'cramps', 'mood.sad', 'sex.unprotected'});
+    });
+
+    testWidgets('sex says it is never combined with an estimate', (
+      tester,
+    ) async {
+      await pumpAndClose(tester, act: (tester) async {});
+      await scrollTo(tester, find.textContaining('never combined'));
+      expect(find.textContaining('never combined with any estimate'), findsOne);
+    });
+
+    testWidgets('the pill switch appears only when offered', (tester) async {
+      await pumpAndClose(tester, act: (tester) async {});
+      expect(find.text('Pill taken'), findsNothing);
+    });
+
+    testWidgets('the pill can be logged when offered', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        offerPill: true,
+        act: (tester) async {
+          await scrollTo(tester, find.text('Pill taken'));
+          await tester.tap(find.text('Pill taken'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), {'pill.taken'});
+    });
+
+    testWidgets('a pill logged earlier survives when not offered', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        entry: aDayEntry(
+          date: day,
+          symptoms: {aSymptom(key: 'pill.taken')},
+        ),
+        act: (tester) async {
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Light'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(keysOf(result), {'pill.taken'});
     });
   });
 }

@@ -137,7 +137,16 @@ ThemeData _themeFrom(Brightness brightness) {
       showCheckmark: false,
       backgroundColor: scheme.groupedBackground,
       selectedColor: scheme.primary,
-      labelStyle: text.bodyMedium,
+      // Resolved per state, so filter chips and choice chips alike get light
+      // text on the filled rose when selected. A fixed secondary style only
+      // reaches choice chips, leaving selected filter chips dark on dark.
+      labelStyle: text.bodyMedium?.copyWith(
+        color: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.onPrimary
+              : scheme.onSurface,
+        ),
+      ),
       secondaryLabelStyle: text.bodyMedium?.copyWith(color: scheme.onPrimary),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
     ),

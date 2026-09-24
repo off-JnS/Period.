@@ -325,4 +325,57 @@ void main() {
       expect(find.text('Estimated fertile window'), findsNothing);
     });
   });
+
+  group('logging the newer kinds', () {
+    testWidgets('mood and sex are stored and summarised', (tester) async {
+      await pumpPage(tester);
+      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.widgetWithText(ChoiceChip, 'Protected'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.widgetWithText(FilterChip, 'Happy'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Protected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final stored = await database.logDao.entryOn(today);
+      expect(stored!.symptoms.map((symptom) => symptom.key).toSet(), {
+        'mood.happy',
+        'sex.protected',
+      });
+      await tester.scrollUntilVisible(
+        find.text('Sex: Protected'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Mood: Happy'), findsOneWidget);
+    });
+
+    testWidgets('the pill is offered only on hormonal contraception', (
+      tester,
+    ) async {
+      Future<bool> offered() async {
+        await tester.pumpWidget(const SizedBox());
+        await pumpPage(tester);
+        await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Note'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        return find.text('Pill taken').evaluate().isNotEmpty;
+      }
+
+      expect(await offered(), isFalse);
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(mode: CycleMode.hormonalContraception),
+      );
+      expect(await offered(), isTrue);
+    });
+  });
 }

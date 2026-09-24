@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/presentation/theme.dart';
+
+import '../support/widgets.dart';
 
 /// WCAG 2.x contrast ratio between two opaque colours.
 double contrast(Color a, Color b) {
@@ -64,6 +67,59 @@ void main() {
           expect(ratio, greaterThanOrEqualTo(floor), reason: '$label: $ratio');
         });
       }
+    });
+  }
+
+  // The pairs above check the theme's colours; this checks what a chip really
+  // draws, which is where a selected filter chip once came out dark on dark.
+  for (final brightness in Brightness.values) {
+    testWidgets('selected chips of both kinds get readable text '
+        '(${brightness.name})', (tester) async {
+      await pumpApp(
+        tester,
+        Scaffold(
+          body: Wrap(
+            children: [
+              FilterChip(
+                label: const Text('filter'),
+                selected: true,
+                onSelected: (_) {},
+              ),
+              ChoiceChip(
+                label: const Text('choice'),
+                selected: true,
+                onSelected: (_) {},
+              ),
+              FilterChip(
+                label: const Text('off'),
+                selected: false,
+                onSelected: (_) {},
+              ),
+            ],
+          ),
+        ),
+        brightness: brightness,
+      );
+      final scheme =
+          (brightness == Brightness.dark ? darkTheme() : lightTheme())
+              .colorScheme;
+      Color colourOf(String label) => tester
+          .renderObject<RenderParagraph>(find.text(label))
+          .text
+          .style!
+          .color!;
+
+      for (final label in ['filter', 'choice']) {
+        expect(
+          contrast(colourOf(label), scheme.primary),
+          greaterThanOrEqualTo(4.5),
+          reason: label,
+        );
+      }
+      expect(
+        contrast(colourOf('off'), scheme.groupedBackground),
+        greaterThanOrEqualTo(4.5),
+      );
     });
   }
 }
