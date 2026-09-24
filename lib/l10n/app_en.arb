@@ -12,15 +12,19 @@
   "@nothingLoggedYet": {
     "description": "Shown on the Today screen before the user has recorded anything at all."
   },
-  "cycleDay": "Day {day}",
-  "@cycleDay": {
-    "description": "The current day of the cycle, shown in the middle of the ring. Kept very short because it sits inside a circle.",
-    "placeholders": { "day": { "type": "int" } }
-  },
   "cycleDayAccessibility": "Cycle day {day}",
   "@cycleDayAccessibility": {
     "description": "Spoken description of the cycle ring for screen readers. Says the value aloud, because the ring itself conveys nothing to a screen reader.",
     "placeholders": { "day": { "type": "int" } }
+  },
+  "cycleDayCaption": "Cycle day",
+  "@cycleDayCaption": {
+    "description": "Small caption above the large day number inside the Today ring. The number itself is shown separately."
+  },
+  "usualLengthCaption": "usually {days} days",
+  "@usualLengthCaption": {
+    "description": "Small line under the day number in the Today ring, giving the user's typical cycle length for context. Says 'usually' because it is a statistic of her own entries, never a certainty.",
+    "placeholders": { "days": { "type": "int" } }
   },
   "noCycleInProgress": "No cycle yet",
   "@noCycleInProgress": {
@@ -75,5 +79,367 @@
   "dismiss": "Dismiss",
   "@dismiss": {
     "description": "Button that hides the doctor hint."
+  },
+  "addEntry": "Add entry",
+  "@addEntry": {
+    "description": "Label and tooltip of the button on the Today screen that opens the logging screen. Spoken by screen readers, so it names the action rather than the icon."
+  },
+  "entryTitle": "Entry",
+  "@entryTitle": {
+    "description": "Title of the screen where the user logs one day."
+  },
+  "entryDateHeading": "Day",
+  "@entryDateHeading": {
+    "description": "Heading above the calendar day being logged."
+  },
+  "changeDay": "Change day",
+  "@changeDay": {
+    "description": "Button that opens the date picker to log a different day. Users log yesterday's period constantly, so this is never buried."
+  },
+  "periodHeading": "Period",
+  "@periodHeading": {
+    "description": "Heading above the period start switch."
+  },
+  "periodStartedThisDay": "My period started on this day",
+  "@periodStartedThisDay": {
+    "description": "Switch marking this day as a period start. First person because the user is recording her own observation."
+  },
+  "periodStartExplanation": "Estimates are based on these days. You can change this whenever you like",
+  "@periodStartExplanation": {
+    "description": "Explains what marking a period start does. Says estimates rather than predictions, and makes clear the entry stays correctable."
+  },
+  "flowHeading": "Flow",
+  "@flowHeading": {
+    "description": "Heading above the flow intensity selector."
+  },
+  "flowNotRecorded": "Not recorded",
+  "@flowNotRecorded": {
+    "description": "The flow option meaning the user did not record it. Deliberately distinct from None, which is an observation that there was no bleeding."
+  },
+  "flowNone": "None",
+  "@flowNone": {
+    "description": "Flow intensity: logged as a period day, but no bleeding. An observation, not missing data."
+  },
+  "flowLight": "Light",
+  "@flowLight": {
+    "description": "Flow intensity: light bleeding, e.g. spotting."
+  },
+  "flowMedium": "Medium",
+  "@flowMedium": {
+    "description": "Flow intensity: moderate bleeding."
+  },
+  "flowHeavy": "Heavy",
+  "@flowHeavy": {
+    "description": "Flow intensity: heavy bleeding."
+  },
+  "symptomsHeading": "Symptoms",
+  "@symptomsHeading": {
+    "description": "Heading above the symptom chips."
+  },
+  "symptomCramps": "Cramps",
+  "@symptomCramps": {
+    "description": "Symptom chip. Describes a sensation the user reports, never a diagnosis."
+  },
+  "symptomHeadache": "Headache",
+  "@symptomHeadache": {
+    "description": "Symptom chip."
+  },
+  "symptomBackache": "Back pain",
+  "@symptomBackache": {
+    "description": "Symptom chip."
+  },
+  "symptomBloating": "Bloating",
+  "@symptomBloating": {
+    "description": "Symptom chip."
+  },
+  "symptomFatigue": "Fatigue",
+  "@symptomFatigue": {
+    "description": "Symptom chip."
+  },
+  "symptomNausea": "Nausea",
+  "@symptomNausea": {
+    "description": "Symptom chip."
+  },
+  "symptomTenderBreasts": "Tender breasts",
+  "@symptomTenderBreasts": {
+    "description": "Symptom chip."
+  },
+  "symptomMoodChange": "Mood change",
+  "@symptomMoodChange": {
+    "description": "Symptom chip. Neutral wording: the app records what the user felt and never characterises her."
+  },
+  "symptomAcne": "Acne",
+  "@symptomAcne": {
+    "description": "Symptom chip."
+  },
+  "symptomTroubleSleeping": "Trouble sleeping",
+  "@symptomTroubleSleeping": {
+    "description": "Symptom chip. Phrased as an experience rather than as insomnia, which reads as a condition."
+  },
+  "noteHeading": "Note",
+  "@noteHeading": {
+    "description": "Heading above the free-text note field."
+  },
+  "noteHint": "Anything you want to remember",
+  "@noteHint": {
+    "description": "Placeholder in the note field. The note is free text and is never parsed."
+  },
+  "noteStaysOnDevice": "Stays on this device, like everything else",
+  "@noteStaysOnDevice": {
+    "description": "Reassurance under the note field. The app has no backend, so this is a statement of fact rather than a promise."
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Button that saves the entry."
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Button that dismisses a dialog without acting."
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Confirming button in the delete-entry dialog."
+  },
+  "entrySaved": "Entry saved",
+  "@entrySaved": {
+    "description": "Confirmation shown after an entry is written."
+  },
+  "deleteEntry": "Delete entry",
+  "@deleteEntry": {
+    "description": "Button that removes everything logged on the day being edited."
+  },
+  "deleteEntryQuestion": "Delete this entry?",
+  "@deleteEntryQuestion": {
+    "description": "Title of the confirmation dialog shown before deleting a day's entry."
+  },
+  "deleteEntryExplanation": "Everything logged on this day is removed, including whether your period started. This cannot be undone",
+  "@deleteEntryExplanation": {
+    "description": "Body of the delete confirmation. Section 9 requires deletion to actually delete, so the wording says so plainly rather than softening it."
+  },
+  "entryDeleted": "Entry deleted",
+  "@entryDeleted": {
+    "description": "Confirmation shown after a day's entry is removed."
+  },
+  "loggedTodayHeading": "Logged today",
+  "@loggedTodayHeading": {
+    "description": "Heading of the card on the Today screen summarising what the user recorded for today."
+  },
+  "nothingLoggedToday": "Nothing logged today",
+  "@nothingLoggedToday": {
+    "description": "Shown in the Today summary card when the user has recorded nothing for today."
+  },
+  "flowSummary": "Flow: {flow}",
+  "@flowSummary": {
+    "description": "Line of the Today summary card naming the recorded flow.",
+    "placeholders": { "flow": { "type": "String" } }
+  },
+  "periodStartSummary": "Period started today",
+  "@periodStartSummary": {
+    "description": "Line in the Today summary card shown when today is marked as a period start."
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Button on the Today summary card that reopens today's entry for changes."
+  },
+  "calendarTitle": "Calendar",
+  "@calendarTitle": {
+    "description": "Title of the month calendar screen, and the label of the button on Today that opens it."
+  },
+  "previousMonth": "Previous month",
+  "@previousMonth": {
+    "description": "Tooltip of the button that moves the calendar back one month."
+  },
+  "nextMonth": "Next month",
+  "@nextMonth": {
+    "description": "Tooltip of the button that moves the calendar forward one month."
+  },
+  "legendPeriodStart": "Period start",
+  "@legendPeriodStart": {
+    "description": "Calendar legend: a day marked as the first day of a period."
+  },
+  "legendLogged": "Logged",
+  "@legendLogged": {
+    "description": "Calendar legend: a day the user recorded something on."
+  },
+  "legendEstimated": "Estimated period",
+  "@legendEstimated": {
+    "description": "Calendar legend: days inside the estimated next-period window. Wording stays an estimate, never a statement that the period will happen then."
+  },
+  "dayNotYetHappened": "Not yet",
+  "@dayNotYetHappened": {
+    "description": "Spoken for a future calendar day, which cannot be logged because it has not happened. Keeps the reason audible rather than leaving a silently dead cell."
+  },
+  "analysisTitle": "Your cycles",
+  "@analysisTitle": {
+    "description": "Title of the screen summarising the user's cycle history. 'Your cycles' rather than 'Analysis': it describes her entries back to her, it does not assess her."
+  },
+  "typicalLengthHeading": "Usual length",
+  "@typicalLengthHeading": {
+    "description": "Heading above the median cycle length."
+  },
+  "lengthInDays": "{days, plural, =1{1 day} other{{days} days}}",
+  "@lengthInDays": {
+    "description": "A cycle length.",
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "basedOnCycles": "Based on your most recent {count, plural, =1{cycle} other{{count} cycles}}",
+  "@basedOnCycles": {
+    "description": "Qualifier under the statistics, naming how much data they rest on. An average over three cycles and one over thirty are not the same claim.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "variationHeading": "Variation",
+  "@variationHeading": {
+    "description": "Heading above the range of cycle lengths."
+  },
+  "variationRange": "Between {shortest} and {longest} days",
+  "@variationRange": {
+    "description": "Describes the spread of the user's cycle lengths. Describes the entries, never the person: no cycle is called irregular here.",
+    "placeholders": { "shortest": { "type": "int" }, "longest": { "type": "int" } }
+  },
+  "variationSteady": "Your cycles have been about the same length",
+  "@variationSteady": {
+    "description": "Shown when every recorded cycle is the same length. Still a description of the data rather than a verdict on it."
+  },
+  "cycleLengthsHeading": "Cycle lengths",
+  "@cycleLengthsHeading": {
+    "description": "Heading above the bar chart comparing the lengths of recent cycles."
+  },
+  "historyHeading": "History",
+  "@historyHeading": {
+    "description": "Heading above the list of individual recorded cycles."
+  },
+  "cycleStartedOn": "Started {date}",
+  "@cycleStartedOn": {
+    "description": "One row of the cycle history, naming when that cycle began.",
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "cycleInProgress": "In progress",
+  "@cycleInProgress": {
+    "description": "Shown instead of a length for the current cycle, which has not ended and therefore has no length yet."
+  },
+  "nothingToSummariseYet": "Log a period to start building your history",
+  "@nothingToSummariseYet": {
+    "description": "Shown on the cycles screen before anything has been logged. Says what to do rather than only that there is nothing."
+  },
+  "needMoreForStatistics": "Log {remaining, plural, =1{one more period} other{{remaining} more periods}} before your usual length can be worked out",
+  "@needMoreForStatistics": {
+    "description": "Shown when there is some history but too little for statistics. Distinct from the Today screen's wording, which is about estimates rather than averages.",
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "cycleLengthChartLabel": "Cycle lengths, most recent last",
+  "@cycleLengthChartLabel": {
+    "description": "Spoken label for the bar chart of cycle lengths. The chart itself conveys nothing to a screen reader, so each bar is also read out individually."
+  },
+  "couldNotOpenData": "Your data could not be opened on this device",
+  "@couldNotOpenData": {
+    "description": "Shown when the encrypted database cannot be opened. Deliberately offers no way to continue without it: there is no unencrypted fallback, and an app that looks like it is saving but is not would be worse than an honest error."
+  },
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title of the Settings tab and screen."
+  },
+  "cycleModeHeading": "Your situation",
+  "@cycleModeHeading": {
+    "description": "Heading above the list of cycle modes in Settings. Neutral on purpose: the options include pregnancy and contraception, not only kinds of cycle."
+  },
+  "modeNatural": "Natural cycle",
+  "@modeNatural": {
+    "description": "Cycle mode option: no hormonal contraception, not pregnant."
+  },
+  "modeHormonalContraception": "Hormonal contraception",
+  "@modeHormonalContraception": {
+    "description": "Cycle mode option. Describes the user's situation only; the app never gives contraceptive guidance (CLAUDE.md section 8)."
+  },
+  "modePregnancy": "Pregnancy",
+  "@modePregnancy": {
+    "description": "Cycle mode option."
+  },
+  "modePerimenopause": "Perimenopause",
+  "@modePerimenopause": {
+    "description": "Cycle mode option."
+  },
+  "modeNaturalFooter": "Your next period is estimated from the cycles you log.",
+  "@modeNaturalFooter": {
+    "description": "Explains the selected mode, shown under the mode list."
+  },
+  "modeContraceptionFooter": "Bleeding on hormonal contraception follows your regimen, not a cycle, so nothing is estimated. Logging works as usual.",
+  "@modeContraceptionFooter": {
+    "description": "Explains the selected mode. Must not suggest the app helps with contraception."
+  },
+  "modePregnancyFooter": "Nothing is estimated and cycle figures are hidden. Your history stays saved and logging works as usual.",
+  "@modePregnancyFooter": {
+    "description": "Explains the selected mode. 'Hidden', not deleted: docs/cycle-logic.md section 6."
+  },
+  "modePerimenopauseFooter": "Cycles often vary a lot during this time, so estimates are off unless you turn them on.",
+  "@modePerimenopauseFooter": {
+    "description": "Explains the selected mode. No medical claims."
+  },
+  "showEstimatesAnyway": "Show estimates anyway",
+  "@showEstimatesAnyway": {
+    "description": "Switch shown only in perimenopause mode, turning period estimates back on."
+  },
+  "showEstimatesAnywayFooter": "Estimates will be wide ranges and may often be off.",
+  "@showEstimatesAnywayFooter": {
+    "description": "Caveat under the perimenopause estimates switch. Honest about uncertainty, per section 8."
+  },
+  "settingsStoredEncrypted": "Settings are stored encrypted on this device, like everything you log.",
+  "@settingsStoredEncrypted": {
+    "description": "Footer at the bottom of Settings. Restates the app's core promise where the user is choosing something sensitive."
+  },
+  "statisticsHiddenInPregnancy": "Cycle figures are hidden during pregnancy. Your history is below.",
+  "@statisticsHiddenInPregnancy": {
+    "description": "Shown on the cycles screen in pregnancy mode in place of the usual length and chart. docs/cycle-logic.md section 6."
+  },
+  "appearanceHeading": "Appearance",
+  "@appearanceHeading": {
+    "description": "Settings group heading for light/dark mode."
+  },
+  "appearanceSystem": "Automatic",
+  "@appearanceSystem": {
+    "description": "Appearance option that follows the device's light/dark setting. 'Automatic' matches the iOS term."
+  },
+  "appearanceLight": "Light",
+  "@appearanceLight": {
+    "description": "Appearance option: always light."
+  },
+  "appearanceDark": "Dark",
+  "@appearanceDark": {
+    "description": "Appearance option: always dark."
+  },
+  "appearanceSystemFooter": "Follows your device's light and dark setting.",
+  "@appearanceSystemFooter": {
+    "description": "Explains the Automatic appearance option."
+  },
+  "languageHeading": "Language",
+  "@languageHeading": {
+    "description": "Settings group heading for the app language."
+  },
+  "languageSystem": "Device language",
+  "@languageSystem": {
+    "description": "Language option that follows the device language, falling back to English."
+  },
+  "languageSystemFooter": "Uses your device's language when the app has it, and English otherwise.",
+  "@languageSystemFooter": {
+    "description": "Explains the device-language option."
+  },
+  "languageNameGerman": "Deutsch",
+  "@languageNameGerman": {
+    "description": "The German language, named in German. An endonym: identical in every translation so a user can find their own language whatever the app is currently showing."
+  },
+  "languageNameEnglish": "English",
+  "@languageNameEnglish": {
+    "description": "The English language, named in English. An endonym: identical in every translation."
+  },
+  "discardChangesQuestion": "Discard your changes?",
+  "@discardChangesQuestion": {
+    "description": "Asked when the user cancels the log sheet after changing something."
+  },
+  "discardChanges": "Discard changes",
+  "@discardChanges": {
+    "description": "Destructive action: close the log sheet without saving."
+  },
+  "keepEditing": "Keep editing",
+  "@keepEditing": {
+    "description": "Cancels the discard prompt and returns to the log sheet."
   }
 }

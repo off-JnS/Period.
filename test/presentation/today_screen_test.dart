@@ -29,7 +29,8 @@ void main() {
 
       // Section 8: a prediction is a window. The en dash is the range.
       expect(find.textContaining('–'), findsWidgets);
-      expect(find.text('Day 22'), findsOneWidget);
+      expect(find.text('22'), findsOneWidget);
+      expect(find.text('Cycle day'), findsOneWidget);
     });
 
     testWidgets('always carries the qualifying wording', (tester) async {
@@ -206,7 +207,8 @@ void main() {
         locale: const Locale('de'),
       );
       expect(tester.takeException(), isNull);
-      expect(find.text('Heute'), findsOneWidget);
+      // The large title and its collapsed twin are both in the tree.
+      expect(find.text('Heute'), findsWidgets);
     });
 
     testWidgets('renders in dark mode', (tester) async {

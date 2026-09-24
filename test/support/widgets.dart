@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/l10n/app_localizations.dart';
+import 'package:period/presentation/theme.dart';
 
 /// Wraps [child] in the localisations and theme the app provides, so a widget
 /// under test sees what it sees in the real app.
@@ -18,7 +19,9 @@ Widget appHarness(
     GlobalCupertinoLocalizations.delegate,
   ],
   supportedLocales: AppLocalizations.supportedLocales,
-  theme: ThemeData(useMaterial3: true, brightness: brightness),
+  // The real theme, not a bare ThemeData: a golden that renders under different
+  // colours and shapes than the app ships is reviewing something nobody sees.
+  theme: brightness == Brightness.dark ? darkTheme() : lightTheme(),
   home: child,
 );
 

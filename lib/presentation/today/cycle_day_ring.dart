@@ -34,11 +34,9 @@ class CycleDayRing extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final currentDay = day;
 
-    final label = currentDay == null
-        ? l10n.noCycleInProgress
-        : l10n.cycleDay(currentDay);
     final spoken = currentDay == null
         ? l10n.noCycleInProgress
         : l10n.cycleDayAccessibility(currentDay);
@@ -46,7 +44,7 @@ class CycleDayRing extends StatelessWidget {
     // Grow with the user's text size rather than clipping. Capped so that a very
     // large setting does not push everything else off the screen.
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
-    final diameter = 180.0 * scale;
+    final diameter = 232.0 * scale;
 
     final length = expectedLength;
     // Deliberately NOT clamped to 1. Past the usual length the ring would
@@ -55,6 +53,46 @@ class CycleDayRing extends StatelessWidget {
     final progress = currentDay == null || length == null || length <= 0
         ? null
         : currentDay / length;
+
+    final Widget centre = currentDay == null
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.water_drop_outlined, size: 28, color: scheme.primary),
+              const SizedBox(height: 8),
+              Text(
+                l10n.noCycleInProgress,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge,
+              ),
+            ],
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                l10n.cycleDayCaption,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              Text(
+                '$currentDay',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.displayLarge?.copyWith(
+                  // Tabular so the number does not shift as the day changes.
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              if (length != null && length > 0)
+                Text(
+                  l10n.usualLengthCaption(length),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          );
 
     return Semantics(
       label: spoken,
@@ -65,19 +103,20 @@ class CycleDayRing extends StatelessWidget {
         child: CustomPaint(
           painter: _RingPainter(
             progress: progress,
-            track: theme.colorScheme.surfaceContainerHighest,
-            arc: theme.colorScheme.primary,
-            overrun: theme.colorScheme.tertiary,
-            strokeWidth: 12 * scale,
+            track: scheme.surfaceContainerHighest,
+            glow: scheme.primaryContainer,
+            arcStart: Color.lerp(scheme.primary, scheme.surface, 0.55)!,
+            arc: scheme.primary,
+            overrun: scheme.onPrimaryContainer,
+            knob: scheme.surfaceContainerLowest,
+            strokeWidth: 14 * scale,
           ),
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(24 * scale),
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium,
-              ),
+              padding: EdgeInsets.all(30 * scale),
+              // Scales the text down rather than clipping it when a long
+              // German caption meets a large text setting.
+              child: FittedBox(fit: BoxFit.scaleDown, child: centre),
             ),
           ),
         ),
@@ -90,18 +129,30 @@ class _RingPainter extends CustomPainter {
   const _RingPainter({
     required this.progress,
     required this.track,
+    required this.glow,
+    required this.arcStart,
     required this.arc,
     required this.overrun,
+    required this.knob,
     required this.strokeWidth,
   });
 
   /// How far through the usual cycle length today is. May exceed 1.
   final double? progress;
   final Color track;
+
+  /// The soft wash inside the ring.
+  final Color glow;
+
+  /// The arc fades in from this colour to [arc].
+  final Color arcStart;
   final Color arc;
 
   /// Used for the part of the ring beyond the usual length.
   final Color overrun;
+
+  /// The dot marking today at the end of the arc.
+  final Color knob;
   final double strokeWidth;
 
   @override
@@ -110,44 +161,68 @@ class _RingPainter extends CustomPainter {
     final centre = rect.center;
     final radius = (size.shortestSide - strokeWidth) / 2;
 
-    final trackPaint = Paint()
-      ..color = track
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(centre, radius, trackPaint);
+    // A faint wash inside the ring gives the number something to sit on.
+    canvas.drawCircle(
+      centre,
+      radius - strokeWidth / 2,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [glow.withValues(alpha: 0.6), glow.withValues(alpha: 0)],
+        ).createShader(Rect.fromCircle(center: centre, radius: radius)),
+    );
+
+    canvas.drawCircle(
+      centre,
+      radius,
+      Paint()
+        ..color = track
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth,
+    );
 
     final fraction = progress;
     if (fraction == null || fraction <= 0) return;
 
     final circle = Rect.fromCircle(center: centre, radius: radius);
     const top = -math.pi / 2;
+    // The round cap reaches back past twelve o'clock. Starting the gradient
+    // that far back keeps the cap in the start colour instead of wrapping round
+    // to the end colour and leaving a dark seam at the top.
+    final cap = strokeWidth / 2 / radius;
+    final rotation = GradientRotation(top - cap);
 
-    Paint stroke(Color color) => Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Up to the usual length.
-    canvas.drawArc(
+    void lap(double sweep, Color from, Color to) => canvas.drawArc(
       circle,
       top,
-      2 * math.pi * math.min(fraction, 1),
+      2 * math.pi * sweep,
       false,
-      stroke(arc),
+      Paint()
+        ..shader = SweepGradient(
+          colors: [from, to],
+          endAngle: 2 * math.pi * math.max(sweep, 0.01) + cap,
+          transform: rotation,
+        ).createShader(circle)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round,
     );
 
-    if (fraction <= 1) return;
+    // Up to the usual length.
+    final firstLap = math.min(fraction, 1.0);
+    lap(firstLap, arcStart, arc);
 
     // Beyond it, drawn as a second lap in a different colour so being late
     // reads differently from being on time. The day number in the middle
     // carries the same fact in words, so this is never colour alone.
-    canvas.drawArc(
-      circle,
-      top,
-      2 * math.pi * math.min(fraction - 1, 1),
-      false,
-      stroke(overrun),
+    final secondLap = math.min(fraction - 1, 1.0);
+    if (secondLap > 0) lap(secondLap, arc, overrun);
+
+    // A knob where today sits, so the end of the arc reads as a position.
+    final end = top + 2 * math.pi * (secondLap > 0 ? secondLap : firstLap);
+    canvas.drawCircle(
+      centre + Offset(math.cos(end), math.sin(end)) * radius,
+      strokeWidth * 0.28,
+      Paint()..color = knob,
     );
   }
 
@@ -155,7 +230,10 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) =>
       old.progress != progress ||
       old.track != track ||
+      old.glow != glow ||
+      old.arcStart != arcStart ||
       old.arc != arc ||
       old.overrun != overrun ||
+      old.knob != knob ||
       old.strokeWidth != strokeWidth;
 }
