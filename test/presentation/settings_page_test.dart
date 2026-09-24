@@ -3,10 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/lock/app_lock.dart';
+import 'package:period/presentation/reminders/reminder_sync.dart';
 import 'package:period/presentation/settings/settings_page.dart';
 
 import '../support/fake_authenticator.dart';
+import '../support/fake_reminder_scheduler.dart';
+import '../support/fixed_clock.dart';
+import '../support/dates.dart';
 
 import '../support/database.dart';
 import '../support/widgets.dart';
@@ -176,6 +181,87 @@ void main() {
     testWidgets('is absent without a lock to control', (tester) async {
       await pumpApp(tester, SettingsPage(settingsDao: database.settingsDao));
       expect(find.text('Lock app'), findsNothing);
+    });
+  });
+
+  group('reminders', () {
+    late FakeReminderScheduler scheduler;
+    late int affected;
+
+    setUp(() {
+      scheduler = FakeReminderScheduler();
+      affected = 0;
+    });
+
+    Future<void> pumpWithReminders(WidgetTester tester) async {
+      await pumpApp(
+        tester,
+        SettingsPage(
+          settingsDao: database.settingsDao,
+          reminderSync: ReminderSync(
+            logDao: database.logDao,
+            settingsDao: database.settingsDao,
+            scheduler: scheduler,
+            clock: FixedClock(aDate(2024, 5, 17)),
+          ),
+          onScheduleAffected: () => affected++,
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Daily reminder to log'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
+
+    testWidgets('the first reminder turned on asks permission, then saves', (
+      tester,
+    ) async {
+      await pumpWithReminders(tester);
+      await tester.tap(find.text('Daily reminder to log'));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.permissionRequests, 1);
+      expect(
+        await database.settingsDao.reminderSettings(),
+        const ReminderSettings(dailyLog: true),
+      );
+      expect(affected, 1);
+    });
+
+    testWidgets('refused permission leaves it off and says why', (
+      tester,
+    ) async {
+      scheduler.grants = false;
+      await pumpWithReminders(tester);
+      await tester.tap(find.text('Daily reminder to log'));
+      await tester.pumpAndSettle();
+
+      expect((await database.settingsDao.reminderSettings()).dailyLog, isFalse);
+      expect(find.textContaining('Notifications are turned off'), findsOne);
+      expect(affected, 0);
+    });
+
+    testWidgets('a second reminder does not ask again', (tester) async {
+      await database.settingsDao.saveReminderSettings(
+        const ReminderSettings(dailyLog: true),
+      );
+      await pumpWithReminders(tester);
+      await tester.tap(find.text('Before my period'));
+      await tester.pumpAndSettle();
+      expect(scheduler.permissionRequests, 0);
+    });
+
+    testWidgets('changing the mode also reschedules', (tester) async {
+      await pumpWithReminders(tester);
+      await tester.scrollUntilVisible(
+        find.bySemanticsLabel('Pregnancy'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.bySemanticsLabel('Pregnancy'));
+      await tester.pumpAndSettle();
+      expect(affected, 1);
     });
   });
 }

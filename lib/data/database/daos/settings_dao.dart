@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../../domain/models/app_preferences.dart';
 import '../../../domain/models/cycle_mode.dart';
+import '../../../domain/models/reminder_settings.dart';
 import '../database.dart';
 import '../tables.dart';
 
@@ -27,6 +28,18 @@ abstract final class SettingKeys {
 
   /// `true` when the app asks for Face ID, Touch ID or the passcode to open.
   static const appLock = 'app_lock';
+
+  /// `true` when she wants a reminder before the estimated window.
+  static const reminderPeriod = 'reminder_period';
+
+  /// Days before the window for that reminder, as a decimal integer.
+  static const reminderDaysBefore = 'reminder_days_before';
+
+  /// `true` when she wants a daily reminder to log.
+  static const reminderDaily = 'reminder_daily';
+
+  /// The reminder time as `HH:MM`, 24-hour.
+  static const reminderTime = 'reminder_time';
 }
 
 /// Reads and writes the user's settings.
@@ -100,6 +113,48 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   /// Turns the app lock on or off.
   Future<void> saveAppLockEnabled({required bool enabled}) =>
       _put(SettingKeys.appLock, '$enabled');
+
+  /// The stored reminder settings, with defaults for anything not stored or
+  /// not understood. Out-of-range numbers fall back rather than being trusted.
+  Future<ReminderSettings> reminderSettings() async {
+    final values = await _values();
+    const defaults = ReminderSettings();
+
+    final days = int.tryParse(values[SettingKeys.reminderDaysBefore] ?? '');
+    final time = RegExp(r'^(\d{2}):(\d{2})$')
+        .firstMatch(values[SettingKeys.reminderTime] ?? '');
+    final hour = time == null ? null : int.parse(time.group(1)!);
+    final minute = time == null ? null : int.parse(time.group(2)!);
+    final timeValid =
+        hour != null && minute != null && hour < 24 && minute < 60;
+
+    return ReminderSettings(
+      periodComing: values[SettingKeys.reminderPeriod] == 'true',
+      daysBefore:
+          days != null &&
+              days >= ReminderSettings.minDaysBefore &&
+              days <= ReminderSettings.maxDaysBefore
+          ? days
+          : defaults.daysBefore,
+      dailyLog: values[SettingKeys.reminderDaily] == 'true',
+      hour: timeValid ? hour : defaults.hour,
+      minute: timeValid ? minute : defaults.minute,
+    );
+  }
+
+  /// Stores [settings], replacing whatever was there.
+  Future<void> saveReminderSettings(ReminderSettings settings) async {
+    String two(int n) => n.toString().padLeft(2, '0');
+    await transaction(() async {
+      await _put(SettingKeys.reminderPeriod, '${settings.periodComing}');
+      await _put(SettingKeys.reminderDaysBefore, '${settings.daysBefore}');
+      await _put(SettingKeys.reminderDaily, '${settings.dailyLog}');
+      await _put(
+        SettingKeys.reminderTime,
+        '${two(settings.hour)}:${two(settings.minute)}',
+      );
+    });
+  }
 
   Future<Map<String, String>> _values() async {
     final rows = await select(appSettings).get();

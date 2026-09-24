@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 
 import '../support/widgets.dart';
@@ -102,11 +103,18 @@ void main() {
         onPreferencesChanged: (_) {},
         lockEnabled: true,
         onLockChanged: (_) {},
+        reminders: const ReminderSettings(
+          periodComing: true,
+          dailyLog: true,
+          hour: 20,
+          minute: 30,
+        ),
+        onRemindersChanged: (_) {},
       ),
       locale: const Locale('de'),
       brightness: Brightness.dark,
       // Tall enough to show every group at once.
-      surface: const Size(400, 1600),
+      surface: const Size(400, 2000),
     );
     await expectLater(
       find.byType(SettingsScreen),

@@ -1,13 +1,17 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/presentation/analysis/analysis_screen.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/home_shell.dart';
+import 'package:period/presentation/reminders/reminder_sync.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
 import '../support/database.dart';
 import '../support/dates.dart';
+import '../support/fake_reminder_scheduler.dart';
 import '../support/fixed_clock.dart';
 import '../support/widgets.dart';
 
@@ -93,5 +97,68 @@ void main() {
     await tester.tap(tab('Today'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Estimates are off during pregnancy'), findsOne);
+  });
+
+  group('reminders', () {
+    late FakeReminderScheduler scheduler;
+
+    Future<void> pumpWithReminders(WidgetTester tester) async {
+      scheduler = FakeReminderScheduler();
+      await pumpApp(
+        tester,
+        HomeShell(
+          logDao: database.logDao,
+          settingsDao: database.settingsDao,
+          clock: FixedClock(today),
+          reminderSync: ReminderSync(
+            logDao: database.logDao,
+            settingsDao: database.settingsDao,
+            scheduler: scheduler,
+            clock: FixedClock(today),
+          ),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('are scheduled when the app opens, in its language', (
+      tester,
+    ) async {
+      await database.settingsDao.saveReminderSettings(
+        const ReminderSettings(dailyLog: true),
+      );
+      await pumpWithReminders(tester);
+      expect(scheduler.schedules, isNotEmpty);
+      expect(scheduler.lastText, 'Reminder');
+    });
+
+    testWidgets('are rescheduled on returning to the app', (tester) async {
+      await pumpWithReminders(tester);
+      final before = scheduler.schedules.length;
+
+      tester.binding
+        ..handleAppLifecycleStateChanged(AppLifecycleState.inactive)
+        ..handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.schedules.length, greaterThan(before));
+    });
+
+    testWidgets('are rescheduled after logging a day', (tester) async {
+      await pumpWithReminders(tester);
+      final before = scheduler.schedules.length;
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.schedules.length, greaterThan(before));
+    });
   });
 }

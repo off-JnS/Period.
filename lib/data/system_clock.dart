@@ -21,4 +21,11 @@ class SystemClock implements Clock {
     final now = DateTime.now();
     return CycleDate(now.year, now.month, now.day);
   }
+
+  /// The current instant, in the device's local time.
+  ///
+  /// For the one caller that needs a time of day rather than a calendar day:
+  /// the reminder scheduler, deciding whether today's reminder time has
+  /// already passed. It never reaches the domain or the database.
+  static DateTime nowInstant() => DateTime.now();
 }

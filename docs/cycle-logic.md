@@ -239,6 +239,35 @@ Stated explicitly so they are inherited rather than rediscovered:
 
 ---
 
+## 8. Reminders
+
+Two optional reminders, both off by default. Neither is cycle science; they are
+written here because the first one depends on the prediction, and §11 wants
+anything that depends on it defined in one place.
+
+**Period coming.** Fires `daysBefore` days before the **first day of the
+estimated window** (§3), at the time she chose. `daysBefore` is 1–5, default 2.
+
+- No estimate, no reminder: in any mode with predictions off (§6), and while
+  there are too few cycles or they vary too much (§3). The reminder is never a
+  prediction of its own.
+- Counted from the window's first day, not its middle, so it arrives before the
+  earliest plausible start rather than after it.
+- A reminder day already in the past, or today at a time already gone, is
+  skipped rather than fired late.
+- Recomputed from the stored period starts every time it is scheduled (§4);
+  nothing about it is stored except her settings.
+
+**Daily log.** Fires every day at the time she chose. Scheduled for the next 30
+days and rescheduled whenever the app is opened, so it keeps going as long as
+the app is used.
+
+**Wording.** Every notification reads only *Reminder* / *Erinnerung*. No
+cycle, period, date or day number appears on the lock screen (CLAUDE.md §9),
+and the two kinds are deliberately indistinguishable there.
+
+---
+
 ## Sources
 
 - Bull, J. R. et al. (2019). *Real-world menstrual cycle characteristics of more

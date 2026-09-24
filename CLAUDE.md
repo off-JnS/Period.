@@ -124,6 +124,14 @@ This makes the promise technically verifiable and makes any accidental network
 dependency fail loudly at build time. If a build breaks because something wants
 INTERNET, remove the dependency — do not add the permission.
 
+**One known exception, approved 2026-09-25:** `timezone` (allowlisted, and
+required by `flutter_local_notifications`) declares `http` as a dependency for
+its web-only data loader, so `http` appears in `pubspec.lock`. The app never
+imports it. `test/network_guard_test.dart` walks every import reachable from
+`lib/main.dart` and fails if any forbidden package is among them; that test, not
+the lockfile, is the check. Do not import `package:timezone/browser.dart` or
+`package:timezone/data/*` — the app uses only the built-in `tz.UTC`.
+
 Before adding ANY new package, ask the human first.
 
 ## 7. Testing

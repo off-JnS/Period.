@@ -2,6 +2,7 @@ import 'package:period/data/database/daos/settings_dao.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:test/test.dart';
 
 import '../support/database.dart';
@@ -147,6 +148,53 @@ void main() {
     test('an unreadable value reads as off', () async {
       await storeRaw(SettingKeys.appLock, 'maybe');
       expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+  });
+
+  group('reminders', () {
+    test('are off until turned on, at 9:00, two days ahead', () async {
+      expect(
+        await database.settingsDao.reminderSettings(),
+        const ReminderSettings(),
+      );
+    });
+
+    test('round-trip', () async {
+      const chosen = ReminderSettings(
+        periodComing: true,
+        daysBefore: 4,
+        dailyLog: true,
+        hour: 7,
+        minute: 5,
+      );
+      await database.settingsDao.saveReminderSettings(chosen);
+      expect(await database.settingsDao.reminderSettings(), chosen);
+    });
+
+    test('an out-of-range lead time falls back to the default', () async {
+      await storeRaw(SettingKeys.reminderDaysBefore, '12');
+      expect(
+        (await database.settingsDao.reminderSettings()).daysBefore,
+        ReminderSettings.defaultDaysBefore,
+      );
+    });
+
+    test('a malformed or impossible time falls back to 9:00', () async {
+      for (final raw in ['7:5', '25:00', '09:60', 'noon', '']) {
+        await database.settingsDao.saveReminderSettings(
+          const ReminderSettings(),
+        );
+        await database
+            .into(database.appSettings)
+            .insertOnConflictUpdate(
+              AppSettingsCompanion.insert(
+                settingKey: SettingKeys.reminderTime,
+                settingValue: raw,
+              ),
+            );
+        final read = await database.settingsDao.reminderSettings();
+        expect((read.hour, read.minute), (9, 0), reason: raw);
+      }
     });
   });
 }

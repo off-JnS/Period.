@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'data/database/database.dart';
 import 'data/app_lock/device_authenticator.dart';
 import 'data/database/open_database.dart';
+import 'data/reminders/reminder_scheduler.dart';
 import 'data/database_key_store.dart';
 import 'data/system_clock.dart';
 import 'domain/models/app_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'presentation/home_shell.dart';
 import 'presentation/lock/app_lock.dart';
+import 'presentation/reminders/reminder_sync.dart';
 import 'presentation/preferences_mapping.dart';
 
 Future<void> main() async {
@@ -53,6 +55,9 @@ class _PeriodAppState extends State<PeriodApp> {
   /// then only the loading screen shows, which holds nothing of hers.
   AppLock? _lock;
 
+  /// Keeps reminders scheduled; created with the database it reads.
+  ReminderSync? _reminders;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +86,12 @@ class _PeriodAppState extends State<PeriodApp> {
       setState(() {
         _preferences = preferences;
         _lock = lock;
+        _reminders = ReminderSync(
+          logDao: database.logDao,
+          settingsDao: database.settingsDao,
+          scheduler: LocalNotificationsReminderScheduler(),
+          clock: const SystemClock(),
+        );
         _database = database;
       });
     } on Object catch (error) {
@@ -115,6 +126,7 @@ class _PeriodAppState extends State<PeriodApp> {
             settingsDao: database.settingsDao,
             clock: const SystemClock(),
             appLock: _lock,
+            reminderSync: _reminders,
             // Applied at once, from the Settings screen: the whole app
             // re-themes or re-translates in place, on the same tab.
             onPreferencesChanged: (preferences) =>

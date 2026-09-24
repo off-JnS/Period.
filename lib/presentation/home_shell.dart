@@ -10,6 +10,7 @@ import '../l10n/app_localizations.dart';
 import 'analysis/analysis_page.dart';
 import 'calendar/calendar_page.dart';
 import 'lock/app_lock.dart';
+import 'reminders/reminder_sync.dart';
 import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'today/today_page.dart';
@@ -32,8 +33,12 @@ class HomeShell extends StatefulWidget {
     required this.clock,
     this.onPreferencesChanged,
     this.appLock,
+    this.reminderSync,
     super.key,
   });
+
+  /// Keeps scheduled reminders current. Null in tests with no notifications.
+  final ReminderSync? reminderSync;
 
   /// The app lock, for its switch in Settings.
   final AppLock? appLock;
@@ -57,6 +62,39 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Back in the app: roll the daily reminders forward, and catch a change
+    // of time zone since they were last scheduled.
+    _lifecycle = AppLifecycleListener(onResume: _syncReminders);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // First build, and any change of language: the notification text is
+    // localised when it is scheduled.
+    _syncReminders();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _syncReminders() {
+    final sync = widget.reminderSync;
+    if (sync == null || !mounted) return;
+    final l10n = AppLocalizations.of(context);
+    sync.sync(
+      text: l10n.reminderNotificationText,
+      channelName: l10n.reminderChannelName,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,11 +107,13 @@ class _HomeShellState extends State<HomeShell> {
           logDao: widget.logDao,
           settingsDao: widget.settingsDao,
           clock: widget.clock,
+          onEntriesChanged: _syncReminders,
         ),
         1 => CalendarPage(
           logDao: widget.logDao,
           settingsDao: widget.settingsDao,
           clock: widget.clock,
+          onEntriesChanged: _syncReminders,
         ),
         2 => AnalysisPage(
           logDao: widget.logDao,
@@ -83,6 +123,8 @@ class _HomeShellState extends State<HomeShell> {
           settingsDao: widget.settingsDao,
           onPreferencesChanged: widget.onPreferencesChanged,
           appLock: widget.appLock,
+          reminderSync: widget.reminderSync,
+          onScheduleAffected: _syncReminders,
         ),
       },
       bottomNavigationBar: CupertinoTabBar(

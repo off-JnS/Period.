@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/models/app_preferences.dart';
 import '../../domain/models/cycle_mode.dart';
+import '../../domain/models/reminder_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../lock/app_lock.dart';
+import '../reminders/reminder_sync.dart';
 import 'settings_screen.dart';
 
 /// Loads the stored settings, hands them to [SettingsScreen], and saves every
@@ -19,8 +21,17 @@ class SettingsPage extends StatefulWidget {
     required this.settingsDao,
     this.onPreferencesChanged,
     this.appLock,
+    this.reminderSync,
+    this.onScheduleAffected,
     super.key,
   });
+
+  /// Asks for notification permission. Null hides the reminders group.
+  final ReminderSync? reminderSync;
+
+  /// Told after any change that could move a reminder: the reminder settings
+  /// themselves, and the mode, which decides whether there is an estimate.
+  final VoidCallback? onScheduleAffected;
 
   /// The app lock. Null hides its switch, as for a device-less test.
   final AppLock? appLock;
@@ -44,6 +55,38 @@ class _SettingsPageState extends State<SettingsPage> {
   /// Set when turning the lock on failed for want of a device passcode.
   bool _lockUnavailable = false;
 
+  ReminderSettings _reminders = const ReminderSettings();
+
+  /// Set when she turned a reminder on but notifications were refused.
+  bool _remindersBlocked = false;
+
+  Future<void> _changeReminders(ReminderSettings next) async {
+    final sync = widget.reminderSync;
+    if (sync == null) return;
+    // Permission is asked for the first time a reminder is turned on, with
+    // the switch she just touched as the explanation.
+    if (next.anyEnabled && !_reminders.anyEnabled) {
+      final granted = await sync.requestPermission();
+      if (!mounted) return;
+      if (!granted) {
+        setState(() => _remindersBlocked = true);
+        return;
+      }
+    }
+    final previous = _reminders;
+    setState(() {
+      _reminders = next;
+      _remindersBlocked = false;
+    });
+    try {
+      await widget.settingsDao.saveReminderSettings(next);
+      widget.onScheduleAffected?.call();
+    } on Object {
+      if (!mounted) return;
+      setState(() => _reminders = previous);
+    }
+  }
+
   Future<void> _changeLock(bool enabled) async {
     final lock = widget.appLock;
     if (lock == null) return;
@@ -65,8 +108,10 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final settings = await widget.settingsDao.cycleSettings();
       final preferences = await widget.settingsDao.appPreferences();
+      final reminders = await widget.settingsDao.reminderSettings();
       if (!mounted) return;
       setState(() {
+        _reminders = reminders;
         _error = null;
         _settings = settings;
         _preferences = preferences;
@@ -83,6 +128,7 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _settings = next);
     try {
       await widget.settingsDao.saveCycleSettings(next);
+      widget.onScheduleAffected?.call();
     } on Object {
       // Put the screen back to what is actually stored rather than leave it
       // showing a choice that was never saved.
@@ -144,6 +190,9 @@ class _SettingsPageState extends State<SettingsPage> {
       // Held still while the system prompt is up.
       onLockChanged: lock == null || lock.authenticating ? null : _changeLock,
       lockUnavailable: _lockUnavailable,
+      reminders: widget.reminderSync == null ? null : _reminders,
+      onRemindersChanged: _changeReminders,
+      remindersBlocked: _remindersBlocked,
     );
 
     return lock == null

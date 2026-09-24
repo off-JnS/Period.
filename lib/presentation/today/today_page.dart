@@ -29,8 +29,13 @@ class TodayPage extends StatefulWidget {
     required this.logDao,
     required this.settingsDao,
     required this.clock,
+    this.onEntriesChanged,
     super.key,
   });
+
+  /// Told after anything is saved or deleted, since a new period start moves
+  /// the estimate and with it the reminder.
+  final VoidCallback? onEntriesChanged;
 
   /// Reads and writes what the user logged.
   final LogDao logDao;
@@ -148,6 +153,7 @@ class _TodayPageState extends State<TodayPage> {
         messenger.showSnackBar(SnackBar(content: Text(l10n.entryDeleted)));
     }
 
+    widget.onEntriesChanged?.call();
     await _load();
   }
 

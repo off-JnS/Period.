@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 
 import '../support/widgets.dart';
@@ -304,6 +305,87 @@ void main() {
       await scrollTo(tester, find.textContaining('English otherwise'));
       expect(find.textContaining("device's light and dark"), findsOneWidget);
       expect(find.textContaining('English otherwise'), findsOneWidget);
+    });
+  });
+
+  group('reminders', () {
+    Future<List<ReminderSettings>> pumpReminders(
+      WidgetTester tester,
+      ReminderSettings reminders, {
+      bool blocked = false,
+    }) async {
+      final changes = <ReminderSettings>[];
+      await pumpApp(
+        tester,
+        SettingsScreen(
+          settings: const CycleSettings(),
+          onChanged: (_) {},
+          reminders: reminders,
+          onRemindersChanged: changes.add,
+          remindersBlocked: blocked,
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Daily reminder to log'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      return changes;
+    }
+
+    testWidgets('are left out without reminder settings', (tester) async {
+      await pumpScreen(tester, const CycleSettings());
+      expect(find.text('Reminders'), findsNothing);
+    });
+
+    testWidgets('turning one on reports it', (tester) async {
+      final changes = await pumpReminders(tester, const ReminderSettings());
+      await tester.tap(find.text('Before my period'));
+      await tester.pump();
+      expect(changes, [const ReminderSettings(periodComing: true)]);
+    });
+
+    testWidgets('lead time and time appear only once they matter', (
+      tester,
+    ) async {
+      await pumpReminders(tester, const ReminderSettings());
+      expect(find.text('Days before'), findsNothing);
+      expect(find.text('Time'), findsNothing);
+
+      await pumpReminders(tester, const ReminderSettings(dailyLog: true));
+      expect(find.text('Days before'), findsNothing);
+      expect(find.text('Time'), findsOneWidget);
+
+      await pumpReminders(tester, const ReminderSettings(periodComing: true));
+      expect(find.text('Days before'), findsOneWidget);
+    });
+
+    testWidgets('choosing a lead time reports it', (tester) async {
+      final changes = await pumpReminders(
+        tester,
+        const ReminderSettings(periodComing: true),
+      );
+      await tester.tap(find.text('4'));
+      await tester.pumpAndSettle();
+      expect(changes.last.daysBefore, 4);
+    });
+
+    testWidgets('shows the time in the device format', (tester) async {
+      await pumpReminders(
+        tester,
+        const ReminderSettings(dailyLog: true, hour: 21, minute: 30),
+      );
+      expect(find.text('9:30 PM'), findsOneWidget);
+    });
+
+    testWidgets('says the notification text is neutral', (tester) async {
+      await pumpReminders(tester, const ReminderSettings());
+      expect(find.textContaining('only ever say'), findsOneWidget);
+    });
+
+    testWidgets('says how to fix refused notifications', (tester) async {
+      await pumpReminders(tester, const ReminderSettings(), blocked: true);
+      expect(find.textContaining("phone's settings"), findsOneWidget);
     });
   });
 }

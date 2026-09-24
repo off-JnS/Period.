@@ -23,8 +23,13 @@ class CalendarPage extends StatefulWidget {
     required this.logDao,
     required this.settingsDao,
     required this.clock,
+    this.onEntriesChanged,
     super.key,
   });
+
+  /// Told after anything is saved or deleted, since a new period start moves
+  /// the estimate and with it the reminder.
+  final VoidCallback? onEntriesChanged;
 
   /// Reads and writes what the user logged.
   final LogDao logDao;
@@ -133,6 +138,7 @@ class _CalendarPageState extends State<CalendarPage> {
         await widget.logDao.removePeriodStart(date);
     }
 
+    widget.onEntriesChanged?.call();
     await _load();
   }
 

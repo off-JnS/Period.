@@ -115,5 +115,14 @@
   "appLockReason": "Period. entsperren",
   "appLockConfirmReason": "Bestätige, dass du es bist, um die App-Sperre zu ändern",
   "lockedTitle": "Period. ist gesperrt",
-  "unlock": "Entsperren"
+  "unlock": "Entsperren",
+  "reminderNotificationText": "Erinnerung",
+  "reminderChannelName": "Erinnerungen",
+  "remindersHeading": "Erinnerungen",
+  "reminderPeriodComing": "Vor meiner Periode",
+  "reminderDaysBefore": "Tage vorher",
+  "reminderDailyLog": "Tägliche Erinnerung zum Eintragen",
+  "reminderTime": "Uhrzeit",
+  "remindersFooter": "Die Erinnerung vor der Periode kommt vor dem ersten Tag des geschätzten Zeitraums, sobald es eine Schätzung gibt. Mitteilungen sagen immer nur „Erinnerung“, damit auf dem Sperrbildschirm nichts über deinen Zyklus steht.",
+  "remindersBlocked": "Mitteilungen sind für Period. ausgeschaltet. Schalte sie in den Einstellungen deines Telefons ein, um Erinnerungen zu bekommen."
 }

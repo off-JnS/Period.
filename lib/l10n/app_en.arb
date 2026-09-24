@@ -473,5 +473,41 @@
   "unlock": "Unlock",
   "@unlock": {
     "description": "Button on the lock screen that shows the Face ID / passcode prompt again."
+  },
+  "reminderNotificationText": "Reminder",
+  "@reminderNotificationText": {
+    "description": "The entire text of every notification. Deliberately says nothing else (CLAUDE.md section 9): it can appear on the lock screen."
+  },
+  "reminderChannelName": "Reminders",
+  "@reminderChannelName": {
+    "description": "How Android lists this app's notifications in the phone's settings."
+  },
+  "remindersHeading": "Reminders",
+  "@remindersHeading": {
+    "description": "Settings group heading."
+  },
+  "reminderPeriodComing": "Before my period",
+  "@reminderPeriodComing": {
+    "description": "Switch: remind before the estimated window."
+  },
+  "reminderDaysBefore": "Days before",
+  "@reminderDaysBefore": {
+    "description": "Label above the choice of 1 to 5 days of lead time."
+  },
+  "reminderDailyLog": "Daily reminder to log",
+  "@reminderDailyLog": {
+    "description": "Switch: remind every day to log."
+  },
+  "reminderTime": "Time",
+  "@reminderTime": {
+    "description": "Label for the time of day reminders arrive."
+  },
+  "remindersFooter": "The reminder before your period arrives before the first day of the estimated window, whenever there is one. Notifications only ever say “Reminder”, so nothing about your cycle shows on the lock screen.",
+  "@remindersFooter": {
+    "description": "Explains reminders. Honest that the period reminder needs an estimate."
+  },
+  "remindersBlocked": "Notifications are turned off for Period. Turn them on in your phone's settings to get reminders.",
+  "@remindersBlocked": {
+    "description": "Shown when the notification permission was refused."
   }
 }
