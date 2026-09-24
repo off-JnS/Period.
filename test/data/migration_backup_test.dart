@@ -138,4 +138,45 @@ void main() {
 
     expect(backup!.readAsStringSync(), 'current');
   });
+
+  group('the synchronous copy used when the database opens', () {
+    test('copies the file when the schema is behind', () {
+      dbFile.writeAsStringSync('the user data');
+
+      final backup = backUpBeforeMigrationSync(
+        dbFile,
+        currentVersion: 1,
+        targetVersion: 2,
+      );
+
+      expect(backup?.path, '${dbFile.path}.backup-v1');
+      expect(backup!.readAsStringSync(), 'the user data');
+      expect(dbFile.readAsStringSync(), 'the user data');
+    });
+
+    test('does nothing for a new file', () {
+      dbFile.writeAsStringSync('');
+      expect(
+        backUpBeforeMigrationSync(dbFile, currentVersion: 0, targetVersion: 2),
+        isNull,
+      );
+      expect(File('${dbFile.path}.backup-v0').existsSync(), isFalse);
+    });
+
+    test('does nothing when already current', () {
+      dbFile.writeAsStringSync('x');
+      expect(
+        backUpBeforeMigrationSync(dbFile, currentVersion: 2, targetVersion: 2),
+        isNull,
+      );
+    });
+
+    test('does nothing on a downgrade', () {
+      dbFile.writeAsStringSync('x');
+      expect(
+        backUpBeforeMigrationSync(dbFile, currentVersion: 3, targetVersion: 2),
+        isNull,
+      );
+    });
+  });
 }

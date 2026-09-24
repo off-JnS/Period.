@@ -1,0 +1,134 @@
+import 'package:period/data/database/daos/settings_dao.dart';
+import 'package:period/data/database/database.dart';
+import 'package:period/domain/models/app_preferences.dart';
+import 'package:period/domain/models/cycle_mode.dart';
+import 'package:test/test.dart';
+
+import '../support/database.dart';
+
+void main() {
+  late AppDatabase database;
+
+  setUp(() => database = aDatabase());
+  tearDown(() => database.close());
+
+  Future<void> storeRaw(String key, String value) => database
+      .into(database.appSettings)
+      .insert(
+        AppSettingsCompanion.insert(settingKey: key, settingValue: value),
+      );
+
+  test('nothing stored reads as the defaults', () async {
+    expect(await database.settingsDao.cycleSettings(), const CycleSettings());
+  });
+
+  test('every mode round-trips', () async {
+    for (final mode in CycleMode.values) {
+      final settings = CycleSettings(mode: mode);
+      await database.settingsDao.saveCycleSettings(settings);
+      expect(await database.settingsDao.cycleSettings(), settings);
+    }
+  });
+
+  test('both opt-ins round-trip, on and back off', () async {
+    const on = CycleSettings(
+      mode: CycleMode.perimenopause,
+      predictionsOptedIn: true,
+      fertileWindowOptedIn: true,
+    );
+    await database.settingsDao.saveCycleSettings(on);
+    expect(await database.settingsDao.cycleSettings(), on);
+
+    // Turning something off is a write, not a no-op.
+    const off = CycleSettings(mode: CycleMode.perimenopause);
+    await database.settingsDao.saveCycleSettings(off);
+    expect(await database.settingsDao.cycleSettings(), off);
+  });
+
+  test('saving again replaces rather than duplicating rows', () async {
+    await database.settingsDao.saveCycleSettings(const CycleSettings());
+    await database.settingsDao.saveCycleSettings(
+      const CycleSettings(mode: CycleMode.pregnancy),
+    );
+    final rows = await database.select(database.appSettings).get();
+    expect(rows.map((row) => row.settingKey).toSet(), hasLength(rows.length));
+  });
+
+  test('a mode this build does not know reads as natural', () async {
+    // Written by a newer version, then the app was downgraded. Failing to
+    // start over a setting would lock her out of her own data.
+    await storeRaw(SettingKeys.cycleMode, 'someFutureMode');
+    expect(
+      (await database.settingsDao.cycleSettings()).mode,
+      CycleMode.natural,
+    );
+  });
+
+  test('an unreadable opt-in reads as off', () async {
+    await storeRaw(SettingKeys.fertileWindowOptedIn, 'yes please');
+    await storeRaw(SettingKeys.predictionsOptedIn, '');
+    final settings = await database.settingsDao.cycleSettings();
+    expect(settings.fertileWindowOptedIn, isFalse);
+    expect(settings.predictionsOptedIn, isFalse);
+  });
+
+  test('settings unknown to this build are left alone', () async {
+    await storeRaw('some_future_setting', 'kept');
+    await database.settingsDao.saveCycleSettings(const CycleSettings());
+    final rows = await database.select(database.appSettings).get();
+    expect(
+      rows.where((row) => row.settingKey == 'some_future_setting').single,
+      isA<SettingRow>().having((row) => row.settingValue, 'value', 'kept'),
+    );
+  });
+
+  group('app preferences', () {
+    test('nothing stored follows the device', () async {
+      expect(
+        await database.settingsDao.appPreferences(),
+        const AppPreferences(),
+      );
+    });
+
+    test('every appearance and language round-trips', () async {
+      for (final appearance in AppearanceChoice.values) {
+        for (final language in LanguageChoice.values) {
+          final preferences = AppPreferences(
+            appearance: appearance,
+            language: language,
+          );
+          await database.settingsDao.saveAppPreferences(preferences);
+          expect(await database.settingsDao.appPreferences(), preferences);
+        }
+      }
+    });
+
+    test('values this build does not know fall back to the device', () async {
+      await storeRaw(SettingKeys.appearance, 'sepia');
+      await storeRaw(SettingKeys.language, 'klingon');
+      expect(
+        await database.settingsDao.appPreferences(),
+        const AppPreferences(),
+      );
+    });
+
+    test('saving preferences leaves the cycle settings alone', () async {
+      const cycle = CycleSettings(
+        mode: CycleMode.pregnancy,
+        fertileWindowOptedIn: true,
+      );
+      await database.settingsDao.saveCycleSettings(cycle);
+      await database.settingsDao.saveAppPreferences(
+        const AppPreferences(appearance: AppearanceChoice.dark),
+      );
+      expect(await database.settingsDao.cycleSettings(), cycle);
+    });
+
+    test('saving cycle settings leaves the preferences alone', () async {
+      const preferences = AppPreferences(language: LanguageChoice.german);
+      await database.settingsDao.saveAppPreferences(preferences);
+      await database.settingsDao.saveCycleSettings(const CycleSettings());
+      expect(await database.settingsDao.appPreferences(), preferences);
+    });
+  });
+}

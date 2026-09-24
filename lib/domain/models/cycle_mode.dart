@@ -43,6 +43,13 @@ abstract class CycleSettings with _$CycleSettings {
     /// disables them. Only [CycleMode.perimenopause] honours this; see
     /// [predictionsEnabled].
     @Default(false) bool predictionsOptedIn,
+
+    /// Whether the user asked to see the estimated fertile window.
+    ///
+    /// Off by default: docs/cycle-logic.md section 4 calls this the app's
+    /// highest-risk feature. It only ever shows when a period prediction exists
+    /// to count back from, so it is silently inert in any mode without one.
+    @Default(false) bool fertileWindowOptedIn,
   }) = _CycleSettings;
 
   /// Whether any prediction may be computed at all.
@@ -55,4 +62,11 @@ abstract class CycleSettings with _$CycleSettings {
     CycleMode.perimenopause => predictionsOptedIn,
     CycleMode.hormonalContraception || CycleMode.pregnancy => false,
   };
+
+  /// Whether summaries of cycle lengths may be shown.
+  ///
+  /// docs/cycle-logic.md section 6: in pregnancy "cycle statistics are hidden,
+  /// not zeroed". The history itself -- the dates she recorded -- stays
+  /// visible in every mode; only the figures summarising it are withheld.
+  bool get cycleStatisticsVisible => mode != CycleMode.pregnancy;
 }

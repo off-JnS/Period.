@@ -59,3 +59,26 @@ class DaySymptoms extends Table {
   @override
   Set<Column<Object>> get primaryKey => {date, symptomKey};
 }
+
+/// The user's settings, one row per setting. Added in schema version 2.
+///
+/// Key/value rather than a column per setting, for the same reason symptoms are
+/// keyed by string: a new setting is a new row, never a migration. Section 5
+/// calls migrations the most dangerous code in the app, so the table is shaped
+/// to need as few of them as possible.
+///
+/// Stored here, inside the encrypted database, rather than in a preferences
+/// file: a mode such as "pregnancy" is exactly the kind of fact section 1 says
+/// must not sit on the device in plain text.
+@DataClassName('SettingRow')
+class AppSettings extends Table {
+  /// The setting's stable key, e.g. `cycle_mode`.
+  TextColumn get settingKey => text()();
+
+  /// The stored value, as text. Read back defensively: a value this build does
+  /// not understand falls back to the default rather than failing to start.
+  TextColumn get settingValue => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {settingKey};
+}

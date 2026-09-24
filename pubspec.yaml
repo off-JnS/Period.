@@ -32,6 +32,24 @@ dependencies:
   # Annotations only; the generator is a dev dependency.
   freezed_annotation: ^3.1.0
 
+# Build configuration for package:sqlite3, which drift reaches sqlite through.
+# Adds no package -- sqlite3 is already resolved as drift's own dependency.
+#
+# Without this, package:sqlite3 downloads a plain, unencrypted SQLite and bundles
+# it as its own native asset. The app then ships two sqlite builds: that one and
+# the SQLCipher provided by sqlcipher_flutter_libs. package:sqlite3 loads its own,
+# so every write goes to a database with no encryption -- exactly the silent
+# failure section 6 describes, reached by a different route than the forbidden
+# sqlite3_flutter_libs dependency, and invisible in pubspec.lock.
+#
+# "process" makes it resolve sqlite symbols from the running process instead,
+# which is the SQLCipher that sqlcipher_flutter_libs links in. That is what that
+# package is for. openEncryptedDatabase asserts the result at runtime.
+hooks:
+  user_defines:
+    sqlite3:
+      source: process
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -64,3 +64,6 @@ lib/l10n/app_localizations*.dart
 *.g.dart
 *.freezed.dart
 *.drift.dart
+
+# Golden-test failure images written by flutter_test on a mismatch.
+test/**/failures/

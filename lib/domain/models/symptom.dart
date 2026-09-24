@@ -20,3 +20,27 @@ abstract class Symptom with _$Symptom {
     required String key,
   }) = _Symptom;
 }
+
+/// The symptoms the app offers as chips, in the order they are shown.
+///
+/// A list in code rather than a table in the database, deliberately. Section 5
+/// requires that adding a symptom never needs a migration, and a catalogue table
+/// would need one every time this list grows. Stored rows reference these keys
+/// by string, so a key that disappears from this list still reads back from the
+/// database as a [Symptom] -- the entry survives its chip being retired.
+///
+/// The keys are stable identifiers and are never shown to the user. Each has a
+/// matching ARB string looked up in the presentation layer; adding one here
+/// without adding its translation is a missing label, not a crash.
+const offeredSymptomKeys = <String>[
+  'cramps',
+  'headache',
+  'backache',
+  'bloating',
+  'fatigue',
+  'nausea',
+  'tenderBreasts',
+  'moodChange',
+  'acne',
+  'troubleSleeping',
+];
