@@ -131,4 +131,22 @@ void main() {
       expect(await database.settingsDao.appPreferences(), preferences);
     });
   });
+
+  group('app lock', () {
+    test('is off until turned on', () async {
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+
+    test('round-trips on and off', () async {
+      await database.settingsDao.saveAppLockEnabled(enabled: true);
+      expect(await database.settingsDao.appLockEnabled(), isTrue);
+      await database.settingsDao.saveAppLockEnabled(enabled: false);
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+
+    test('an unreadable value reads as off', () async {
+      await storeRaw(SettingKeys.appLock, 'maybe');
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+  });
 }

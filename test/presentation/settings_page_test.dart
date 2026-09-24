@@ -3,7 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/presentation/lock/app_lock.dart';
 import 'package:period/presentation/settings/settings_page.dart';
+
+import '../support/fake_authenticator.dart';
 
 import '../support/database.dart';
 import '../support/widgets.dart';
@@ -96,5 +99,83 @@ void main() {
     const expected = AppPreferences(appearance: AppearanceChoice.dark);
     expect(await database.settingsDao.appPreferences(), expected);
     expect(applied, [expected]);
+  });
+
+  group('the app lock switch', () {
+    late FakeAuthenticator auth;
+    late AppLock lock;
+
+    setUp(() {
+      auth = FakeAuthenticator();
+      lock = AppLock(
+        authenticator: auth,
+        enabled: false,
+        save: database.settingsDao.saveAppLockEnabled,
+      );
+    });
+    tearDown(() => lock.dispose());
+
+    Future<void> pumpWithLock(WidgetTester tester) async {
+      await pumpApp(
+        tester,
+        SettingsPage(settingsDao: database.settingsDao, appLock: lock),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Lock app'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
+
+    testWidgets('turning it on asks for the owner, then stores it', (
+      tester,
+    ) async {
+      await pumpWithLock(tester);
+      await tester.tap(find.text('Lock app'));
+      await tester.pumpAndSettle();
+
+      expect(auth.prompts, 1);
+      expect(await database.settingsDao.appLockEnabled(), isTrue);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.widgetWithText(SwitchListTile, 'Lock app'),
+            )
+            .value,
+        isTrue,
+      );
+    });
+
+    testWidgets('a failed confirmation leaves it off', (tester) async {
+      auth.succeeds = false;
+      await pumpWithLock(tester);
+      await tester.tap(find.text('Lock app'));
+      await tester.pumpAndSettle();
+
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+      expect(
+        tester
+            .widget<SwitchListTile>(
+              find.widgetWithText(SwitchListTile, 'Lock app'),
+            )
+            .value,
+        isFalse,
+      );
+    });
+
+    testWidgets('without a device passcode it says what to do', (tester) async {
+      auth.available = false;
+      await pumpWithLock(tester);
+      await tester.tap(find.text('Lock app'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Set a device passcode'), findsOneWidget);
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+
+    testWidgets('is absent without a lock to control', (tester) async {
+      await pumpApp(tester, SettingsPage(settingsDao: database.settingsDao));
+      expect(find.text('Lock app'), findsNothing);
+    });
   });
 }

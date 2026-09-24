@@ -24,6 +24,9 @@ abstract final class SettingKeys {
 
   /// Which [LanguageChoice], by enum name.
   static const language = 'language';
+
+  /// `true` when the app asks for Face ID, Touch ID or the passcode to open.
+  static const appLock = 'app_lock';
 }
 
 /// Reads and writes the user's settings.
@@ -89,6 +92,14 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
       await _put(SettingKeys.language, preferences.language.name);
     });
   }
+
+  /// Whether the app lock is on. Off unless she turned it on.
+  Future<bool> appLockEnabled() async =>
+      (await _values())[SettingKeys.appLock] == 'true';
+
+  /// Turns the app lock on or off.
+  Future<void> saveAppLockEnabled({required bool enabled}) =>
+      _put(SettingKeys.appLock, '$enabled');
 
   Future<Map<String, String>> _values() async {
     final rows = await select(appSettings).get();

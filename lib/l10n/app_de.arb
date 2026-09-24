@@ -107,5 +107,13 @@
   "languageNameEnglish": "English",
   "discardChangesQuestion": "Änderungen verwerfen?",
   "discardChanges": "Änderungen verwerfen",
-  "keepEditing": "Weiter bearbeiten"
+  "keepEditing": "Weiter bearbeiten",
+  "privacyHeading": "Datenschutz",
+  "appLockToggle": "App sperren",
+  "appLockFooter": "Fragt nach Face ID, Touch ID oder deinem Gerätecode, wenn Period. öffnet und jedes Mal, wenn du zurückkehrst. In der App-Übersicht ist Period. immer verschwommen.",
+  "appLockUnavailable": "Lege zuerst in den Einstellungen deines Telefons einen Gerätecode fest, um die App-Sperre zu nutzen.",
+  "appLockReason": "Period. entsperren",
+  "appLockConfirmReason": "Bestätige, dass du es bist, um die App-Sperre zu ändern",
+  "lockedTitle": "Period. ist gesperrt",
+  "unlock": "Entsperren"
 }

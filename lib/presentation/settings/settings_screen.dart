@@ -18,8 +18,20 @@ class SettingsScreen extends StatelessWidget {
     required this.onChanged,
     this.preferences = const AppPreferences(),
     this.onPreferencesChanged,
+    this.lockEnabled,
+    this.onLockChanged,
+    this.lockUnavailable = false,
     super.key,
   });
+
+  /// Whether the app lock is on, or null to leave the privacy group out.
+  final bool? lockEnabled;
+
+  /// Called when she flips the lock switch. Null disables the switch.
+  final ValueChanged<bool>? onLockChanged;
+
+  /// Whether the last attempt to turn the lock on found no device passcode.
+  final bool lockUnavailable;
 
   /// The current appearance and language.
   final AppPreferences preferences;
@@ -88,6 +100,27 @@ class SettingsScreen extends StatelessWidget {
             // Section 8: the caveat sits beside the switch, visible before
             // she turns it on, never behind a tap.
             footer: l10n.fertileWindowCaveat,
+          ),
+        ],
+        if (lockEnabled case final enabled?) ...[
+          const SizedBox(height: 28),
+          GroupHeader(l10n.privacyHeading),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile.adaptive(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: enabled,
+              onChanged: onLockChanged == null
+                  ? null
+                  : (value) {
+                      HapticFeedback.selectionClick();
+                      onLockChanged!(value);
+                    },
+              title: Text(l10n.appLockToggle),
+            ),
+          ),
+          GroupFooter(
+            lockUnavailable ? l10n.appLockUnavailable : l10n.appLockFooter,
           ),
         ],
         const SizedBox(height: 28),

@@ -5,6 +5,7 @@ import '../../domain/models/app_preferences.dart';
 import '../../domain/models/cycle_mode.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
+import '../lock/app_lock.dart';
 import 'settings_screen.dart';
 
 /// Loads the stored settings, hands them to [SettingsScreen], and saves every
@@ -17,8 +18,12 @@ class SettingsPage extends StatefulWidget {
   const SettingsPage({
     required this.settingsDao,
     this.onPreferencesChanged,
+    this.appLock,
     super.key,
   });
+
+  /// The app lock. Null hides its switch, as for a device-less test.
+  final AppLock? appLock;
 
   /// Reads and writes the settings.
   final SettingsDao settingsDao;
@@ -35,6 +40,20 @@ class _SettingsPageState extends State<SettingsPage> {
   CycleSettings? _settings;
   AppPreferences _preferences = const AppPreferences();
   Object? _error;
+
+  /// Set when turning the lock on failed for want of a device passcode.
+  bool _lockUnavailable = false;
+
+  Future<void> _changeLock(bool enabled) async {
+    final lock = widget.appLock;
+    if (lock == null) return;
+    final result = await lock.setEnabled(
+      enabled: enabled,
+      reason: AppLocalizations.of(context).appLockConfirmReason,
+    );
+    if (!mounted) return;
+    setState(() => _lockUnavailable = result == LockChange.unavailable);
+  }
 
   @override
   void initState() {
@@ -115,11 +134,20 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     }
 
-    return SettingsScreen(
+    final lock = widget.appLock;
+    Widget screen() => SettingsScreen(
       settings: settings,
       onChanged: _change,
       preferences: _preferences,
       onPreferencesChanged: _changePreferences,
+      lockEnabled: lock?.enabled,
+      // Held still while the system prompt is up.
+      onLockChanged: lock == null || lock.authenticating ? null : _changeLock,
+      lockUnavailable: _lockUnavailable,
     );
+
+    return lock == null
+        ? screen()
+        : ListenableBuilder(listenable: lock, builder: (_, _) => screen());
   }
 }

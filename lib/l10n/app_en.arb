@@ -441,5 +441,37 @@
   "keepEditing": "Keep editing",
   "@keepEditing": {
     "description": "Cancels the discard prompt and returns to the log sheet."
+  },
+  "privacyHeading": "Privacy",
+  "@privacyHeading": {
+    "description": "Settings group heading for the app lock."
+  },
+  "appLockToggle": "Lock app",
+  "@appLockToggle": {
+    "description": "Switch that turns on the Face ID / passcode lock."
+  },
+  "appLockFooter": "Asks for Face ID, Touch ID or your device passcode when Period. opens and whenever you return to it. In the app switcher, Period. is always blurred.",
+  "@appLockFooter": {
+    "description": "Explains the app lock. Neutral: says nothing about cycles."
+  },
+  "appLockUnavailable": "Set a device passcode in your phone's settings first to use the app lock.",
+  "@appLockUnavailable": {
+    "description": "Shown when the device has no passcode, so the lock cannot be turned on."
+  },
+  "appLockReason": "Unlock Period.",
+  "@appLockReason": {
+    "description": "Reason shown in the system authentication prompt when opening the app. Neutral on purpose: it can appear over the lock screen."
+  },
+  "appLockConfirmReason": "Confirm it's you to change the app lock",
+  "@appLockConfirmReason": {
+    "description": "Reason shown in the system prompt when turning the lock on or off."
+  },
+  "lockedTitle": "Period. is locked",
+  "@lockedTitle": {
+    "description": "Title on the lock screen."
+  },
+  "unlock": "Unlock",
+  "@unlock": {
+    "description": "Button on the lock screen that shows the Face ID / passcode prompt again."
   }
 }

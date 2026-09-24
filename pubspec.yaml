@@ -31,6 +31,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   # Annotations only; the generator is a dev dependency.
   freezed_annotation: ^3.1.0
+  local_auth: ^3.0.2
 
 # Build configuration for package:sqlite3, which drift reaches sqlite through.
 # Adds no package -- sqlite3 is already resolved as drift's own dependency.

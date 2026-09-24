@@ -3,6 +3,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../domain/models/app_preferences.dart';
 import '../l10n/app_localizations.dart';
+import 'lock/app_lock.dart';
+import 'lock/lock_gate.dart';
 import 'theme.dart';
 
 /// The Flutter theme mode for [choice].
@@ -46,10 +48,14 @@ Locale resolveDeviceLocale(
 ///
 /// Separate from `main.dart` so a test can check that a stored preference
 /// really changes the theme and language, through the same code the app runs.
+///
+/// With a [lock], everything the navigator shows sits under a [LockGate].
 MaterialApp periodMaterialApp({
   required AppPreferences preferences,
   required Widget home,
+  AppLock? lock,
 }) => MaterialApp(
+  debugShowCheckedModeBanner: false,
   onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
   localizationsDelegates: const [
     AppLocalizations.delegate,
@@ -64,5 +70,9 @@ MaterialApp periodMaterialApp({
   theme: lightTheme(),
   darkTheme: darkTheme(),
   themeMode: themeModeFor(preferences.appearance),
+  builder: lock == null
+      ? null
+      : (context, child) =>
+            LockGate(lock: lock, child: child ?? const SizedBox()),
   home: home,
 );

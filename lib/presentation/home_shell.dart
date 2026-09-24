@@ -9,6 +9,7 @@ import '../domain/models/clock.dart';
 import '../l10n/app_localizations.dart';
 import 'analysis/analysis_page.dart';
 import 'calendar/calendar_page.dart';
+import 'lock/app_lock.dart';
 import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'today/today_page.dart';
@@ -30,8 +31,12 @@ class HomeShell extends StatefulWidget {
     required this.settingsDao,
     required this.clock,
     this.onPreferencesChanged,
+    this.appLock,
     super.key,
   });
+
+  /// The app lock, for its switch in Settings.
+  final AppLock? appLock;
 
   /// Told when the user changes appearance or language, so the app root can
   /// apply it.
@@ -77,6 +82,7 @@ class _HomeShellState extends State<HomeShell> {
         _ => SettingsPage(
           settingsDao: widget.settingsDao,
           onPreferencesChanged: widget.onPreferencesChanged,
+          appLock: widget.appLock,
         ),
       },
       bottomNavigationBar: CupertinoTabBar(

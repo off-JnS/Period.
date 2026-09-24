@@ -1,0 +1,2 @@
+/* Shown by iOS when Period. first asks to use Face ID for the app lock. Deliberately says nothing about cycles. */
+"NSFaceIDUsageDescription" = "Face ID keeps your entries private: only you can open Period.";

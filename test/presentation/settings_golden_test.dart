@@ -100,11 +100,13 @@ void main() {
           language: LanguageChoice.german,
         ),
         onPreferencesChanged: (_) {},
+        lockEnabled: true,
+        onLockChanged: (_) {},
       ),
       locale: const Locale('de'),
       brightness: Brightness.dark,
       // Tall enough to show every group at once.
-      surface: const Size(400, 1400),
+      surface: const Size(400, 1600),
     );
     await expectLater(
       find.byType(SettingsScreen),

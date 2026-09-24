@@ -1,0 +1,2 @@
+/* Wird von iOS angezeigt, wenn Period. zum ersten Mal Face ID für die App-Sperre verwenden möchte. Sagt bewusst nichts über Zyklen. */
+"NSFaceIDUsageDescription" = "Face ID schützt deine Einträge: Nur du kannst Period. öffnen.";
