@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:period/domain/models/cycle_date.dart';
+import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/analysis/analysis_page.dart';
 import 'package:period/presentation/analysis/analysis_screen.dart';
 
@@ -217,6 +219,83 @@ void main() {
       expect(find.text('Cycle lengths'), findsNothing);
       // The history is description, not statistics: it stays.
       expect(find.textContaining('Started Jan 1, 2024'), findsOneWidget);
+    });
+  });
+
+  group('period length', () {
+    Map<CycleDate, FlowIntensity> flowFrom(List<(CycleDate, int)> runs) => {
+      for (final (start, days) in runs)
+        for (var i = 0; i < days; i++) start.addDays(i): FlowIntensity.medium,
+    };
+
+    final starts = regularPeriodStarts(
+      from: aDate(2024, 1, 1),
+      length: 28,
+      count: 4,
+    );
+    final today = starts.last.addDays(10);
+
+    testWidgets('states the usual length once two periods are known', (
+      tester,
+    ) async {
+      final data = analysisFrom(
+        starts,
+        flowByDay: flowFrom([
+          (starts[0], 4),
+          (starts[1], 6),
+          (starts[2], 5),
+          (starts[3], 5),
+        ]),
+        today: today,
+      );
+      await pumpApp(tester, AnalysisScreen(data: data));
+
+      expect(find.text('Usual period length'), findsOneWidget);
+      expect(find.text('5 days'), findsWidgets);
+      expect(find.text('Based on 4 periods'), findsOneWidget);
+    });
+
+    testWidgets('asks for flow until there is enough', (tester) async {
+      final data = analysisFrom(
+        starts,
+        flowByDay: flowFrom([(starts[0], 4)]),
+        today: today,
+      );
+      await pumpApp(tester, AnalysisScreen(data: data));
+      expect(find.textContaining('Log your flow on each period day'), findsOne);
+    });
+
+    testWidgets('each history row says how long that period lasted', (
+      tester,
+    ) async {
+      final data = analysisFrom(
+        starts,
+        flowByDay: flowFrom([(starts[0], 4), (starts[3], 3)]),
+        today: starts.last.addDays(2),
+      );
+      await pumpApp(tester, AnalysisScreen(data: data));
+      await tester.scrollUntilVisible(
+        find.text('Period: 4 days'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Period: 4 days'), findsOneWidget);
+      // Still running today.
+      expect(find.text('Period ongoing, day 3'), findsOneWidget);
+      // Periods with no flow logged say nothing, never "0 days".
+      expect(find.textContaining('Period: 0'), findsNothing);
+    });
+
+    testWidgets('is still shown in pregnancy, as description', (tester) async {
+      final data = analysisFrom(
+        starts,
+        statisticsVisible: false,
+        flowByDay: flowFrom([(starts[0], 4), (starts[1], 6)]),
+        today: today,
+      );
+      await pumpApp(tester, AnalysisScreen(data: data));
+      expect(find.text('Usual period length'), findsOneWidget);
+      expect(find.text('Usual length'), findsNothing);
     });
   });
 }

@@ -56,6 +56,22 @@ flow recorded as light, medium or heavy. A day recorded as `none`, or a day with
 no flow recorded at all, ends the run. FIGO puts normal duration at 2–7 days;
 the app does not enforce that, it only reports what was logged.
 
+Three cases the run needs spelled out:
+
+- **Start day with no flow recorded** — the duration is *unknown*, not zero.
+  She marked a start and logged nothing else; a zero would be a figure she
+  never gave. Unknown durations are left out of every statistic.
+- **Still running** — when the run reaches today, the period may not be over.
+  Its duration is *so far*, is shown as ongoing, and is left out of every
+  statistic until a later day ends the run.
+- **Never past the next start** — a run stops the day before the next period
+  start, however the flow was logged.
+
+**Usual period duration** — the median of the known, finished durations, shown
+once there are at least **2** (the same bar as cycles, §3, so the two screens
+never disagree about how much history is enough). Pure description, so it is
+shown in **every** mode, pregnancy included (§6).
+
 **Completed cycle** — one with a known end. Only completed cycles feed any
 statistic.
 

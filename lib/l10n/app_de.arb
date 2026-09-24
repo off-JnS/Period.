@@ -151,5 +151,10 @@
   "singleChoiceHint": "Zum Entfernen erneut tippen.",
   "moodSummary": "Stimmung: {moods}",
   "dischargeSummary": "Ausfluss: {kind}",
-  "sexSummary": "Sex: {kind}"
+  "sexSummary": "Sex: {kind}",
+  "usualPeriodLengthHeading": "Übliche Periodendauer",
+  "basedOnPeriods": "{count, plural, =1{Basierend auf 1 Periode} other{Basierend auf {count} Perioden}}",
+  "needFlowForPeriodLength": "Trage an jedem Periodentag deine Blutung ein, um zu sehen, wie lange deine Perioden meist dauern.",
+  "periodLastedInHistory": "Periode: {days, plural, =1{1 Tag} other{{days} Tage}}",
+  "periodOngoingInHistory": "Periode läuft, Tag {days}"
 }

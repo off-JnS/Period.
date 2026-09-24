@@ -4,6 +4,9 @@ import '../../data/database/daos/log_dao.dart';
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/logic/cycle_analysis.dart';
 import '../../domain/logic/cycle_statistics.dart';
+import '../../domain/logic/period_length.dart';
+import '../../domain/models/clock.dart';
+import '../../domain/models/day_entry.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
@@ -19,8 +22,12 @@ class AnalysisPage extends StatefulWidget {
   const AnalysisPage({
     required this.logDao,
     required this.settingsDao,
+    required this.clock,
     super.key,
   });
+
+  /// Supplies today, which decides whether a period is still running.
+  final Clock clock;
 
   /// Reads what the user logged.
   final LogDao logDao;
@@ -46,12 +53,20 @@ class _AnalysisPageState extends State<AnalysisPage> {
     try {
       final starts = await widget.logDao.allPeriodStarts();
       final settings = await widget.settingsDao.cycleSettings();
+      final today = widget.clock.today();
+      // Flow from the first start on: lengths only ever count forward from
+      // a start, so nothing earlier can matter.
+      final entries = starts.isEmpty
+          ? const <DayEntry>[]
+          : await widget.logDao.entriesBetween(starts.first, today);
       if (!mounted) return;
       setState(() {
         _error = null;
         _data = analysisFrom(
           starts,
           statisticsVisible: settings.cycleStatisticsVisible,
+          flowByDay: {for (final entry in entries) entry.date: ?entry.flow},
+          today: today,
         );
       });
     } on Object catch (error) {
@@ -96,17 +111,32 @@ class _AnalysisPageState extends State<AnalysisPage> {
 ///
 /// A free function so it can be tested as a function, with no widget and no
 /// database: the interesting cases here are all about the shape of the history.
+///
+/// Period lengths need [today] and the logged [flowByDay]; without [today]
+/// none are computed.
 AnalysisViewData analysisFrom(
   List<CycleDate> periodStarts, {
   bool statisticsVisible = true,
+  Map<CycleDate, FlowIntensity> flowByDay = const {},
+  CycleDate? today,
 }) {
   final cycles = cyclesFrom(periodStarts);
   final eligible = eligibleForStatistics(cycles);
 
   final lengths = [for (final cycle in eligible) ?cycle.lengthInDays]..sort();
 
+  final periods = today == null
+      ? const <PeriodLength>[]
+      : periodLengths(starts: periodStarts, flowByDay: flowByDay, today: today);
+
   return AnalysisViewData(
     statisticsVisible: statisticsVisible,
+    periodLengths: {
+      for (final (i, start) in periodStarts.indexed)
+        if (i < periods.length) start: periods[i],
+    },
+    usualPeriodLength: usualPeriodLength(periods)?.round(),
+    knownPeriodCount: periods.whereType<KnownPeriodLength>().length,
     cycles: cycles,
     eligible: eligible,
     // Null until there is enough to be worth stating. The screen says so in

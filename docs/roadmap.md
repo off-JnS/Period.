@@ -72,7 +72,7 @@ kinds are deliberately indistinguishable there.
 **Not in this step:** a pill reminder (part of feature 2's contraception
 logging), snooze, custom notification text.
 
-### 2. More to log 🔨 — built, awaiting review
+### 2. More to log ✅
 
 **What:** mood, sex (protected / unprotected / none), discharge, and for the
 contraception mode, "pill taken".
@@ -85,14 +85,14 @@ same table family. Log sheet gains sections; Today's summary lists them.
 beneath that it is never combined with any estimate; moods any number, discharge
 and sex one each (tap again to clear), pill only in the contraception mode.
 
-### 3. Period length ⏳
+### 3. Period length 🔨 — built, awaiting review
 
 **What:** mark the day a period ends; "periods usually last N days" in history.
 
-**How:** an end is a derived fact from logged flow days, or an explicit end
-marker — decided in `docs/cycle-logic.md` first (§11), since §4 forbids storing
-anything derivable. Descriptive only, so allowed in every mode (spec §6).
-Possibly a migration if an explicit marker is chosen; flagged if so.
+**How:** derived, not marked: `docs/cycle-logic.md` §1 already defines a
+period's duration as the run of flow days from its start. Edge cases (no flow on
+the start day, still running, the next start) added there first. Nothing stored,
+no migration. Shown in every mode, pregnancy included (spec §6).
 
 ### 4. Delete all data ⏳
 

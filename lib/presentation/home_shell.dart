@@ -118,6 +118,7 @@ class _HomeShellState extends State<HomeShell> {
         2 => AnalysisPage(
           logDao: widget.logDao,
           settingsDao: widget.settingsDao,
+          clock: widget.clock,
         ),
         _ => SettingsPage(
           settingsDao: widget.settingsDao,

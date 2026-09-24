@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../domain/logic/period_length.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/cycle.dart';
 import '../../domain/models/cycle_date.dart';
@@ -22,7 +23,23 @@ class AnalysisViewData {
     this.shortest,
     this.longest,
     this.statisticsVisible = true,
+    this.periodLengths = const {},
+    this.usualPeriodLength,
+    this.knownPeriodCount = 0,
   });
+
+  /// How long each period lasted, by its start day. Missing means not worked
+  /// out; see [PeriodLength] for known, ongoing and unknown.
+  final Map<CycleDate, PeriodLength> periodLengths;
+
+  /// The median of the finished lengths, once there are enough.
+  ///
+  /// Shown in every mode, pregnancy included: a duration is description, not
+  /// a statistic about cycles (docs/cycle-logic.md §1 and §6).
+  final int? usualPeriodLength;
+
+  /// How many finished lengths [usualPeriodLength] rests on.
+  final int knownPeriodCount;
 
   /// Whether the length summaries and chart may be shown.
   ///
@@ -83,11 +100,13 @@ class AnalysisScreen extends StatelessWidget {
                 _Statistics(data: data),
                 const SizedBox(height: 12),
               ],
+              _PeriodLength(data: data),
+              const SizedBox(height: 12),
               if (data.statisticsVisible && data.eligible.length >= 2) ...[
                 _LengthChart(cycles: data.eligible),
                 const SizedBox(height: 28),
               ],
-              _History(cycles: data.cycles),
+              _History(cycles: data.cycles, lengths: data.periodLengths),
             ],
     );
   }
@@ -297,10 +316,47 @@ class _LengthChart extends StatelessWidget {
   }
 }
 
+class _PeriodLength extends StatelessWidget {
+  const _PeriodLength({required this.data});
+
+  final AnalysisViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final usual = data.usualPeriodLength;
+
+    return SectionCard(
+      icon: Icons.water_drop_outlined,
+      heading: l10n.usualPeriodLengthHeading,
+      child: usual == null
+          ? Text(l10n.needFlowForPeriodLength, style: theme.textTheme.bodyLarge)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.lengthInDays(usual),
+                  style: theme.textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.basedOnPeriods(data.knownPeriodCount),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
 class _History extends StatelessWidget {
-  const _History({required this.cycles});
+  const _History({required this.cycles, this.lengths = const {}});
 
   final List<Cycle> cycles;
+  final Map<CycleDate, PeriodLength> lengths;
 
   @override
   Widget build(BuildContext context) {
@@ -330,9 +386,31 @@ class _History extends StatelessWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          l10n.cycleStartedOn(_formatDay(locale, cycle.start)),
-                          style: theme.textTheme.bodyMedium,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.cycleStartedOn(
+                                _formatDay(locale, cycle.start),
+                              ),
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            // Unknown lengths say nothing rather than "0".
+                            if (switch (lengths[cycle.start]) {
+                                  KnownPeriodLength(:final days) =>
+                                    l10n.periodLastedInHistory(days),
+                                  OngoingPeriodLength(:final daysSoFar) =>
+                                    l10n.periodOngoingInHistory(daysSoFar),
+                                  _ => null,
+                                }
+                                case final line?)
+                              Text(
+                                line,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),

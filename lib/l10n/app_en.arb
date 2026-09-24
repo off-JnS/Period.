@@ -563,5 +563,15 @@
   "dischargeSummary": "Discharge: {kind}",
   "@dischargeSummary": {"description": "Today's summary line.", "placeholders": {"kind": {"type": "String"}}},
   "sexSummary": "Sex: {kind}",
-  "@sexSummary": {"description": "Today's summary line.", "placeholders": {"kind": {"type": "String"}}}
+  "@sexSummary": {"description": "Today's summary line.", "placeholders": {"kind": {"type": "String"}}},
+  "usualPeriodLengthHeading": "Usual period length",
+  "@usualPeriodLengthHeading": {"description": "Card heading on the cycles screen."},
+  "basedOnPeriods": "{count, plural, =1{Based on 1 period} other{Based on {count} periods}}",
+  "@basedOnPeriods": {"description": "Under the usual period length.", "placeholders": {"count": {"type": "int"}}},
+  "needFlowForPeriodLength": "Log your flow on each period day to see how long your periods usually last.",
+  "@needFlowForPeriodLength": {"description": "Shown until two period durations are known."},
+  "periodLastedInHistory": "Period: {days, plural, =1{1 day} other{{days} days}}",
+  "@periodLastedInHistory": {"description": "Second line of a history row: how long that period lasted.", "placeholders": {"days": {"type": "int"}}},
+  "periodOngoingInHistory": "Period ongoing, day {days}",
+  "@periodOngoingInHistory": {"description": "Second line of a history row when the period is still running.", "placeholders": {"days": {"type": "int"}}}
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/analysis/analysis_page.dart';
 import 'package:period/presentation/analysis/analysis_screen.dart';
 
@@ -43,6 +44,33 @@ void main() {
       tester,
       analysisFrom([aDate(2024, 1, 1), aDate(2024, 1, 29)]),
       'too_few',
+    );
+  });
+
+  testWidgets('period lengths from logged flow', (tester) async {
+    final starts = regularPeriodStarts(
+      from: aDate(2024, 1, 1),
+      length: 28,
+      count: 5,
+    );
+    await expectGolden(
+      tester,
+      analysisFrom(
+        starts,
+        flowByDay: {
+          for (final (start, days) in [
+            (starts[0], 5),
+            (starts[1], 4),
+            (starts[2], 6),
+            (starts[3], 5),
+            (starts[4], 2),
+          ])
+            for (var i = 0; i < days; i++)
+              start.addDays(i): FlowIntensity.medium,
+        },
+        today: starts.last.addDays(1),
+      ),
+      'period_lengths',
     );
   });
 
