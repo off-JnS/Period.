@@ -147,20 +147,26 @@ fertile window from these would need a method in the spec first.
 Health leaves this app's encryption and can sync through iCloud. Off by default,
 with that stated plainly beside the switch, if built at all.
 
-### 9. Pregnancy week counter 🔨 — built, awaiting review
+### 9. Pregnancy week counter ✅
 
 **What:** in pregnancy mode, "week N" instead of a cycle day.
 
 **How:** date arithmetic from the last period start. Needs a spec entry (§11),
 and must not show a due date as certain (§8).
 
-### 10. Home-screen widget ⏳
+### 10. Home-screen widget 🔨 — built, awaiting review
 
 **What:** today's cycle day at a glance.
 
-**How:** native iOS WidgetKit extension; no allowlisted Flutter package covers
-it. ❓ A widget shows on the home screen to anyone holding the phone — likely
-an opt-in with a "hide details" mode.
+**Decided 2026-09-25:** discreet by default — a ring and "Day 12", no word
+like period or cycle; blank while the app lock is on; details (the estimate)
+only if turned on in Settings. Home screen only, never the lock screen.
+
+**How:** native WidgetKit extension (`ios/PeriodWidget`). The app hands it a
+small snapshot through a Keychain group shared with the widget (encrypted; free
+developer accounts have no App Groups, and a Keychain item is safer anyway).
+The app's private group is listed first in its entitlements so the database key
+can never land in the shared one. Cleared by Delete all data.
 
 ---
 

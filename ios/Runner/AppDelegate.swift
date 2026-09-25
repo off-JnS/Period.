@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import WidgetKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -18,6 +19,69 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PeriodWidgetBridge") {
+      WidgetBridge.install(messenger: registrar.messenger())
+    }
+  }
+}
+
+/// Hands the home-screen widget the little it may show.
+///
+/// The widget runs as its own process and cannot open the encrypted database,
+/// so the app writes a small snapshot for it -- the last period start and how
+/// to label the day -- into a Keychain group the two share. The Keychain, not
+/// a shared file: it is encrypted, where an App Group container is not.
+/// Nothing else of hers is ever written there.
+enum WidgetBridge {
+  static let service = "app.period.widget"
+  static let account = "snapshot"
+
+  static func install(messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "period/widget", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "update":
+        guard let json = call.arguments as? String else {
+          result(FlutterError(code: "bad_args", message: nil, details: nil))
+          return
+        }
+        result(write(Data(json.utf8)))
+      case "clear":
+        result(write(nil))
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// Replaces the snapshot (or removes it, for nil) and asks WidgetKit to
+  /// redraw. True on success.
+  static func write(_ data: Data?) -> Bool {
+    guard let group = sharedGroup() else { return false }
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+      kSecAttrAccessGroup as String: group,
+    ]
+    SecItemDelete(query as CFDictionary)
+    var ok = true
+    if let data = data {
+      var add = query
+      add[kSecValueData as String] = data
+      // Readable by the widget after the first unlock since restart, so it can
+      // redraw at midnight while the phone is locked -- and never before.
+      add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+      ok = SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+    }
+    WidgetCenter.shared.reloadAllTimelines()
+    return ok
+  }
+
+  static func sharedGroup() -> String? {
+    guard let prefix = Bundle.main.object(forInfoDictionaryKey: "AppIdentifierPrefix") as? String
+    else { return nil }
+    return prefix + "app.period.shared"
   }
 }
 

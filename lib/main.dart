@@ -4,6 +4,7 @@ import 'data/database/database.dart';
 import 'data/app_lock/device_authenticator.dart';
 import 'data/database/open_database.dart';
 import 'data/reminders/reminder_scheduler.dart';
+import 'data/widget/widget_bridge.dart';
 import 'data/database_key_store.dart';
 import 'data/demo_data.dart';
 import 'data/erase_all_data.dart';
@@ -13,6 +14,7 @@ import 'l10n/app_localizations.dart';
 import 'presentation/home_shell.dart';
 import 'presentation/lock/app_lock.dart';
 import 'presentation/reminders/reminder_sync.dart';
+import 'presentation/widget/widget_sync.dart';
 import 'presentation/preferences_mapping.dart';
 
 Future<void> main() async {
@@ -60,6 +62,11 @@ class _PeriodAppState extends State<PeriodApp> {
   /// Keeps reminders scheduled; created with the database it reads.
   ReminderSync? _reminders;
 
+  /// Keeps the home-screen widget's snapshot current.
+  WidgetSync? _widget;
+
+  final WidgetBridge _widgetBridge = const MethodChannelWidgetBridge();
+
   final DatabaseKeyStore _keyStore = SecureDatabaseKeyStore();
   final ReminderScheduler _scheduler = LocalNotificationsReminderScheduler();
 
@@ -81,6 +88,7 @@ class _PeriodAppState extends State<PeriodApp> {
       _database = null;
       _lock = null;
       _reminders = null;
+      _widget = null;
     });
     // Disposed after the frame that stops the lock gate listening to it.
     WidgetsBinding.instance.addPostFrameCallback((_) => lock?.dispose());
@@ -92,6 +100,7 @@ class _PeriodAppState extends State<PeriodApp> {
         directory: await databaseDirectory(),
         keyStore: _keyStore,
         reminders: _scheduler,
+        widget: _widgetBridge,
       );
       erased = true;
     } on Object {
@@ -142,6 +151,13 @@ class _PeriodAppState extends State<PeriodApp> {
           scheduler: _scheduler,
           clock: const SystemClock(),
         );
+        _widget = WidgetSync(
+          logDao: database.logDao,
+          settingsDao: database.settingsDao,
+          bridge: _widgetBridge,
+          clock: const SystemClock(),
+          lockEnabled: () => lock.enabled,
+        );
         _database = database;
       });
     } on Object catch (error) {
@@ -178,6 +194,7 @@ class _PeriodAppState extends State<PeriodApp> {
             clock: const SystemClock(),
             appLock: _lock,
             reminderSync: _reminders,
+            widgetSync: _widget,
             onEraseEverything: _eraseEverything,
             // Applied at once, from the Settings screen: the whole app
             // re-themes or re-translates in place, on the same tab.

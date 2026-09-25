@@ -697,5 +697,19 @@
   "pregnancyNeedsLastPeriod": "Log the first day of your last period to count the weeks of your pregnancy.",
   "@pregnancyNeedsLastPeriod": {"description": "Shown in pregnancy mode when no period start exists."},
   "pregnancyCounterEnded": "Is pregnancy mode still right for you? You can change your situation in Settings.",
-  "@pregnancyCounterEnded": {"description": "Shown after 44 weeks. A question, never an assumption."}
+  "@pregnancyCounterEnded": {"description": "Shown after 44 weeks. A question, never an assumption."},
+  "widgetDay": "Day {day}",
+  "@widgetDay": {"description": "The home-screen widget's only text: the cycle day. No word like 'period' or 'cycle', on purpose.", "placeholders": {"day": {"type": "String"}}},
+  "widgetPregnancy": "{weeks}+{days}",
+  "@widgetPregnancy": {"description": "The widget's text in pregnancy mode.", "placeholders": {"weeks": {"type": "String"}, "days": {"type": "String"}}},
+  "widgetNextPeriod": "Next period {range}",
+  "@widgetNextPeriod": {"description": "The widget's second line, only when details are on.", "placeholders": {"range": {"type": "String"}}},
+  "widgetHeading": "Home-screen widget",
+  "@widgetHeading": {"description": "Settings group heading."},
+  "widgetDetailedToggle": "Show details",
+  "@widgetDetailedToggle": {"description": "Switch for the detailed widget."},
+  "widgetDiscreetFooter": "The widget shows only the day number, never a word like period or cycle, and nothing at all while the app lock is on.",
+  "@widgetDiscreetFooter": {"description": "Footer while details are off."},
+  "widgetDetailedFooter": "The widget also shows your next period estimate, readable by anyone who sees your home screen. Nothing is shown while the app lock is on.",
+  "@widgetDetailedFooter": {"description": "Footer while details are on."}
 }

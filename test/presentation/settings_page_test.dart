@@ -346,4 +346,37 @@ void main() {
       expect(find.text('Delete all data'), findsNothing);
     });
   });
+
+  group('home-screen widget', () {
+    testWidgets('is offered only where there is a widget', (tester) async {
+      await pumpApp(tester, SettingsPage(settingsDao: database.settingsDao));
+      expect(find.text('Show details'), findsNothing);
+    });
+
+    testWidgets('details are off by default, and saved when turned on', (
+      tester,
+    ) async {
+      var affected = 0;
+      await pumpApp(
+        tester,
+        SettingsPage(
+          settingsDao: database.settingsDao,
+          offerWidget: true,
+          onScheduleAffected: () => affected++,
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Show details'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.textContaining('only the day number'), findsOneWidget);
+
+      await tester.tap(find.text('Show details'));
+      await tester.pumpAndSettle();
+      expect(await database.settingsDao.widgetDetailed(), isTrue);
+      expect(affected, 1);
+      expect(find.textContaining('readable by anyone'), findsOneWidget);
+    });
+  });
 }

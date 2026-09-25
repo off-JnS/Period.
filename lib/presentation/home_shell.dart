@@ -11,6 +11,7 @@ import 'analysis/analysis_page.dart';
 import 'calendar/calendar_page.dart';
 import 'lock/app_lock.dart';
 import 'reminders/reminder_sync.dart';
+import 'widget/widget_sync.dart';
 import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'today/today_page.dart';
@@ -34,6 +35,7 @@ class HomeShell extends StatefulWidget {
     this.onPreferencesChanged,
     this.appLock,
     this.reminderSync,
+    this.widgetSync,
     this.onEraseEverything,
     super.key,
   });
@@ -43,6 +45,9 @@ class HomeShell extends StatefulWidget {
 
   /// Keeps scheduled reminders current. Null in tests with no notifications.
   final ReminderSync? reminderSync;
+
+  /// Keeps the home-screen widget current. Null in tests.
+  final WidgetSync? widgetSync;
 
   /// The app lock, for its switch in Settings.
   final AppLock? appLock;
@@ -73,7 +78,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     // Back in the app: roll the daily reminders forward, and catch a change
     // of time zone since they were last scheduled.
-    _lifecycle = AppLifecycleListener(onResume: _syncReminders);
+    _lifecycle = AppLifecycleListener(onResume: _syncOutsideTheApp);
   }
 
   @override
@@ -81,7 +86,7 @@ class _HomeShellState extends State<HomeShell> {
     super.didChangeDependencies();
     // First build, and any change of language: the notification text is
     // localised when it is scheduled.
-    _syncReminders();
+    _syncOutsideTheApp();
   }
 
   @override
@@ -90,13 +95,19 @@ class _HomeShellState extends State<HomeShell> {
     super.dispose();
   }
 
-  void _syncReminders() {
-    final sync = widget.reminderSync;
-    if (sync == null || !mounted) return;
+  /// Everything that lives outside the app and depends on what is stored:
+  /// scheduled reminders and the home-screen widget. Both are rebuilt from
+  /// scratch whenever anything they depend on might have changed.
+  void _syncOutsideTheApp() {
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context);
-    sync.sync(
+    widget.reminderSync?.sync(
       text: l10n.reminderNotificationText,
       channelName: l10n.reminderChannelName,
+    );
+    widget.widgetSync?.sync(
+      l10n,
+      Localizations.localeOf(context).toLanguageTag(),
     );
   }
 
@@ -111,13 +122,13 @@ class _HomeShellState extends State<HomeShell> {
           logDao: widget.logDao,
           settingsDao: widget.settingsDao,
           clock: widget.clock,
-          onEntriesChanged: _syncReminders,
+          onEntriesChanged: _syncOutsideTheApp,
         ),
         1 => CalendarPage(
           logDao: widget.logDao,
           settingsDao: widget.settingsDao,
           clock: widget.clock,
-          onEntriesChanged: _syncReminders,
+          onEntriesChanged: _syncOutsideTheApp,
         ),
         2 => AnalysisPage(
           logDao: widget.logDao,
@@ -129,8 +140,9 @@ class _HomeShellState extends State<HomeShell> {
           onPreferencesChanged: widget.onPreferencesChanged,
           appLock: widget.appLock,
           reminderSync: widget.reminderSync,
-          onScheduleAffected: _syncReminders,
+          onScheduleAffected: _syncOutsideTheApp,
           onEraseEverything: widget.onEraseEverything,
+          offerWidget: widget.widgetSync != null,
         ),
       },
       bottomNavigationBar: CupertinoTabBar(

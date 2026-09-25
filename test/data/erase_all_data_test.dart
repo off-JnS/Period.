@@ -10,6 +10,7 @@ import 'package:test/test.dart';
 
 import '../support/dates.dart';
 import '../support/fake_reminder_scheduler.dart';
+import '../support/fake_widget_bridge.dart';
 import '../support/models.dart';
 
 class _FakeKeyStore implements DatabaseKeyStore {
@@ -116,6 +117,18 @@ void main() {
       () => deleteDatabaseFiles(Directory('${dir.path}/missing')),
       returnsNormally,
     );
+  });
+
+  test("the widget's snapshot is cleared too", () async {
+    final widget = FakeWidgetBridge();
+    await eraseAllData(
+      database: database,
+      directory: dir,
+      keyStore: keyStore,
+      reminders: reminders,
+      widget: widget,
+    );
+    expect(widget.cleared, 1);
   });
 }
 

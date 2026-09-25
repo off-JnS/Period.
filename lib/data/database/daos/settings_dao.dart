@@ -40,6 +40,9 @@ abstract final class SettingKeys {
 
   /// The reminder time as `HH:MM`, 24-hour.
   static const reminderTime = 'reminder_time';
+
+  /// `true` when the home-screen widget may show details.
+  static const widgetDetailed = 'widget_detailed';
 }
 
 /// Reads and writes the user's settings.
@@ -155,6 +158,15 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
       );
     });
   }
+
+  /// Whether the widget may show more than the day number. Off unless she
+  /// turned it on.
+  Future<bool> widgetDetailed() async =>
+      (await _values())[SettingKeys.widgetDetailed] == 'true';
+
+  /// Turns the widget's details on or off.
+  Future<void> saveWidgetDetailed({required bool detailed}) =>
+      _put(SettingKeys.widgetDetailed, '$detailed');
 
   Future<Map<String, String>> _values() async {
     final rows = await select(appSettings).get();

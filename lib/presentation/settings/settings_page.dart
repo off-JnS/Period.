@@ -28,8 +28,12 @@ class SettingsPage extends StatefulWidget {
     this.reminderSync,
     this.onScheduleAffected,
     this.onEraseEverything,
+    this.offerWidget = false,
     super.key,
   });
+
+  /// Whether this platform has the home-screen widget to configure.
+  final bool offerWidget;
 
   /// Deletes all data. Null hides the row.
   final Future<void> Function(String done, String failed)? onEraseEverything;
@@ -64,6 +68,13 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _lockUnavailable = false;
 
   ReminderSettings _reminders = const ReminderSettings();
+  bool _widgetDetailed = false;
+
+  Future<void> _changeWidgetDetailed(bool detailed) async {
+    setState(() => _widgetDetailed = detailed);
+    await widget.settingsDao.saveWidgetDetailed(detailed: detailed);
+    widget.onScheduleAffected?.call();
+  }
 
   /// Asks, confirms the owner if the lock is on, then deletes everything.
   Future<void> _confirmErase() async {
@@ -151,6 +162,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
     if (!mounted) return;
     setState(() => _lockUnavailable = result == LockChange.unavailable);
+    // The widget shows nothing while the lock is on; tell it.
+    if (result == LockChange.changed) widget.onScheduleAffected?.call();
   }
 
   @override
@@ -164,8 +177,10 @@ class _SettingsPageState extends State<SettingsPage> {
       final settings = await widget.settingsDao.cycleSettings();
       final preferences = await widget.settingsDao.appPreferences();
       final reminders = await widget.settingsDao.reminderSettings();
+      final widgetDetailed = await widget.settingsDao.widgetDetailed();
       if (!mounted) return;
       setState(() {
+        _widgetDetailed = widgetDetailed;
         _reminders = reminders;
         _error = null;
         _settings = settings;
@@ -248,6 +263,8 @@ class _SettingsPageState extends State<SettingsPage> {
       reminders: widget.reminderSync == null ? null : _reminders,
       onRemindersChanged: _changeReminders,
       remindersBlocked: _remindersBlocked,
+      widgetDetailed: widget.offerWidget ? _widgetDetailed : null,
+      onWidgetDetailedChanged: _changeWidgetDetailed,
       onEraseEverything: widget.onEraseEverything == null
           ? null
           : _confirmErase,

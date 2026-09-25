@@ -28,8 +28,17 @@ class SettingsScreen extends StatelessWidget {
     this.onRemindersChanged,
     this.remindersBlocked = false,
     this.onEraseEverything,
+    this.widgetDetailed,
+    this.onWidgetDetailedChanged,
     super.key,
   });
+
+  /// Whether the home-screen widget shows details, or null to leave the
+  /// widget group out.
+  final bool? widgetDetailed;
+
+  /// Called when she flips the widget switch.
+  final ValueChanged<bool>? onWidgetDetailedChanged;
 
   /// Starts deleting all data. Null hides the row.
   final VoidCallback? onEraseEverything;
@@ -148,6 +157,27 @@ class SettingsScreen extends StatelessWidget {
           ),
           GroupFooter(
             lockUnavailable ? l10n.appLockUnavailable : l10n.appLockFooter,
+          ),
+        ],
+        if (widgetDetailed case final detailed?) ...[
+          const SizedBox(height: 28),
+          GroupHeader(l10n.widgetHeading),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: SwitchListTile.adaptive(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: detailed,
+              onChanged: onWidgetDetailedChanged == null
+                  ? null
+                  : (value) {
+                      HapticFeedback.selectionClick();
+                      onWidgetDetailedChanged!(value);
+                    },
+              title: Text(l10n.widgetDetailedToggle),
+            ),
+          ),
+          GroupFooter(
+            detailed ? l10n.widgetDetailedFooter : l10n.widgetDiscreetFooter,
           ),
         ],
         const SizedBox(height: 28),

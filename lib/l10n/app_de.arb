@@ -210,5 +210,12 @@
   "pregnancyAccessibility": "Schwangerschaft: {weeks} Wochen und {days} Tage",
   "pregnancyCountedFrom": "Gezählt ab dem ersten Tag deiner letzten Periode.",
   "pregnancyNeedsLastPeriod": "Trage den ersten Tag deiner letzten Periode ein, um die Schwangerschaftswochen zu zählen.",
-  "pregnancyCounterEnded": "Passt der Schwangerschaftsmodus noch? Du kannst deine Situation in den Einstellungen ändern."
+  "pregnancyCounterEnded": "Passt der Schwangerschaftsmodus noch? Du kannst deine Situation in den Einstellungen ändern.",
+  "widgetDay": "Tag {day}",
+  "widgetPregnancy": "{weeks}+{days}",
+  "widgetNextPeriod": "Nächste Periode {range}",
+  "widgetHeading": "Widget auf dem Home-Bildschirm",
+  "widgetDetailedToggle": "Details anzeigen",
+  "widgetDiscreetFooter": "Das Widget zeigt nur die Tageszahl, nie ein Wort wie Periode oder Zyklus, und gar nichts, solange die App-Sperre an ist.",
+  "widgetDetailedFooter": "Das Widget zeigt zusätzlich deine geschätzte nächste Periode, lesbar für alle, die deinen Home-Bildschirm sehen. Solange die App-Sperre an ist, zeigt es nichts."
 }

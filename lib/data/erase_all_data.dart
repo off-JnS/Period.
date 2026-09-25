@@ -4,6 +4,7 @@ import 'database/database.dart';
 import 'database/open_database.dart';
 import 'database_key_store.dart';
 import 'reminders/reminder_scheduler.dart';
+import 'widget/widget_bridge.dart';
 
 /// CLAUDE.md §9: "Delete all data" must actually delete.
 ///
@@ -25,12 +26,19 @@ Future<void> eraseAllData({
   required Directory directory,
   required DatabaseKeyStore keyStore,
   required ReminderScheduler reminders,
+  WidgetBridge? widget,
 }) async {
   try {
     await reminders.cancelAll();
   } on Object {
     // A reminder left behind reads only "Reminder" and reveals nothing;
     // failing to cancel one must not stop the data being deleted.
+  }
+  try {
+    // The widget's snapshot holds the last period start: it goes too.
+    await widget?.clear();
+  } on Object {
+    // As with reminders, not a reason to keep her data.
   }
   await database.close();
   deleteDatabaseFiles(directory);

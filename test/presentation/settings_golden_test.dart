@@ -111,11 +111,13 @@ void main() {
         ),
         onRemindersChanged: (_) {},
         onEraseEverything: () {},
+        widgetDetailed: false,
+        onWidgetDetailedChanged: (_) {},
       ),
       locale: const Locale('de'),
       brightness: Brightness.dark,
       // Tall enough to show every group at once.
-      surface: const Size(400, 2200),
+      surface: const Size(400, 2450),
     );
     await expectLater(
       find.byType(SettingsScreen),
