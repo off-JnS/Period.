@@ -168,6 +168,38 @@ developer accounts have no App Groups, and a Keychain item is safer anyway).
 The app's private group is listed first in its entitlements so the database key
 can never land in the shared one. Cleared by Delete all data.
 
+### 11. Profile 🔨 — built, awaiting review
+
+**What:** a Profile tab in place of Settings, with the cycle mode and what she
+tells the app about herself: birth year, usual cycle and period length,
+contraception method, conditions she has been diagnosed with. Settings opens
+from a gear at the top of the profile.
+
+**Decided 2026-09-25:** all recorded only, never used by an estimate
+(`docs/cycle-logic.md` §10); birth year rather than a birthday; a hormonal
+method offers the contraception mode, never switches to it. Stored in the
+settings table as new keys — **no migration**. `cupertino_icons` approved.
+
+### 12. A personal, simpler entry page ⏳
+
+**What:** she chooses which sections the log sheet shows (symptoms, mood,
+discharge, sex, pill, body signals, note), and the sheet itself is calmer:
+fewer boxes, less text, the common things first. Defaults follow the profile
+— the pill section only with a pill, body signals off until she wants them.
+
+### 13. Onboarding ⏳
+
+**What:** on first launch, a few short pages: what the app is and its privacy
+promise, the profile questions, what to track, and optionally the first day of
+her last period (a real entry, not a setting). Every page skippable. Never
+shown again once finished or skipped, and not at all on an install that
+already has data.
+
+### 14. Icons and motion ⏳
+
+**What:** an icon beside every row, heading and option; gentle animations
+where something appears, changes or is saved. Respects Reduce Motion.
+
 ---
 
 ## Not building, and why

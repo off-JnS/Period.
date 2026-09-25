@@ -97,7 +97,7 @@ Allowed:
 `flutter_local_notifications`, `timezone`, `local_auth`, `health`,
 `in_app_purchase`, `intl`, `flutter_localizations`, `pdf`, `printing`,
 `share_plus`, `file_picker`, `flutter_secure_storage`, `mocktail`,
-`golden_toolkit`
+`golden_toolkit`, `cupertino_icons` (approved 2026-09-25: an icon font, no code)
 
 `flutter_secure_storage` holds the database encryption key in the Android
 Keystore and the iOS Keychain. Nothing else on this list can store a secret —

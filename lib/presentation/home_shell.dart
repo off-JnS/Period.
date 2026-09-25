@@ -10,6 +10,7 @@ import '../l10n/app_localizations.dart';
 import 'analysis/analysis_page.dart';
 import 'calendar/calendar_page.dart';
 import 'lock/app_lock.dart';
+import 'profile/profile_page.dart';
 import 'reminders/reminder_sync.dart';
 import 'widget/widget_sync.dart';
 import 'settings/settings_page.dart';
@@ -17,6 +18,9 @@ import 'theme.dart';
 import 'today/today_page.dart';
 
 /// The four top-level screens behind an iOS tab bar.
+///
+/// Settings is not a tab: it opens from the gear on Profile, inside that
+/// tab's own navigator, so the tab bar stays in place as in any iOS app.
 ///
 /// The HIG puts top-level navigation in a tab bar at the bottom rather than in
 /// buttons on the home screen, and it keeps each destination one tap away from
@@ -73,6 +77,10 @@ class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
   late final AppLifecycleListener _lifecycle;
 
+  /// Lets the navigation bars on Profile and Settings animate into each
+  /// other, which a nested navigator only does with its own controller.
+  final _profileHeroes = HeroController();
+
   @override
   void initState() {
     super.initState();
@@ -92,6 +100,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _profileHeroes.dispose();
     super.dispose();
   }
 
@@ -135,14 +144,25 @@ class _HomeShellState extends State<HomeShell> {
           settingsDao: widget.settingsDao,
           clock: widget.clock,
         ),
-        _ => SettingsPage(
-          settingsDao: widget.settingsDao,
-          onPreferencesChanged: widget.onPreferencesChanged,
-          appLock: widget.appLock,
-          reminderSync: widget.reminderSync,
-          onScheduleAffected: _syncOutsideTheApp,
-          onEraseEverything: widget.onEraseEverything,
-          offerWidget: widget.widgetSync != null,
+        _ => Navigator(
+          observers: [_profileHeroes],
+          onGenerateRoute: (_) => CupertinoPageRoute<void>(
+            builder: (_) => ProfilePage(
+              settingsDao: widget.settingsDao,
+              clock: widget.clock,
+              onScheduleAffected: _syncOutsideTheApp,
+              settingsPage: (backLabel) => SettingsPage(
+                settingsDao: widget.settingsDao,
+                onPreferencesChanged: widget.onPreferencesChanged,
+                appLock: widget.appLock,
+                reminderSync: widget.reminderSync,
+                onScheduleAffected: _syncOutsideTheApp,
+                onEraseEverything: widget.onEraseEverything,
+                offerWidget: widget.widgetSync != null,
+                backLabel: backLabel,
+              ),
+            ),
+          ),
         ),
       },
       bottomNavigationBar: CupertinoTabBar(
@@ -175,9 +195,9 @@ class _HomeShellState extends State<HomeShell> {
             label: l10n.analysisTitle,
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.settings_outlined),
-            activeIcon: const Icon(Icons.settings_rounded),
-            label: l10n.settingsTitle,
+            icon: const Icon(CupertinoIcons.person_crop_circle),
+            activeIcon: const Icon(CupertinoIcons.person_crop_circle_fill),
+            label: l10n.profileTitle,
           ),
         ],
       ),

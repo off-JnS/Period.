@@ -2,6 +2,7 @@ import 'package:period/data/database/daos/settings_dao.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/profile.dart';
 import 'package:period/domain/models/reminder_settings.dart';
 import 'package:test/test.dart';
 
@@ -195,6 +196,70 @@ void main() {
         final read = await database.settingsDao.reminderSettings();
         expect((read.hour, read.minute), (9, 0), reason: raw);
       }
+    });
+  });
+
+  group('profile', () {
+    Future<Profile> read() => database.settingsDao.profile(currentYear: 2026);
+
+    test('nothing stored reads as an empty profile', () async {
+      expect(await read(), const Profile());
+    });
+
+    test('a full profile round-trips', () async {
+      const profile = Profile(
+        birthYear: 1998,
+        usualCycleLength: 31,
+        usualPeriodLength: 5,
+        contraception: ContraceptionMethod.copperIud,
+        conditions: {KnownCondition.pcos, KnownCondition.thyroid},
+      );
+      await database.settingsDao.saveProfile(profile);
+      expect(await read(), profile);
+    });
+
+    test('every method and condition round-trips', () async {
+      for (final method in ContraceptionMethod.values) {
+        await database.settingsDao.saveProfile(
+          Profile(contraception: method),
+        );
+        expect((await read()).contraception, method);
+      }
+      await database.settingsDao.saveProfile(
+        Profile(conditions: KnownCondition.values.toSet()),
+      );
+      expect((await read()).conditions, KnownCondition.values.toSet());
+    });
+
+    test('clearing a field deletes it', () async {
+      await database.settingsDao.saveProfile(
+        const Profile(birthYear: 1990, conditions: {KnownCondition.pmdd}),
+      );
+      await database.settingsDao.saveProfile(const Profile());
+      expect(await read(), const Profile());
+      final keys = (await database.select(database.appSettings).get())
+          .map((row) => row.settingKey);
+      expect(keys.where((key) => key.startsWith('profile_')), isEmpty);
+    });
+
+    test('values out of range or not understood read as unsaid', () async {
+      await storeRaw(SettingKeys.profileBirthYear, '2025');
+      await storeRaw(SettingKeys.profileCycleLength, '200');
+      await storeRaw(SettingKeys.profilePeriodLength, 'five');
+      await storeRaw(SettingKeys.profileContraception, 'tomorrowPill');
+      await storeRaw(SettingKeys.profileConditions, 'pcos,,somethingNew');
+      expect(
+        await read(),
+        const Profile(conditions: {KnownCondition.pcos}),
+      );
+    });
+
+    test('does not disturb the other settings', () async {
+      const settings = CycleSettings(mode: CycleMode.pregnancy);
+      await database.settingsDao.saveCycleSettings(settings);
+      await database.settingsDao.saveProfile(const Profile(birthYear: 1990));
+      await database.settingsDao.saveProfile(const Profile());
+      expect(await database.settingsDao.cycleSettings(), settings);
     });
   });
 }

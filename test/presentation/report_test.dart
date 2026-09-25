@@ -9,6 +9,7 @@ import 'package:period/data/database/database.dart';
 import 'package:period/domain/logic/cycle_report.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
+import 'package:period/domain/models/profile.dart';
 import 'package:period/l10n/app_localizations.dart';
 import 'package:period/presentation/analysis/analysis_page.dart';
 import 'package:period/presentation/report/report_pdf.dart';
@@ -57,12 +58,17 @@ void main() {
       );
 
   /// The text of an uncompressed PDF, near enough to search.
-  Future<String> pdfText(CycleReport report, String language) async {
+  Future<String> pdfText(
+    CycleReport report,
+    String language, {
+    Profile profile = const Profile(),
+  }) async {
     final l10n = await AppLocalizations.delegate.load(Locale(language));
     final bytes = await renderReportPdf(
       report,
       l10n: l10n,
       locale: language,
+      profile: profile,
       compress: false,
     );
     expect(ascii.decode(bytes.sublist(0, 5)), '%PDF-');
@@ -83,6 +89,34 @@ void main() {
       expect(text, contains('28 days'));
       expect(text, contains('Cramps'));
       expect(text, contains('Sad'));
+    });
+
+    test('states her profile answers as her own, when she gave any', () async {
+      final text = await pdfText(
+        sampleReport(),
+        'en',
+        profile: const Profile(
+          birthYear: 1990,
+          usualCycleLength: 31,
+          contraception: ContraceptionMethod.copperIud,
+          conditions: {KnownCondition.pcos, KnownCondition.pmdd},
+        ),
+      );
+      final stated = text.substring(
+        text.indexOf('Stated by me'),
+        text.indexOf('Cycles Period started'),
+      );
+      expect(stated, contains('Age this year 34'));
+      expect(stated, contains('Usual cycle length 31 days'));
+      expect(stated, contains('Copper IUD'));
+      expect(stated, contains('PCOS, PMDD'));
+      // Nothing said about period length, so no row for it.
+      expect(stated, isNot(contains('Usual period length')));
+    });
+
+    test('leaves the profile section out when she said nothing', () async {
+      final text = await pdfText(sampleReport(), 'en');
+      expect(text, isNot(contains('Stated by me')));
     });
 
     test('always carries the not-a-diagnosis note (section 8)', () async {

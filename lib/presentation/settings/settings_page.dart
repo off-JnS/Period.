@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/models/app_preferences.dart';
-import '../../domain/models/cycle_mode.dart';
 import '../../domain/models/reminder_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
@@ -29,8 +28,12 @@ class SettingsPage extends StatefulWidget {
     this.onScheduleAffected,
     this.onEraseEverything,
     this.offerWidget = false,
+    this.backLabel,
     super.key,
   });
+
+  /// The title of the screen Settings was opened from, for its back button.
+  final String? backLabel;
 
   /// Whether this platform has the home-screen widget to configure.
   final bool offerWidget;
@@ -41,8 +44,8 @@ class SettingsPage extends StatefulWidget {
   /// Asks for notification permission. Null hides the reminders group.
   final ReminderSync? reminderSync;
 
-  /// Told after any change that could move a reminder: the reminder settings
-  /// themselves, and the mode, which decides whether there is an estimate.
+  /// Told after any change that affects what lives outside the app: the
+  /// reminders, the lock and the widget.
   final VoidCallback? onScheduleAffected;
 
   /// The app lock. Null hides its switch, as for a device-less test.
@@ -60,7 +63,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  CycleSettings? _settings;
+  bool _loaded = false;
   AppPreferences _preferences = const AppPreferences();
   Object? _error;
 
@@ -174,7 +177,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _load() async {
     try {
-      final settings = await widget.settingsDao.cycleSettings();
       final preferences = await widget.settingsDao.appPreferences();
       final reminders = await widget.settingsDao.reminderSettings();
       final widgetDetailed = await widget.settingsDao.widgetDetailed();
@@ -183,28 +185,12 @@ class _SettingsPageState extends State<SettingsPage> {
         _widgetDetailed = widgetDetailed;
         _reminders = reminders;
         _error = null;
-        _settings = settings;
+        _loaded = true;
         _preferences = preferences;
       });
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _error = error);
-    }
-  }
-
-  Future<void> _change(CycleSettings next) async {
-    final previous = _settings;
-    // Shown at once so the control answers the tap, then written.
-    setState(() => _settings = next);
-    try {
-      await widget.settingsDao.saveCycleSettings(next);
-      widget.onScheduleAffected?.call();
-    } on Object {
-      // Put the screen back to what is actually stored rather than leave it
-      // showing a choice that was never saved.
-      if (!mounted) return;
-      setState(() => _settings = previous);
-      await _load();
     }
   }
 
@@ -230,6 +216,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_error != null) {
       return GroupedPage(
         title: l10n.settingsTitle,
+        backLabel: widget.backLabel,
         children: [
           Padding(
             padding: const EdgeInsets.all(24),
@@ -239,10 +226,10 @@ class _SettingsPageState extends State<SettingsPage> {
       );
     }
 
-    final settings = _settings;
-    if (settings == null) {
+    if (!_loaded) {
       return GroupedPage(
         title: l10n.settingsTitle,
+        backLabel: widget.backLabel,
         children: const [
           SizedBox(height: 80),
           Center(child: CircularProgressIndicator.adaptive()),
@@ -252,8 +239,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     final lock = widget.appLock;
     Widget screen() => SettingsScreen(
-      settings: settings,
-      onChanged: _change,
+      backLabel: widget.backLabel,
       preferences: _preferences,
       onPreferencesChanged: _changePreferences,
       lockEnabled: lock?.enabled,

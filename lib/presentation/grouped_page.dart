@@ -14,6 +14,7 @@ class GroupedPage extends StatelessWidget {
     required this.title,
     required this.children,
     this.trailing,
+    this.backLabel,
     this.bottomPadding = 32,
     super.key,
   });
@@ -26,6 +27,10 @@ class GroupedPage extends StatelessWidget {
 
   /// Controls at the end of the navigation bar.
   final Widget? trailing;
+
+  /// The previous screen's title, for a back button, when this screen was
+  /// pushed. Null on a root screen, which has no way back.
+  final String? backLabel;
 
   /// Space after the last child, so nothing ends flush against the tab bar.
   final double bottomPadding;
@@ -44,9 +49,8 @@ class GroupedPage extends StatelessWidget {
             backgroundColor: scheme.groupedBackground.withValues(alpha: 0.85),
             // No hairline until content scrolls under, as iOS does.
             border: null,
-            // The title is the screen's heading; a back label repeating the
-            // previous title would only add noise on the root screens.
-            automaticallyImplyLeading: false,
+            automaticallyImplyLeading: backLabel != null,
+            previousPageTitle: backLabel,
           ),
           SliverSafeArea(
             top: false,

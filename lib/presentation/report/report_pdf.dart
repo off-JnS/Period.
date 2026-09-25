@@ -6,13 +6,20 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../domain/logic/cycle_report.dart';
 import '../../domain/logic/period_length.dart';
+import '../../domain/logic/profile.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
+import '../../domain/models/profile.dart';
 import '../../l10n/app_localizations.dart';
 import '../log/entry_labels.dart';
-import '../settings/settings_screen.dart' show modeLabel;
+import '../profile/profile_labels.dart';
+import '../profile/cycle_mode_section.dart' show modeLabel;
 
 /// Draws [report] as an A4 PDF in the language of [l10n].
+///
+/// What she said in her [profile] gets its own section, headed as her own
+/// statement so it is never mistaken for a figure from her entries
+/// (docs/cycle-logic.md §10). Left out entirely when she said nothing.
 ///
 /// Plain on purpose: black on white, the built-in Helvetica (it covers German
 /// umlauts, so no font file is bundled), and a table a doctor can scan in
@@ -21,6 +28,7 @@ Future<Uint8List> renderReportPdf(
   CycleReport report, {
   required AppLocalizations l10n,
   required String locale,
+  Profile profile = const Profile(),
   bool compress = true,
 }) {
   String day(CycleDate date) =>
@@ -126,6 +134,32 @@ Future<Uint8List> renderReportPdf(
                   ? l10n.reportNotEnough
                   : l10n.lengthInDays(report.usualPeriodLength!),
             ),
+            if (!profile.isEmpty) ...[
+              pw.SizedBox(height: 18),
+              pw.Text(l10n.reportProfileHeading, style: heading),
+              pw.SizedBox(height: 6),
+              if (ageThisYear(
+                    birthYear: profile.birthYear,
+                    currentYear: report.to.year,
+                  )
+                  case final age?)
+                row(l10n.reportAge, '$age'),
+              if (profile.usualCycleLength case final days?)
+                row(l10n.usualCycleLabel, l10n.lengthInDays(days)),
+              if (profile.usualPeriodLength case final days?)
+                row(l10n.usualPeriodLabel, l10n.lengthInDays(days)),
+              if (profile.contraception case final method?)
+                row(l10n.contraceptionLabel, methodLabel(l10n, method)),
+              if (profile.conditions.isNotEmpty)
+                row(
+                  l10n.conditionsLabel,
+                  [
+                    for (final condition in KnownCondition.values)
+                      if (profile.conditions.contains(condition))
+                        conditionLabel(l10n, condition),
+                  ].join(', '),
+                ),
+            ],
             pw.SizedBox(height: 18),
             pw.Text(l10n.reportCyclesHeading, style: heading),
             pw.SizedBox(height: 6),

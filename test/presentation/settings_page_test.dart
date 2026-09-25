@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
-import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/lock/app_lock.dart';
 import 'package:period/presentation/reminders/reminder_sync.dart';
@@ -27,59 +26,27 @@ void main() {
       pumpApp(tester, SettingsPage(settingsDao: database.settingsDao));
 
   testWidgets('opens on what is stored', (tester) async {
-    await database.settingsDao.saveCycleSettings(
-      const CycleSettings(mode: CycleMode.hormonalContraception),
+    await database.settingsDao.saveAppPreferences(
+      const AppPreferences(appearance: AppearanceChoice.dark),
     );
     await pumpPage(tester);
+    await tester.scrollUntilVisible(
+      find.bySemanticsLabel('Dark'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
 
     expect(
-      tester.getSemantics(find.bySemanticsLabel('Hormonal contraception')),
+      tester.getSemantics(find.bySemanticsLabel('Dark')),
       isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true),
     );
   });
 
-  testWidgets('a chosen mode is saved at once, with no Save button', (
+  testWidgets('no longer holds the cycle mode, which is on Profile', (
     tester,
   ) async {
     await pumpPage(tester);
-    await tester.tap(find.bySemanticsLabel('Pregnancy'));
-    await tester.pumpAndSettle();
-
-    expect(
-      (await database.settingsDao.cycleSettings()).mode,
-      CycleMode.pregnancy,
-    );
-  });
-
-  testWidgets('the fertile window opt-in is saved', (tester) async {
-    await pumpPage(tester);
-    await tester.tap(find.text('Estimated fertile window'));
-    await tester.pumpAndSettle();
-
-    expect(
-      (await database.settingsDao.cycleSettings()).fertileWindowOptedIn,
-      isTrue,
-    );
-  });
-
-  testWidgets('a saved choice is still there after reopening', (tester) async {
-    await pumpPage(tester);
-    await tester.tap(find.bySemanticsLabel('Perimenopause'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Show estimates anyway'));
-    await tester.pumpAndSettle();
-
-    await tester.pumpWidget(const SizedBox());
-    await pumpPage(tester);
-
-    expect(
-      tester.getSemantics(find.bySemanticsLabel('Perimenopause')),
-      isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true),
-    );
-    final tile = tester.widget<SwitchListTile>(
-      find.widgetWithText(SwitchListTile, 'Show estimates anyway'),
-    );
-    expect(tile.value, isTrue);
+    expect(find.text('Your situation'), findsNothing);
   });
 
   testWidgets('a chosen appearance is stored, then handed to the app', (
@@ -250,18 +217,6 @@ void main() {
       await tester.tap(find.text('Before my period'));
       await tester.pumpAndSettle();
       expect(scheduler.permissionRequests, 0);
-    });
-
-    testWidgets('changing the mode also reschedules', (tester) async {
-      await pumpWithReminders(tester);
-      await tester.scrollUntilVisible(
-        find.bySemanticsLabel('Pregnancy'),
-        -200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.bySemanticsLabel('Pregnancy'));
-      await tester.pumpAndSettle();
-      expect(affected, 1);
     });
   });
 

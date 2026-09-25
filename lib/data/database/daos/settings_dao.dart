@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../../../domain/models/app_preferences.dart';
 import '../../../domain/models/cycle_mode.dart';
+import '../../../domain/models/profile.dart';
 import '../../../domain/models/reminder_settings.dart';
 import '../database.dart';
 import '../tables.dart';
@@ -43,6 +44,21 @@ abstract final class SettingKeys {
 
   /// `true` when the home-screen widget may show details.
   static const widgetDetailed = 'widget_detailed';
+
+  /// Her birth year, as a decimal integer.
+  static const profileBirthYear = 'profile_birth_year';
+
+  /// The cycle length she says is usual, in days.
+  static const profileCycleLength = 'profile_cycle_length';
+
+  /// The period length she says is usual, in days.
+  static const profilePeriodLength = 'profile_period_length';
+
+  /// Her [ContraceptionMethod], by enum name.
+  static const profileContraception = 'profile_contraception';
+
+  /// Her [KnownCondition]s, by enum name, comma-separated.
+  static const profileConditions = 'profile_conditions';
 }
 
 /// Reads and writes the user's settings.
@@ -167,6 +183,80 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   /// Turns the widget's details on or off.
   Future<void> saveWidgetDetailed({required bool detailed}) =>
       _put(SettingKeys.widgetDetailed, '$detailed');
+
+  /// What she has said about herself. Anything missing, out of range or not
+  /// understood reads as unsaid rather than being trusted or thrown over.
+  Future<Profile> profile({required int currentYear}) async {
+    final values = await _values();
+
+    int? within(String key, int min, int max) {
+      final value = int.tryParse(values[key] ?? '');
+      return value != null && value >= min && value <= max ? value : null;
+    }
+
+    final conditionNames = KnownCondition.values.asNameMap();
+    return Profile(
+      birthYear: within(
+        SettingKeys.profileBirthYear,
+        currentYear - Profile.maxAge,
+        currentYear - Profile.minAge,
+      ),
+      usualCycleLength: within(
+        SettingKeys.profileCycleLength,
+        Profile.minCycleLength,
+        Profile.maxCycleLength,
+      ),
+      usualPeriodLength: within(
+        SettingKeys.profilePeriodLength,
+        Profile.minPeriodLength,
+        Profile.maxPeriodLength,
+      ),
+      contraception: ContraceptionMethod.values
+          .asNameMap()[values[SettingKeys.profileContraception]],
+      conditions: {
+        for (final name
+            in (values[SettingKeys.profileConditions] ?? '').split(','))
+          ?conditionNames[name],
+      },
+    );
+  }
+
+  /// Stores [profile], replacing whatever was there. A field she cleared is
+  /// deleted rather than kept as an empty value.
+  Future<void> saveProfile(Profile profile) async {
+    Future<void> putOrClear(String key, Object? value) => value == null
+        ? _clear(key)
+        : _put(key, '$value');
+
+    await transaction(() async {
+      await putOrClear(SettingKeys.profileBirthYear, profile.birthYear);
+      await putOrClear(
+        SettingKeys.profileCycleLength,
+        profile.usualCycleLength,
+      );
+      await putOrClear(
+        SettingKeys.profilePeriodLength,
+        profile.usualPeriodLength,
+      );
+      await putOrClear(
+        SettingKeys.profileContraception,
+        profile.contraception?.name,
+      );
+      await putOrClear(
+        SettingKeys.profileConditions,
+        profile.conditions.isEmpty
+            ? null
+            : [
+                for (final condition in KnownCondition.values)
+                  if (profile.conditions.contains(condition)) condition.name,
+              ].join(','),
+      );
+    });
+  }
+
+  Future<void> _clear(String key) => (delete(
+    appSettings,
+  )..where((row) => row.settingKey.equals(key))).go();
 
   Future<Map<String, String>> _values() async {
     final rows = await select(appSettings).get();

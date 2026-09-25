@@ -6,7 +6,9 @@ import 'package:period/presentation/analysis/analysis_screen.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
 import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/home_shell.dart';
+import 'package:period/presentation/profile/profile_page.dart';
 import 'package:period/presentation/reminders/reminder_sync.dart';
+import 'package:period/presentation/settings/settings_page.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
 import '../support/database.dart';
@@ -49,7 +51,9 @@ void main() {
     expect(tab('Today'), findsOneWidget);
     expect(tab('Calendar'), findsOneWidget);
     expect(tab('Your cycles'), findsOneWidget);
-    expect(tab('Settings'), findsOneWidget);
+    expect(tab('Profile'), findsOneWidget);
+    // Settings opens from Profile rather than taking a tab.
+    expect(tab('Settings'), findsNothing);
   });
 
   testWidgets('switches between the three screens', (tester) async {
@@ -87,16 +91,38 @@ void main() {
     expect(find.bySemanticsLabel('Cycle day 1'), findsOneWidget);
   });
 
-  testWidgets('a mode chosen in Settings applies on Today', (tester) async {
+  testWidgets('a mode chosen on Profile applies on Today', (tester) async {
     await pumpShell(tester);
-    await tester.tap(tab('Settings'));
+    await tester.tap(tab('Profile'));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.bySemanticsLabel('Pregnancy'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.bySemanticsLabel('Pregnancy'));
     await tester.pumpAndSettle();
 
     await tester.tap(tab('Today'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Estimates are off during pregnancy'), findsOne);
+  });
+
+  testWidgets('Settings opens from Profile and keeps the tab bar', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await tester.tap(tab('Profile'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsPage), findsOneWidget);
+    expect(find.byType(CupertinoTabBar), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(ProfilePage), findsOneWidget);
   });
 
   group('reminders', () {

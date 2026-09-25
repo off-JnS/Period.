@@ -60,7 +60,7 @@
   "@predictionsOffPregnancy": {
     "description": "Explains why no estimate is shown during pregnancy, and reassures that logging still works."
   },
-  "predictionsOffPerimenopause": "Estimates are off. Cycle lengths often change a lot during perimenopause, so an estimate can be misleading. You can turn estimates on in settings",
+  "predictionsOffPerimenopause": "Estimates are off. Cycle lengths often change a lot during perimenopause, so an estimate can be misleading. You can turn estimates on in your profile",
   "@predictionsOffPerimenopause": {
     "description": "Explains why estimates are off in perimenopause and that the user may re-enable them."
   },
@@ -696,7 +696,7 @@
   "@pregnancyCountedFrom": {"description": "Under the ring, stating how the weeks are counted."},
   "pregnancyNeedsLastPeriod": "Log the first day of your last period to count the weeks of your pregnancy.",
   "@pregnancyNeedsLastPeriod": {"description": "Shown in pregnancy mode when no period start exists."},
-  "pregnancyCounterEnded": "Is pregnancy mode still right for you? You can change your situation in Settings.",
+  "pregnancyCounterEnded": "Is pregnancy mode still right for you? You can change your situation in your profile.",
   "@pregnancyCounterEnded": {"description": "Shown after 44 weeks. A question, never an assumption."},
   "widgetDay": "Day {day}",
   "@widgetDay": {"description": "The home-screen widget's only text: the cycle day. No word like 'period' or 'cycle', on purpose.", "placeholders": {"day": {"type": "String"}}},
@@ -711,5 +711,151 @@
   "widgetDiscreetFooter": "The widget shows only the day number, never a word like period or cycle, and nothing at all while the app lock is on.",
   "@widgetDiscreetFooter": {"description": "Footer while details are off."},
   "widgetDetailedFooter": "The widget also shows your next period estimate, readable by anyone who sees your home screen. Nothing is shown while the app lock is on.",
-  "@widgetDetailedFooter": {"description": "Footer while details are on."}
+  "@widgetDetailedFooter": {"description": "Footer while details are on."},
+  "profileTitle": "Profile",
+  "@profileTitle": {
+    "description": "Title of the Profile tab and screen, where she says what she wants the app to know about her."
+  },
+  "profileAgeThisYear": "Turning {age} this year",
+  "@profileAgeThisYear": {
+    "description": "Under the avatar on Profile. The age she turns this calendar year: only her birth year is stored, so this is exact where 'N years old' would not be.",
+    "placeholders": { "age": { "type": "int" } }
+  },
+  "profileEmptyPrompt": "Tell Period. a little about you",
+  "@profileEmptyPrompt": {
+    "description": "Under the avatar on Profile before she has entered a birth year."
+  },
+  "aboutMeHeading": "About me",
+  "@aboutMeHeading": {
+    "description": "Profile group heading above birth year, usual lengths, contraception and conditions."
+  },
+  "aboutMeFooter": "Only for you and your doctor report. Estimates use what you log, never these answers.",
+  "@aboutMeFooter": {
+    "description": "Footer under About me. States that none of it feeds an estimate (docs/cycle-logic.md §10)."
+  },
+  "birthYearLabel": "Birth year",
+  "@birthYearLabel": {
+    "description": "Profile row."
+  },
+  "usualCycleLabel": "Usual cycle length",
+  "@usualCycleLabel": {
+    "description": "Profile row: the cycle length she believes is usual for her."
+  },
+  "usualPeriodLabel": "Usual period length",
+  "@usualPeriodLabel": {
+    "description": "Profile row: the period length she believes is usual for her."
+  },
+  "contraceptionLabel": "Contraception",
+  "@contraceptionLabel": {
+    "description": "Profile row and picker title."
+  },
+  "conditionsLabel": "Diagnosed conditions",
+  "@conditionsLabel": {
+    "description": "Profile row and picker title. 'Diagnosed' so it cannot read as a checklist of possibilities."
+  },
+  "conditionsCount": "{count, plural, =1{1 condition} other{{count} conditions}}",
+  "@conditionsCount": {
+    "description": "Profile row value when more than one condition is chosen.",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "conditionsFooter": "Only conditions a doctor has diagnosed. Period. never suggests or checks for any condition.",
+  "@conditionsFooter": {
+    "description": "Footer on the conditions picker."
+  },
+  "notSet": "Not set",
+  "@notSet": {
+    "description": "Profile row value when she has not answered."
+  },
+  "clearAnswer": "Clear",
+  "@clearAnswer": {
+    "description": "Button on a profile picker that removes the answer."
+  },
+  "doneButton": "Done",
+  "@doneButton": {
+    "description": "Button that closes a picker, keeping the choice."
+  },
+  "contraceptionOffer": "A hormonal method shapes your bleeding, so estimates from a natural cycle would mislead. Switch to the contraception mode?",
+  "@contraceptionOffer": {
+    "description": "Shown on Profile when she picks a hormonal method while in the natural-cycle mode. An offer, never an automatic switch."
+  },
+  "contraceptionOfferAccept": "Switch",
+  "@contraceptionOfferAccept": {
+    "description": "Button accepting the contraception-mode offer."
+  },
+  "methodNone": "None",
+  "@methodNone": {
+    "description": "Contraception method."
+  },
+  "methodCondom": "Condoms",
+  "@methodCondom": {
+    "description": "Contraception method."
+  },
+  "methodCombinedPill": "Combined pill",
+  "@methodCombinedPill": {
+    "description": "Contraception method."
+  },
+  "methodProgestinPill": "Progestin-only pill",
+  "@methodProgestinPill": {
+    "description": "Contraception method."
+  },
+  "methodHormonalIud": "Hormonal IUD",
+  "@methodHormonalIud": {
+    "description": "Contraception method."
+  },
+  "methodCopperIud": "Copper IUD",
+  "@methodCopperIud": {
+    "description": "Contraception method."
+  },
+  "methodImplant": "Implant",
+  "@methodImplant": {
+    "description": "Contraception method."
+  },
+  "methodRing": "Vaginal ring",
+  "@methodRing": {
+    "description": "Contraception method."
+  },
+  "methodPatch": "Patch",
+  "@methodPatch": {
+    "description": "Contraception method."
+  },
+  "methodInjection": "Injection",
+  "@methodInjection": {
+    "description": "Contraception method."
+  },
+  "methodOther": "Another method",
+  "@methodOther": {
+    "description": "Contraception method."
+  },
+  "conditionPcos": "PCOS",
+  "@conditionPcos": {
+    "description": "Diagnosed condition: polycystic ovary syndrome. The abbreviation is how patients know it."
+  },
+  "conditionEndometriosis": "Endometriosis",
+  "@conditionEndometriosis": {
+    "description": "Diagnosed condition."
+  },
+  "conditionAdenomyosis": "Adenomyosis",
+  "@conditionAdenomyosis": {
+    "description": "Diagnosed condition."
+  },
+  "conditionFibroids": "Uterine fibroids",
+  "@conditionFibroids": {
+    "description": "Diagnosed condition."
+  },
+  "conditionThyroid": "Thyroid condition",
+  "@conditionThyroid": {
+    "description": "Diagnosed condition."
+  },
+  "conditionPmdd": "PMDD",
+  "@conditionPmdd": {
+    "description": "Diagnosed condition: premenstrual dysphoric disorder."
+  },
+  "reportProfileHeading": "Stated by me",
+  "@reportProfileHeading": {
+    "description": "Report heading above the profile answers. Makes clear these are her own statements, not figures from her entries."
+  },
+  "reportAge": "Age this year",
+  "@reportAge": {
+    "description": "Report row."
+  }
 }

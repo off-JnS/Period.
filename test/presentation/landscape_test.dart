@@ -5,6 +5,8 @@ import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/analysis/analysis_page.dart';
 import 'package:period/presentation/analysis/analysis_screen.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
+import 'package:period/domain/models/profile.dart';
+import 'package:period/presentation/profile/profile_screen.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
@@ -37,9 +39,19 @@ void main() {
         regularPeriodStarts(from: aDate(2024, 1, 1), length: 28, count: 5),
       ),
     ),
-    'Settings': SettingsScreen(
+    'Settings': const SettingsScreen(),
+    'Profile': ProfileScreen(
+      profile: const Profile(
+        birthYear: 1998,
+        usualCycleLength: 30,
+        contraception: ContraceptionMethod.combinedPill,
+        conditions: {KnownCondition.pcos, KnownCondition.thyroid},
+      ),
       settings: const CycleSettings(),
-      onChanged: (_) {},
+      currentYear: 2024,
+      onProfileChanged: (_) {},
+      onSettingsChanged: (_) {},
+      onOpenSettings: () {},
     ),
   };
 

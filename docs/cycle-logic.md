@@ -319,6 +319,38 @@ then the app draws no conclusion from them, and says so beside the chart.
 
 ---
 
+## 10. Profile
+
+What she tells the app about herself, as opposed to what she logs day by day.
+All of it optional, all of it **recorded only**: shown back to her and in the
+doctor report, and **never an input to any estimate**.
+
+- **Birth year**, not a birth date: the year is all a doctor's report needs,
+  and storing less is the safer default for data like this. Age is derived on
+  read (§4) and shown as the age she turns *this calendar year* — "28 this
+  year" — which the year alone determines exactly, where "28 years old" would
+  be wrong for part of every year. Accepted: 8 to 70 years before today's year.
+- **Usual cycle length** (15–90 days) and **usual period length** (1–14 days),
+  as she believes them to be. **Not used by §3**, deliberately: §2 requires
+  two logged cycles and refuses a default, and a remembered figure is a default
+  she supplied, checked against nothing — the §0 error with her own number in
+  it. (Product judgement, not a finding.) The report labels them as her own
+  statement, beside the figures from her entries.
+- **Contraception method**: none, condoms, combined pill, progestin-only pill,
+  hormonal IUD, copper IUD, implant, ring, patch, injection, or another method.
+  Product rule, not cycle science: when she picks a **hormonal** method while
+  in the natural-cycle mode, the profile offers to switch to the contraception
+  mode (§6), because estimates from a withdrawal bleed are meaningless. It
+  offers; it never switches by itself. Copper IUD and condoms are not hormonal
+  and change nothing.
+- **Known conditions**: ones she has *already been diagnosed with* — PCOS,
+  endometriosis, adenomyosis, uterine fibroids, a thyroid condition, PMDD.
+  The app never suggests, infers or asks about symptoms of any of them (§7,
+  CLAUDE.md §8); the list is worded "diagnosed with" so it cannot read as a
+  checklist of possibilities.
+
+---
+
 ## Sources
 
 - Bull, J. R. et al. (2019). *Real-world menstrual cycle characteristics of more

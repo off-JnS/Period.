@@ -36,6 +36,9 @@ dependencies:
   timezone: ^0.11.1
   pdf: ^3.13.1
   share_plus: ^12.0.2
+  # Apple-style icons. A font and the constants naming its glyphs: no code
+  # that runs, nothing that reaches the network. Approved 2026-09-25.
+  cupertino_icons: ^1.0.8
 
 # Build configuration for package:sqlite3, which drift reaches sqlite through.
 # Adds no package -- sqlite3 is already resolved as drift's own dependency.

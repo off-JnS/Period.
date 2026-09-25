@@ -80,7 +80,12 @@ class _AnalysisPageState extends State<AnalysisPage> {
         settings: await widget.settingsDao.cycleSettings(),
         today: today,
       );
-      final bytes = await renderReportPdf(report, l10n: l10n, locale: locale);
+      final bytes = await renderReportPdf(
+        report,
+        l10n: l10n,
+        locale: locale,
+        profile: await widget.settingsDao.profile(currentYear: today.year),
+      );
       await sharePdf(
         bytes,
         fileName: '${l10n.reportFileName}-${today.toIso8601()}',
