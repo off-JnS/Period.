@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
+import 'package:period/domain/logic/pregnancy_week.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
@@ -276,6 +277,62 @@ void main() {
       );
       expect(find.text('Temperature: 36.68 °C'), findsOneWidget);
       expect(find.text('Ovulation test: Positive'), findsOneWidget);
+    });
+  });
+
+  group('in pregnancy mode', () {
+    Future<void> pumpWith(WidgetTester tester, PregnancyCount count) => pumpApp(
+      tester,
+      TodayScreen(
+        data: TodayViewData(
+          cycleDay: 88,
+          prediction: const PredictionsDisabled(CycleMode.pregnancy),
+          pregnancy: count,
+        ),
+      ),
+    );
+
+    testWidgets('shows weeks plus days in place of the cycle day', (
+      tester,
+    ) async {
+      await pumpWith(
+        tester,
+        const PregnancyCounting(PregnancyWeek(weeks: 12, days: 3)),
+      );
+      expect(find.text('12+3'), findsOneWidget);
+      expect(find.text('weeks + days'), findsOneWidget);
+      expect(find.text('88'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Pregnancy: 12 weeks and 3 days'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('first day of your last period'), findsOne);
+    });
+
+    testWidgets('never shows a due date', (tester) async {
+      await pumpWith(
+        tester,
+        const PregnancyCounting(PregnancyWeek(weeks: 38, days: 0)),
+      );
+      expect(find.textContaining('due'), findsNothing);
+      expect(find.textContaining('Due'), findsNothing);
+    });
+
+    testWidgets('asks for the last period when there is none', (tester) async {
+      await pumpWith(tester, const PregnancyNeedsLastPeriod());
+      expect(
+        find.textContaining('Log the first day of your last period'),
+        findsOne,
+      );
+    });
+
+    testWidgets('after 44 weeks asks, without assuming, about the mode', (
+      tester,
+    ) async {
+      await pumpWith(tester, const PregnancyCounterEnded());
+      expect(find.textContaining('still right for you'), findsOneWidget);
+      // Back to the plain cycle day, not a week count.
+      expect(find.text('88'), findsOneWidget);
     });
   });
 }

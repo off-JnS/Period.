@@ -683,5 +683,19 @@
   "temperatureChartLabel": "Temperature chart: {count} readings between {low} and {high}",
   "@temperatureChartLabel": {"description": "Screen reader description of the chart.", "placeholders": {"count": {"type": "int"}, "low": {"type": "String"}, "high": {"type": "String"}}},
   "cycleDayAxis": "Day {day}",
-  "@cycleDayAxis": {"description": "Chart x-axis label.", "placeholders": {"day": {"type": "int"}}}
+  "@cycleDayAxis": {"description": "Chart x-axis label.", "placeholders": {"day": {"type": "int"}}},
+  "pregnancyCaption": "Pregnancy",
+  "@pregnancyCaption": {"description": "Small caption above the week count in the Today ring."},
+  "pregnancyWeeksAndDays": "{weeks}+{days}",
+  "@pregnancyWeeksAndDays": {"description": "The week count in the ring, in the conventional 12+3 form.", "placeholders": {"weeks": {"type": "int"}, "days": {"type": "int"}}},
+  "pregnancyWeeksDaysUnit": "weeks + days",
+  "@pregnancyWeeksDaysUnit": {"description": "Under the week count, explaining the 12+3 form."},
+  "pregnancyAccessibility": "Pregnancy: {weeks} weeks and {days} days",
+  "@pregnancyAccessibility": {"description": "Screen reader label for the ring in pregnancy mode.", "placeholders": {"weeks": {"type": "int"}, "days": {"type": "int"}}},
+  "pregnancyCountedFrom": "Counted from the first day of your last period.",
+  "@pregnancyCountedFrom": {"description": "Under the ring, stating how the weeks are counted."},
+  "pregnancyNeedsLastPeriod": "Log the first day of your last period to count the weeks of your pregnancy.",
+  "@pregnancyNeedsLastPeriod": {"description": "Shown in pregnancy mode when no period start exists."},
+  "pregnancyCounterEnded": "Is pregnancy mode still right for you? You can change your situation in Settings.",
+  "@pregnancyCounterEnded": {"description": "Shown after 44 weeks. A question, never an assumption."}
 }

@@ -231,6 +231,21 @@ first-class state, not a suppressed display.
 | **Pregnancy** | Off | Cycle statistics are hidden, not zeroed. Symptom logging matters more here, not less. |
 | **Perimenopause** | Off by default, user may opt in | STRAW+10 defines the transition *by* rising variability, so a confident prediction is most wrong exactly where it would be most trusted. If opted in, everything is shown as ranges with the widening spread made visible rather than smoothed away. |
 
+**Pregnancy week counter.** In pregnancy mode, Today shows how far along the
+pregnancy is, in place of the cycle day, counted the conventional way: from the
+**first day of the last period** (the most recent period start), written as
+completed weeks plus days — *12+3* is 12 weeks and 3 days. Pure date arithmetic
+on recorded starts; nothing is stored (§4).
+
+- No recorded period start: no counter; Today asks for the first day of the
+  last period instead.
+- **No due date**, not even a window: a due date is a prediction, and in the
+  one mode where predictions are off it would be the most trusted number on
+  the screen (CLAUDE.md §8).
+- The counter runs to **44+0**. Beyond that it stops, and Today asks — without
+  assuming anything — whether pregnancy mode is still right, since the mode is
+  easily left on after a birth or a loss.
+
 **Every mode states why predictions are off**, in place of where they would
 otherwise appear. Silently showing nothing reads as a bug and invites the user to
 conclude the app is broken.

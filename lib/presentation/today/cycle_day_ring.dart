@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../domain/logic/pregnancy_week.dart';
 import '../../l10n/app_localizations.dart';
 
 /// The cycle-day ring on the Today screen.
@@ -117,6 +118,80 @@ class CycleDayRing extends StatelessWidget {
               // Scales the text down rather than clipping it when a long
               // German caption meets a large text setting.
               child: FittedBox(fit: BoxFit.scaleDown, child: centre),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The Today ring in pregnancy mode: weeks plus days since the last period,
+/// in the conventional 12+3 form (docs/cycle-logic.md §6).
+///
+/// The arc fills towards 40 weeks as decoration only, as with the cycle ring:
+/// the numbers in the middle carry the meaning, and no due date is shown.
+class PregnancyWeekRing extends StatelessWidget {
+  /// Creates the ring.
+  const PregnancyWeekRing({required this.week, super.key});
+
+  /// How far along.
+  final PregnancyWeek week;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final diameter = 232.0 * scale;
+
+    return Semantics(
+      label: l10n.pregnancyAccessibility(week.weeks, week.days),
+      excludeSemantics: true,
+      child: SizedBox(
+        width: diameter,
+        height: diameter,
+        child: CustomPaint(
+          painter: _RingPainter(
+            progress: week.totalDays / (40 * 7),
+            track: scheme.surfaceContainerHighest,
+            glow: scheme.primaryContainer,
+            arcStart: Color.lerp(scheme.primary, scheme.surface, 0.55)!,
+            arc: scheme.primary,
+            overrun: scheme.onPrimaryContainer,
+            knob: scheme.surfaceContainerLowest,
+            strokeWidth: 14 * scale,
+          ),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(30 * scale),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.pregnancyCaption,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      l10n.pregnancyWeeksAndDays(week.weeks, week.days),
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    Text(
+                      l10n.pregnancyWeeksDaysUnit,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

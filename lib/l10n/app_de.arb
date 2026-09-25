@@ -203,5 +203,12 @@
   "temperatureChartNeedMore": "Trage jeden Morgen deine Temperatur ein, um hier deine Kurve zu sehen.",
   "positiveTestLegend": "Positiver Ovulationstest",
   "temperatureChartLabel": "Temperaturkurve: {count} Werte zwischen {low} und {high}",
-  "cycleDayAxis": "Tag {day}"
+  "cycleDayAxis": "Tag {day}",
+  "pregnancyCaption": "Schwangerschaft",
+  "pregnancyWeeksAndDays": "{weeks}+{days}",
+  "pregnancyWeeksDaysUnit": "Wochen + Tage",
+  "pregnancyAccessibility": "Schwangerschaft: {weeks} Wochen und {days} Tage",
+  "pregnancyCountedFrom": "Gezählt ab dem ersten Tag deiner letzten Periode.",
+  "pregnancyNeedsLastPeriod": "Trage den ersten Tag deiner letzten Periode ein, um die Schwangerschaftswochen zu zählen.",
+  "pregnancyCounterEnded": "Passt der Schwangerschaftsmodus noch? Du kannst deine Situation in den Einstellungen ändern."
 }

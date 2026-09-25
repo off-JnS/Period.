@@ -7,6 +7,7 @@ import '../../domain/logic/cycle_statistics.dart';
 import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/irregularity.dart';
 import '../../domain/logic/period_prediction.dart';
+import '../../domain/logic/pregnancy_week.dart';
 import '../../domain/models/clock.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
@@ -121,6 +122,9 @@ class _TodayPageState extends State<TodayPage> {
           shouldSuggestSeeingADoctor(eligible),
       todayEntry: todayEntry,
       isTodayPeriodStart: periodStarts.contains(today),
+      pregnancy: settings.mode == CycleMode.pregnancy
+          ? pregnancyCountOn(today, periodStarts)
+          : null,
     );
   }
 

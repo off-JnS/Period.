@@ -130,7 +130,7 @@ to show a doctor. Flo charges for this.
 **How:** `pdf`, `printing` (allowlisted). Wording reviewed against §8: states
 what was recorded, never what it means.
 
-### 7. Body signals 🔨 — built, awaiting review
+### 7. Body signals ✅
 
 **What:** basal body temperature and ovulation (LH) test results.
 
@@ -139,7 +139,7 @@ what was recorded, never what it means.
 additive, flagged and tested); ovulation tests as keyed tags. Narrowing the
 fertile window from these would need a method in the spec first.
 
-### 8. Apple Health / Health Connect ⏳ ❓
+### 8. Apple Health / Health Connect ⏸ — skipped by the owner (2026-09-25): data stays inside Period.
 
 **What:** write periods and symptoms to Apple Health (and read them back).
 
@@ -147,7 +147,7 @@ fertile window from these would need a method in the spec first.
 Health leaves this app's encryption and can sync through iCloud. Off by default,
 with that stated plainly beside the switch, if built at all.
 
-### 9. Pregnancy week counter ⏳
+### 9. Pregnancy week counter 🔨 — built, awaiting review
 
 **What:** in pregnancy mode, "week N" instead of a cycle day.
 

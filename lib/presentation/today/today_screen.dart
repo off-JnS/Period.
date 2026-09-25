@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/period_prediction.dart';
+import '../../domain/logic/pregnancy_week.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
 import '../../domain/models/day_entry.dart';
@@ -29,7 +30,12 @@ class TodayViewData {
     this.showDoctorHint = false,
     this.todayEntry,
     this.isTodayPeriodStart = false,
+    this.pregnancy,
   });
+
+  /// In pregnancy mode, how far along -- or why that cannot be said. Null in
+  /// every other mode.
+  final PregnancyCount? pregnancy;
 
   /// The current cycle day, or null when nothing has been logged.
   final int? cycleDay;
@@ -99,11 +105,28 @@ class _TodayScreenState extends State<TodayScreen> {
       children: [
         const SizedBox(height: 8),
         Center(
-          child: CycleDayRing(
-            day: data.cycleDay,
-            expectedLength: data.typicalCycleLength,
-          ),
+          child: switch (data.pregnancy) {
+            PregnancyCounting(:final week) => PregnancyWeekRing(week: week),
+            _ => CycleDayRing(
+              day: data.cycleDay,
+              expectedLength: data.typicalCycleLength,
+            ),
+          },
         ),
+        if (data.pregnancy case final pregnancy?) ...[
+          const SizedBox(height: 12),
+          Text(
+            switch (pregnancy) {
+              PregnancyCounting() => l10n.pregnancyCountedFrom,
+              PregnancyNeedsLastPeriod() => l10n.pregnancyNeedsLastPeriod,
+              PregnancyCounterEnded() => l10n.pregnancyCounterEnded,
+            },
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
         if (widget.onAddEntry case final onAdd?) ...[
           const SizedBox(height: 24),
           // Labelled rather than an icon alone: a bare plus is guessable but

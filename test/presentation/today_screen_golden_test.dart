@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
+import 'package:period/domain/logic/pregnancy_week.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/today/today_screen.dart';
@@ -205,6 +206,18 @@ void main() {
         ),
       ),
       'logged_everything',
+    );
+  });
+
+  testWidgets('pregnancy week counter', (tester) async {
+    await expectGolden(
+      tester,
+      const TodayViewData(
+        cycleDay: 88,
+        prediction: PredictionsDisabled(CycleMode.pregnancy),
+        pregnancy: PregnancyCounting(PregnancyWeek(weeks: 12, days: 3)),
+      ),
+      'pregnancy_week',
     );
   });
 }

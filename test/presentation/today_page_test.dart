@@ -262,7 +262,7 @@ void main() {
       expect(find.text('Estimated, based on your entries'), findsNothing);
     });
 
-    testWidgets('pregnancy hides the usual length but keeps the day', (
+    testWidgets('pregnancy hides the usual length and counts weeks instead', (
       tester,
     ) async {
       await logRegularHistory();
@@ -271,7 +271,11 @@ void main() {
       );
       await pumpPage(tester);
 
-      expect(find.bySemanticsLabel('Cycle day 1'), findsOneWidget);
+      // The last start is today: 0+0, in place of cycle day 1.
+      expect(
+        find.bySemanticsLabel('Pregnancy: 0 weeks and 0 days'),
+        findsOneWidget,
+      );
       expect(find.textContaining('usually'), findsNothing);
     });
 
@@ -378,5 +382,16 @@ void main() {
       );
       expect(await offered(), isTrue);
     });
+  });
+
+  testWidgets('pregnancy mode counts weeks from the last period start', (
+    tester,
+  ) async {
+    await database.logDao.addPeriodStart(today.subtractDays(87));
+    await database.settingsDao.saveCycleSettings(
+      const CycleSettings(mode: CycleMode.pregnancy),
+    );
+    await pumpPage(tester);
+    expect(find.text('12+3'), findsOneWidget);
   });
 }
