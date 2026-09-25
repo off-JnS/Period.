@@ -573,5 +573,37 @@
   "periodLastedInHistory": "Period: {days, plural, =1{1 day} other{{days} days}}",
   "@periodLastedInHistory": {"description": "Second line of a history row: how long that period lasted.", "placeholders": {"days": {"type": "int"}}},
   "periodOngoingInHistory": "Period ongoing, day {days}",
-  "@periodOngoingInHistory": {"description": "Second line of a history row when the period is still running.", "placeholders": {"days": {"type": "int"}}}
+  "@periodOngoingInHistory": {"description": "Second line of a history row when the period is still running.", "placeholders": {"days": {"type": "int"}}},
+  "eraseAllData": "Delete all data",
+  "@eraseAllData": {
+    "description": "Red row at the bottom of Settings."
+  },
+  "eraseAllFooter": "Removes every entry, period start and setting from this device, and turns off reminders and the app lock. This can't be undone.",
+  "@eraseAllFooter": {
+    "description": "Under the delete row."
+  },
+  "eraseAllQuestion": "Delete all data?",
+  "@eraseAllQuestion": {
+    "description": "Confirmation title."
+  },
+  "eraseAllExplanation": "Everything you have logged in Period. will be permanently deleted from this device. There is no backup, so it cannot be recovered.",
+  "@eraseAllExplanation": {
+    "description": "Confirmation body. States plainly that it is irreversible."
+  },
+  "eraseAllConfirm": "Delete everything",
+  "@eraseAllConfirm": {
+    "description": "Destructive confirmation button."
+  },
+  "eraseAllReason": "Confirm it's you to delete all data",
+  "@eraseAllReason": {
+    "description": "System authentication prompt reason, when the app lock is on."
+  },
+  "eraseAllDone": "All data deleted",
+  "@eraseAllDone": {
+    "description": "Shown once everything has been deleted."
+  },
+  "eraseAllFailed": "Your data could not be deleted. Nothing was changed.",
+  "@eraseAllFailed": {
+    "description": "Shown when deletion failed and the data was kept."
+  }
 }

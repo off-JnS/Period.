@@ -143,4 +143,21 @@ void main() {
       expect(l.locked, isFalse);
     });
   });
+
+  group('confirmOwner', () {
+    test('asks when the lock is on', () async {
+      final l = lock();
+      await l.unlock(reason: 'r');
+      auth.succeeds = false;
+      expect(await l.confirmOwner(reason: 'r'), isFalse);
+      auth.succeeds = true;
+      expect(await l.confirmOwner(reason: 'r'), isTrue);
+    });
+
+    test('passes without a prompt when the lock is off', () async {
+      final l = lock(enabled: false);
+      expect(await l.confirmOwner(reason: 'r'), isTrue);
+      expect(auth.prompts, 0);
+    });
+  });
 }

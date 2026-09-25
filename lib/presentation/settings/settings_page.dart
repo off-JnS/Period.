@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/models/app_preferences.dart';
@@ -23,8 +27,12 @@ class SettingsPage extends StatefulWidget {
     this.appLock,
     this.reminderSync,
     this.onScheduleAffected,
+    this.onEraseEverything,
     super.key,
   });
+
+  /// Deletes all data. Null hides the row.
+  final Future<void> Function(String done, String failed)? onEraseEverything;
 
   /// Asks for notification permission. Null hides the reminders group.
   final ReminderSync? reminderSync;
@@ -56,6 +64,53 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _lockUnavailable = false;
 
   ReminderSettings _reminders = const ReminderSettings();
+
+  /// Asks, confirms the owner if the lock is on, then deletes everything.
+  Future<void> _confirmErase() async {
+    final erase = widget.onEraseEverything;
+    if (erase == null) return;
+    final l10n = AppLocalizations.of(context);
+    final isIos = Theme.of(context).platform == TargetPlatform.iOS;
+
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text(l10n.eraseAllQuestion),
+        content: Text(l10n.eraseAllExplanation),
+        actions: isIos
+            ? [
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                CupertinoDialogAction(
+                  isDestructiveAction: true,
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.eraseAllConfirm),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.eraseAllConfirm),
+                ),
+              ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final lock = widget.appLock;
+    if (lock != null && !await lock.confirmOwner(reason: l10n.eraseAllReason)) {
+      return;
+    }
+    unawaited(HapticFeedback.heavyImpact());
+    await erase(l10n.eraseAllDone, l10n.eraseAllFailed);
+  }
 
   /// Set when she turned a reminder on but notifications were refused.
   bool _remindersBlocked = false;
@@ -193,6 +248,9 @@ class _SettingsPageState extends State<SettingsPage> {
       reminders: widget.reminderSync == null ? null : _reminders,
       onRemindersChanged: _changeReminders,
       remindersBlocked: _remindersBlocked,
+      onEraseEverything: widget.onEraseEverything == null
+          ? null
+          : _confirmErase,
     );
 
     return lock == null

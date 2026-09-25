@@ -264,4 +264,86 @@ void main() {
       expect(affected, 1);
     });
   });
+
+  group('delete all data', () {
+    late List<(String, String)> erased;
+
+    setUp(() => erased = []);
+
+    Future<void> pumpWithErase(WidgetTester tester, {AppLock? lock}) async {
+      await pumpApp(
+        tester,
+        SettingsPage(
+          settingsDao: database.settingsDao,
+          appLock: lock,
+          onEraseEverything: (done, failed) async => erased.add((done, failed)),
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Delete all data'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
+
+    testWidgets('says plainly that it cannot be undone', (tester) async {
+      await pumpWithErase(tester);
+      expect(find.textContaining("can't be undone"), findsOneWidget);
+      await tester.tap(find.text('Delete all data'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete all data?'), findsOneWidget);
+      expect(find.textContaining('cannot be recovered'), findsOneWidget);
+    });
+
+    testWidgets('Cancel deletes nothing', (tester) async {
+      await pumpWithErase(tester);
+      await tester.tap(find.text('Delete all data'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(erased, isEmpty);
+    });
+
+    testWidgets('confirming deletes, with messages in her language', (
+      tester,
+    ) async {
+      await pumpWithErase(tester);
+      await tester.tap(find.text('Delete all data'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete everything'));
+      await tester.pumpAndSettle();
+      expect(erased, [
+        (
+          'All data deleted',
+          'Your data could not be deleted. Nothing was changed.',
+        ),
+      ]);
+    });
+
+    testWidgets('with the lock on, a failed Face ID stops it', (tester) async {
+      final auth = FakeAuthenticator();
+      final lock = AppLock(
+        authenticator: auth,
+        enabled: true,
+        save: ({required enabled}) async {},
+      );
+      addTearDown(lock.dispose);
+      await lock.unlock(reason: 'r');
+      auth.succeeds = false;
+
+      await pumpWithErase(tester, lock: lock);
+      await tester.tap(find.text('Delete all data'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete everything'));
+      await tester.pumpAndSettle();
+
+      expect(auth.prompts, 2);
+      expect(erased, isEmpty);
+    });
+
+    testWidgets('is absent without a way to delete', (tester) async {
+      await pumpApp(tester, SettingsPage(settingsDao: database.settingsDao));
+      expect(find.text('Delete all data'), findsNothing);
+    });
+  });
 }

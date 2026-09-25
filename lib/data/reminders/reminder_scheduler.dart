@@ -13,6 +13,9 @@ abstract interface class ReminderScheduler {
   /// Asks for permission to show notifications. True when granted.
   Future<bool> requestPermission();
 
+  /// Cancels every scheduled reminder.
+  Future<void> cancelAll();
+
   /// Cancels every scheduled reminder and schedules [reminders] instead.
   ///
   /// Every notification carries only [text] (CLAUDE.md §9). [channelName] is
@@ -80,6 +83,12 @@ class LocalNotificationsReminderScheduler implements ReminderScheduler {
       return await android.requestNotificationsPermission() ?? false;
     }
     return false;
+  }
+
+  @override
+  Future<void> cancelAll() async {
+    await _ensureInitialised();
+    await _plugin.cancelAll();
   }
 
   @override

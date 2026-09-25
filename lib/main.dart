@@ -5,6 +5,7 @@ import 'data/app_lock/device_authenticator.dart';
 import 'data/database/open_database.dart';
 import 'data/reminders/reminder_scheduler.dart';
 import 'data/database_key_store.dart';
+import 'data/erase_all_data.dart';
 import 'data/system_clock.dart';
 import 'domain/models/app_preferences.dart';
 import 'l10n/app_localizations.dart';
@@ -58,6 +59,52 @@ class _PeriodAppState extends State<PeriodApp> {
   /// Keeps reminders scheduled; created with the database it reads.
   ReminderSync? _reminders;
 
+  final DatabaseKeyStore _keyStore = SecureDatabaseKeyStore();
+  final ReminderScheduler _scheduler = LocalNotificationsReminderScheduler();
+
+  /// Shows the one message that has to survive the whole app being rebuilt:
+  /// that everything was deleted.
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
+  /// Deletes everything and starts again as a fresh install.
+  ///
+  /// Every screen is taken down first, so nothing reads the database while it
+  /// is closed and deleted. If deletion fails part-way, the file and its key
+  /// are still intact (see [eraseAllData]) and the app simply reopens them.
+  Future<void> _eraseEverything(String done, String failed) async {
+    final database = _database;
+    if (database == null) return;
+    final lock = _lock;
+
+    setState(() {
+      _database = null;
+      _lock = null;
+      _reminders = null;
+    });
+    // Disposed after the frame that stops the lock gate listening to it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => lock?.dispose());
+
+    var erased = false;
+    try {
+      await eraseAllData(
+        database: database,
+        directory: await databaseDirectory(),
+        keyStore: _keyStore,
+        reminders: _scheduler,
+      );
+      erased = true;
+    } on Object {
+      erased = false;
+    }
+
+    if (!mounted) return;
+    if (erased) setState(() => _preferences = const AppPreferences());
+    await _open();
+    _messenger.currentState?.showSnackBar(
+      SnackBar(content: Text(erased ? done : failed)),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,9 +113,7 @@ class _PeriodAppState extends State<PeriodApp> {
 
   Future<void> _open() async {
     try {
-      final database = await openEncryptedDatabase(
-        keyStore: SecureDatabaseKeyStore(),
-      );
+      final database = await openEncryptedDatabase(keyStore: _keyStore);
       // Read before the database is handed to the screens, so the first
       // screen already has her theme and language rather than switching
       // under her a moment later.
@@ -89,7 +134,7 @@ class _PeriodAppState extends State<PeriodApp> {
         _reminders = ReminderSync(
           logDao: database.logDao,
           settingsDao: database.settingsDao,
-          scheduler: LocalNotificationsReminderScheduler(),
+          scheduler: _scheduler,
           clock: const SystemClock(),
         );
         _database = database;
@@ -112,6 +157,7 @@ class _PeriodAppState extends State<PeriodApp> {
     return periodMaterialApp(
       preferences: _preferences,
       lock: _lock,
+      messengerKey: _messenger,
       home: Builder(
         builder: (context) {
           if (_error != null) return const _CouldNotOpen();
@@ -127,6 +173,7 @@ class _PeriodAppState extends State<PeriodApp> {
             clock: const SystemClock(),
             appLock: _lock,
             reminderSync: _reminders,
+            onEraseEverything: _eraseEverything,
             // Applied at once, from the Settings screen: the whole app
             // re-themes or re-translates in place, on the same tab.
             onPreferencesChanged: (preferences) =>

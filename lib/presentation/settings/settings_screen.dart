@@ -27,8 +27,12 @@ class SettingsScreen extends StatelessWidget {
     this.reminders,
     this.onRemindersChanged,
     this.remindersBlocked = false,
+    this.onEraseEverything,
     super.key,
   });
+
+  /// Starts deleting all data. Null hides the row.
+  final VoidCallback? onEraseEverything;
 
   /// The reminder settings, or null to leave the reminders group out.
   final ReminderSettings? reminders;
@@ -178,6 +182,32 @@ class SettingsScreen extends StatelessWidget {
           GroupFooter(l10n.languageSystemFooter),
         const SizedBox(height: 28),
         GroupFooter(l10n.settingsStoredEncrypted),
+        if (onEraseEverything case final erase?) ...[
+          const SizedBox(height: 28),
+          // Alone at the very bottom, in red, as iOS places "Erase All
+          // Content and Settings": far from anything tapped by habit.
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: erase,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  child: Center(
+                    child: Text(
+                      l10n.eraseAllData,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: CupertinoColors.systemRed.resolveFrom(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          GroupFooter(l10n.eraseAllFooter),
+        ],
       ],
     );
   }

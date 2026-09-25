@@ -84,6 +84,11 @@ class AppLock extends ChangeNotifier {
     return LockChange.changed;
   }
 
+  /// Confirms the owner before something that cannot be undone. Always true
+  /// when the lock is off: then the device has no owner check to ask for.
+  Future<bool> confirmOwner({required String reason}) async =>
+      !_enabled || await _confirm(reason);
+
   Future<bool> _confirm(String reason) async {
     if (_authenticating) return false;
     _authenticating = true;

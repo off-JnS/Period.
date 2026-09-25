@@ -156,5 +156,13 @@
   "basedOnPeriods": "{count, plural, =1{Basierend auf 1 Periode} other{Basierend auf {count} Perioden}}",
   "needFlowForPeriodLength": "Trage an jedem Periodentag deine Blutung ein, um zu sehen, wie lange deine Perioden meist dauern.",
   "periodLastedInHistory": "Periode: {days, plural, =1{1 Tag} other{{days} Tage}}",
-  "periodOngoingInHistory": "Periode läuft, Tag {days}"
+  "periodOngoingInHistory": "Periode läuft, Tag {days}",
+  "eraseAllData": "Alle Daten löschen",
+  "eraseAllFooter": "Entfernt alle Einträge, Periodenstarts und Einstellungen von diesem Gerät und schaltet Erinnerungen und App-Sperre aus. Das kann nicht rückgängig gemacht werden.",
+  "eraseAllQuestion": "Alle Daten löschen?",
+  "eraseAllExplanation": "Alles, was du in Period. eingetragen hast, wird endgültig von diesem Gerät gelöscht. Es gibt keine Sicherung, daher lässt es sich nicht wiederherstellen.",
+  "eraseAllConfirm": "Alles löschen",
+  "eraseAllReason": "Bestätige, dass du es bist, um alle Daten zu löschen",
+  "eraseAllDone": "Alle Daten gelöscht",
+  "eraseAllFailed": "Deine Daten konnten nicht gelöscht werden. Es wurde nichts verändert."
 }

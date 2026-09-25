@@ -25,6 +25,15 @@ class FakeReminderScheduler implements ReminderScheduler {
     return grants;
   }
 
+  /// How many times everything was cancelled.
+  int cancelled = 0;
+
+  @override
+  Future<void> cancelAll() async {
+    cancelled++;
+    schedules.add(const []);
+  }
+
   @override
   Future<void> replaceAll(
     List<PlannedReminder> reminders, {

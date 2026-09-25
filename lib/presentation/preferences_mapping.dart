@@ -54,8 +54,10 @@ MaterialApp periodMaterialApp({
   required AppPreferences preferences,
   required Widget home,
   AppLock? lock,
+  GlobalKey<ScaffoldMessengerState>? messengerKey,
 }) => MaterialApp(
   debugShowCheckedModeBanner: false,
+  scaffoldMessengerKey: messengerKey,
   onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
   localizationsDelegates: const [
     AppLocalizations.delegate,

@@ -34,8 +34,12 @@ class HomeShell extends StatefulWidget {
     this.onPreferencesChanged,
     this.appLock,
     this.reminderSync,
+    this.onEraseEverything,
     super.key,
   });
+
+  /// Deletes all data, given the localised messages for how it went.
+  final Future<void> Function(String done, String failed)? onEraseEverything;
 
   /// Keeps scheduled reminders current. Null in tests with no notifications.
   final ReminderSync? reminderSync;
@@ -126,6 +130,7 @@ class _HomeShellState extends State<HomeShell> {
           appLock: widget.appLock,
           reminderSync: widget.reminderSync,
           onScheduleAffected: _syncReminders,
+          onEraseEverything: widget.onEraseEverything,
         ),
       },
       bottomNavigationBar: CupertinoTabBar(

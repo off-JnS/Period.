@@ -27,6 +27,9 @@ class DatabaseNotEncrypted implements Exception {
   String toString() => 'DatabaseNotEncrypted: $detail';
 }
 
+/// The directory the database, its journal and its backups live in.
+Future<Directory> databaseDirectory() => getApplicationSupportDirectory();
+
 /// Opens the on-device encrypted database.
 ///
 /// [keyStore] supplies the SQLCipher key, generating one on first launch. The
@@ -49,7 +52,7 @@ Future<AppDatabase> openEncryptedDatabase({
   // occasionally cannot be opened by the usual route. A no-op elsewhere.
   await applyWorkaroundToOpenSqlCipherOnOldAndroidVersions();
 
-  final directory = await getApplicationSupportDirectory();
+  final directory = await databaseDirectory();
   final file = File('${directory.path}/$databaseFileName');
   await file.parent.create(recursive: true);
 

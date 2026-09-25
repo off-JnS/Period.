@@ -110,11 +110,12 @@ void main() {
           minute: 30,
         ),
         onRemindersChanged: (_) {},
+        onEraseEverything: () {},
       ),
       locale: const Locale('de'),
       brightness: Brightness.dark,
       // Tall enough to show every group at once.
-      surface: const Size(400, 2000),
+      surface: const Size(400, 2200),
     );
     await expectLater(
       find.byType(SettingsScreen),
