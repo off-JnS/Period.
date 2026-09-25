@@ -187,5 +187,21 @@
   "shareReportFooter": "Ein PDF mit deinen Zyklen, Periodendauern, Symptomen und Stimmungen aus dem letzten Jahr. Notizen, Sex und Ausfluss sind nie enthalten.",
   "reportFileName": "zyklusbericht",
   "reportFailed": "Der Bericht konnte nicht erstellt werden.",
-  "reportNotLogged": "nicht eingetragen"
+  "reportNotLogged": "nicht eingetragen",
+  "bodySignalsHeading": "Körpersignale",
+  "temperatureLabel": "Basaltemperatur",
+  "temperatureInvalid": "Gib eine Temperatur zwischen 34 und 43 °C ein.",
+  "ovulationTestNegative": "Negativ",
+  "ovulationTestPositive": "Positiv",
+  "ovulationTestLabel": "Ovulationstest",
+  "bodySignalsFooter": "Nur eine Aufzeichnung für dich. Die App nutzt diese Werte für keine Schätzung.",
+  "temperatureSummary": "Temperatur: {value}",
+  "ovulationTestSummary": "Ovulationstest: {result}",
+  "temperatureChartHeading": "Temperatur in diesem Zyklus",
+  "temperatureChartSince": "Zyklus ab {date}",
+  "temperatureChartNote": "Nur eine Aufzeichnung deiner Werte. Die App nutzt sie für keine Schätzung.",
+  "temperatureChartNeedMore": "Trage jeden Morgen deine Temperatur ein, um hier deine Kurve zu sehen.",
+  "positiveTestLegend": "Positiver Ovulationstest",
+  "temperatureChartLabel": "Temperaturkurve: {count} Werte zwischen {low} und {high}",
+  "cycleDayAxis": "Tag {day}"
 }

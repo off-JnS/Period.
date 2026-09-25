@@ -62,6 +62,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
       date: row.date,
       flow: row.flow,
       note: row.note,
+      temperatureCentiCelsius: row.temperatureCenti,
       symptoms: symptoms,
     );
   }
@@ -85,6 +86,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
           date: row.date,
           flow: row.flow,
           note: row.note,
+          temperatureCentiCelsius: row.temperatureCenti,
           symptoms: await _symptomsOn(row.date.toIso8601()),
         ),
     ];
@@ -102,6 +104,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
           date: entry.date,
           flow: Value(entry.flow),
           note: Value(entry.note),
+          temperatureCenti: Value(entry.temperatureCentiCelsius),
         ),
         mode: InsertMode.replace,
       );

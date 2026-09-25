@@ -85,5 +85,16 @@ const offeredSexKeys = <String>['sex.none', 'sex.protected', 'sex.unprotected'];
 /// The pill was taken that day. Offered in the hormonal contraception mode.
 const pillTakenKey = 'pill.taken';
 
+/// Ovulation (LH) test result. At most one per day. Recorded only; no estimate
+/// reads it (docs/cycle-logic.md §9).
+const offeredOvulationTestKeys = <String>[
+  'ovulationTest.negative',
+  'ovulationTest.positive',
+];
+
 /// The groups of which at most one key may be logged on a day.
-const singleChoiceGroups = <List<String>>[offeredDischargeKeys, offeredSexKeys];
+const singleChoiceGroups = <List<String>>[
+  offeredDischargeKeys,
+  offeredSexKeys,
+  offeredOvulationTestKeys,
+];

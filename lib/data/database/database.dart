@@ -16,7 +16,7 @@ part 'database.g.dart';
 
 /// The on-device database.
 ///
-/// Schema version 2. Read section 5 before changing anything here: there is no
+/// Schema version 3. Read section 5 before changing anything here: there is no
 /// cloud backup and no recovery path, so a broken migration destroys a user's
 /// data permanently. Migrations are additive only, a shipped one is never
 /// edited, and every one needs a test that builds the previous schema, fills it
@@ -36,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// The schema this build writes. Every change bumps it, and every bump adds a
   /// step to [migration] below; see the history there.
-  static const currentSchemaVersion = 2;
+  static const currentSchemaVersion = 3;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -59,6 +59,14 @@ class AppDatabase extends _$AppDatabase {
       // defaults, which is exactly what version 1 behaved as.
       if (from < 2) {
         await migrator.createTable(appSettings);
+      }
+
+      // 2 -> 3: basal body temperature (docs/cycle-logic.md §9). Purely
+      // additive -- one new nullable column on day_entries. Every existing
+      // row keeps every value it had and reads its temperature as null, which
+      // is the truth: none was recorded.
+      if (from < 3) {
+        await migrator.addColumn(dayEntries, dayEntries.temperatureCenti);
       }
     },
   );

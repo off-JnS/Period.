@@ -41,6 +41,8 @@ String? symptomLabel(AppLocalizations l10n, String key) => switch (key) {
   'sex.protected' => l10n.sexProtected,
   'sex.unprotected' => l10n.sexUnprotected,
   pillTakenKey => l10n.pillTaken,
+  'ovulationTest.negative' => l10n.ovulationTestNegative,
+  'ovulationTest.positive' => l10n.ovulationTestPositive,
   _ => null,
 };
 

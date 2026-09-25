@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:period/presentation/log/log_entry_screen.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
@@ -142,11 +143,11 @@ void main() {
       await tester.pumpAndSettle();
       // The note is the last section and sits below the fold.
       await tester.scrollUntilVisible(
-        find.byType(TextField),
+        find.byKey(noteFieldKey),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.enterText(find.byType(TextField), 'long day');
+      await tester.enterText(find.byKey(noteFieldKey), 'long day');
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();
 

@@ -34,6 +34,11 @@ class DayEntries extends Table {
   /// The user's own note. Free text, never parsed.
   TextColumn get note => text().nullable()();
 
+  /// Basal body temperature in hundredths of a degree Celsius. Added in schema
+  /// version 3; null for every day logged before it, and for any day without a
+  /// reading.
+  IntColumn get temperatureCenti => integer().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {date};
 }

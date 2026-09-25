@@ -10,6 +10,7 @@ void main() {
     ...offeredMoodKeys,
     ...offeredDischargeKeys,
     ...offeredSexKeys,
+    ...offeredOvulationTestKeys,
     pillTakenKey,
   ];
 
@@ -38,7 +39,7 @@ void main() {
   test('keys are stable identifiers, not display text', () {
     expect(
       all,
-      everyElement(matches(RegExp(r'^[a-z]+(\.[a-zA-Z]+)?$|^[a-z][a-zA-Z]*$'))),
+      everyElement(matches(RegExp(r'^[a-z][a-zA-Z]*(\.[a-z][a-zA-Z]*)?$'))),
     );
   });
 }

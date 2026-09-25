@@ -86,4 +86,26 @@ void main() {
     );
     expect(entries.every((entry) => !entry.date.isAfter(today)), isTrue);
   });
+
+  test('the current cycle has temperatures for the chart', () async {
+    final starts = await database.logDao.allPeriodStarts();
+    final entries = await database.logDao.entriesBetween(starts.last, today);
+    final readings = entries.where((e) => e.temperatureCentiCelsius != null);
+    expect(readings.length, greaterThanOrEqualTo(2));
+    expect(
+      readings.every(
+        (e) =>
+            e.temperatureCentiCelsius! >= 3400 &&
+            e.temperatureCentiCelsius! <= 4300,
+      ),
+      isTrue,
+    );
+  });
+
+  test('flow and temperature on the same day both survive', () async {
+    final starts = await database.logDao.allPeriodStarts();
+    final first = await database.logDao.entryOn(starts.last);
+    expect(first!.flow, isNotNull);
+    expect(first.temperatureCentiCelsius, isNotNull);
+  });
 }

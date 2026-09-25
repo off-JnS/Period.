@@ -302,4 +302,14 @@ void main() {
       }
     });
   });
+
+  test('a temperature round-trips, and is cleared when removed', () async {
+    final day = aDate(2024, 5, 17);
+    await db.logDao.saveEntry(
+      aDayEntry(date: day).copyWith(temperatureCentiCelsius: 3651),
+    );
+    expect((await db.logDao.entryOn(day))!.temperatureCentiCelsius, 3651);
+    await db.logDao.saveEntry(aDayEntry(date: day, flow: FlowIntensity.light));
+    expect((await db.logDao.entryOn(day))!.temperatureCentiCelsius, isNull);
+  });
 }

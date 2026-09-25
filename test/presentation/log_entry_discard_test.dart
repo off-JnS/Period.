@@ -117,11 +117,11 @@ void main() {
   testWidgets('typing a note counts as a change', (tester) async {
     await openSheet(tester);
     await tester.scrollUntilVisible(
-      find.byType(TextField),
+      find.byKey(noteFieldKey),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.enterText(find.byType(TextField), 'tired');
+    await tester.enterText(find.byKey(noteFieldKey), 'tired');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();

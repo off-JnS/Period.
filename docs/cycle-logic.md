@@ -284,6 +284,26 @@ and the two kinds are deliberately indistinguishable there.
 
 ---
 
+## 9. Body signals
+
+**Recorded only.** Basal body temperature and ovulation (LH) test results are
+logged, charted and kept, and **never used by any estimate**: not the period
+window (§3), not the fertile window (§4). §4 names body signals as the only
+honest way a fertile window could ever be narrowed; doing so would need a
+method written here first, with its sources, and a decision by the owner. Until
+then the app draws no conclusion from them, and says so beside the chart.
+
+- **Temperature** is stored in hundredths of a degree Celsius, one reading per
+  day, so 36.45 °C is 3645 and no floating-point rounding can alter what was
+  entered. Accepted range 34.00–43.00 °C: anything outside is a typo, not a
+  reading, and is refused at entry rather than stored.
+- **Ovulation test** is *negative* or *positive*, one per day, like discharge.
+- The chart shows the readings of one cycle by cycle day. It marks positive
+  tests with a shape as well as a colour (CLAUDE.md §9) and draws no line,
+  band or label that interprets them.
+
+---
+
 ## Sources
 
 - Bull, J. R. et al. (2019). *Real-world menstrual cycle characteristics of more

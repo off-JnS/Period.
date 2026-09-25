@@ -74,6 +74,53 @@ void main() {
     );
   });
 
+  testWidgets('a temperature chart with a positive test', (tester) async {
+    final starts = regularPeriodStarts(
+      from: aDate(2024, 3, 1),
+      length: 28,
+      count: 3,
+    );
+    const readings = [
+      3638,
+      3642,
+      3635,
+      3640,
+      3637,
+      3644,
+      3639,
+      3641,
+      3636,
+      3643,
+      3640,
+      3638,
+      3635,
+      3662,
+      3671,
+      3675,
+      3680,
+      3677,
+      3682,
+      3679,
+      3684,
+      3678,
+      3681,
+      3676,
+    ];
+    await expectGolden(
+      tester,
+      analysisFrom(
+        starts,
+        temperatures: {
+          for (var i = 0; i < readings.length; i++)
+            if (i != 6) starts[2].addDays(i): readings[i],
+        },
+        positiveTests: {starts[2].addDays(12)},
+        today: starts[2].addDays(readings.length - 1),
+      ),
+      'temperature',
+    );
+  });
+
   testWidgets('a steady history', (tester) async {
     await expectGolden(
       tester,

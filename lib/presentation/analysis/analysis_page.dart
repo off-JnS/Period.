@@ -15,6 +15,7 @@ import '../../domain/models/cycle_date.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../report/report_pdf.dart';
+import 'temperature_chart.dart';
 import '../report/share_report.dart';
 import 'analysis_screen.dart';
 
@@ -117,6 +118,17 @@ class _AnalysisPageState extends State<AnalysisPage> {
           starts,
           statisticsVisible: settings.cycleStatisticsVisible,
           flowByDay: {for (final entry in entries) entry.date: ?entry.flow},
+          temperatures: {
+            for (final entry in entries)
+              entry.date: ?entry.temperatureCentiCelsius,
+          },
+          positiveTests: {
+            for (final entry in entries)
+              if (entry.symptoms.any(
+                (symptom) => symptom.key == 'ovulationTest.positive',
+              ))
+                entry.date,
+          },
           today: today,
         );
       });
@@ -169,6 +181,8 @@ AnalysisViewData analysisFrom(
   List<CycleDate> periodStarts, {
   bool statisticsVisible = true,
   Map<CycleDate, FlowIntensity> flowByDay = const {},
+  Map<CycleDate, int> temperatures = const {},
+  Set<CycleDate> positiveTests = const {},
   CycleDate? today,
 }) {
   final cycles = cyclesFrom(periodStarts);
@@ -188,6 +202,14 @@ AnalysisViewData analysisFrom(
     },
     usualPeriodLength: usualPeriodLength(periods)?.round(),
     knownPeriodCount: periods.whereType<KnownPeriodLength>().length,
+    temperatureChart: today == null
+        ? null
+        : temperatureChartFrom(
+            periodStarts: periodStarts,
+            temperatures: temperatures,
+            positiveTests: positiveTests,
+            today: today,
+          ),
     cycles: cycles,
     eligible: eligible,
     // Null until there is enough to be worth stating. The screen says so in

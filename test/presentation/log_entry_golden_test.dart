@@ -34,12 +34,13 @@ void main() {
             aSymptom(key: 'discharge.sticky'),
             aSymptom(key: 'sex.none'),
             aSymptom(key: 'pill.taken'),
+            aSymptom(key: 'ovulationTest.negative'),
           },
-        ),
+        ).copyWith(temperatureCentiCelsius: 3645),
       ),
       locale: locale,
       brightness: brightness,
-      surface: const Size(400, 2100),
+      surface: const Size(400, 2500),
     );
     await expectLater(
       find.byType(LogEntryScreen),

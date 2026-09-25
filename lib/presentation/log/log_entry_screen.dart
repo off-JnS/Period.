@@ -10,6 +10,10 @@ import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../theme.dart';
 import 'entry_labels.dart';
+import 'temperature.dart';
+
+/// Identifies the note field, the sheet's last text field, for tests.
+const noteFieldKey = ValueKey('noteField');
 
 /// What the user recorded on one day, on its way back to the caller.
 ///
@@ -104,6 +108,16 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
     for (final symptom in widget.entry?.symptoms ?? const <Symptom>{})
       symptom.key,
   };
+
+  /// The temperature as typed. Filled in [didChangeDependencies], once the
+  /// locale is known, so a stored 3645 shows as "36,45" in German.
+  final TextEditingController _temperature = TextEditingController();
+  String _initialTemperatureText = '';
+  bool _temperatureFilled = false;
+
+  /// Set when Save was tapped with a temperature that could not be accepted.
+  bool _temperatureInvalid = false;
+
   late final TextEditingController _note = TextEditingController(
     text: widget.entry?.note ?? '',
   )..addListener(_noteChanged);
@@ -124,7 +138,15 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
       _flow != widget.entry?.flow ||
       _symptomKeys.length != _initialSymptomKeys.length ||
       !_symptomKeys.containsAll(_initialSymptomKeys) ||
-      _note.text.trim() != (widget.entry?.note ?? '').trim();
+      _note.text.trim() != (widget.entry?.note ?? '').trim() ||
+      _temperature.text.trim() != _initialTemperatureText;
+
+  void _temperatureChanged() {
+    // The warning is about what was there when Save was tapped; editing is
+    // her fixing it.
+    if (_temperatureInvalid) setState(() => _temperatureInvalid = false);
+    _noteChanged();
+  }
 
   void _noteChanged() {
     if (_hasUnsavedChanges != _reportedUnsaved) setState(() {});
@@ -138,6 +160,9 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
 
   @override
   void dispose() {
+    _temperature
+      ..removeListener(_temperatureChanged)
+      ..dispose();
     _note
       ..removeListener(_noteChanged)
       ..dispose();
@@ -344,6 +369,16 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               ),
             ],
             const SizedBox(height: 28),
+            _BodySignalsSection(
+              temperature: _temperature,
+              invalid: _temperatureInvalid,
+              selectedKeys: _symptomKeys,
+              onToggle: (key, selected) {
+                toggled();
+                _toggle(key, selected: selected);
+              },
+            ),
+            const SizedBox(height: 28),
             _NoteSection(controller: _note),
             if (_hasSomethingStored) ...[
               const SizedBox(height: 28),
@@ -438,7 +473,35 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
     Navigator.of(context).pop(LogEntryDeleted(_date));
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_temperatureFilled) return;
+    _temperatureFilled = true;
+    final stored = widget.entry?.temperatureCentiCelsius;
+    if (stored != null) {
+      _initialTemperatureText = formatTemperatureNumber(
+        stored,
+        Localizations.localeOf(context).toLanguageTag(),
+      );
+      _temperature.text = _initialTemperatureText;
+    }
+    _temperature.addListener(_temperatureChanged);
+  }
+
   void _save() {
+    final int? temperature;
+    switch (parseTemperature(_temperature.text)) {
+      case ValidTemperature(:final centi):
+        temperature = centi;
+      case NoTemperature():
+        temperature = null;
+      case InvalidTemperature():
+        // Refused, not stored and not silently dropped: she typed something,
+        // so she is told why it cannot be kept.
+        setState(() => _temperatureInvalid = true);
+        return;
+    }
     final note = _note.text.trim();
     Navigator.of(context).pop(
       LogEntrySaved(
@@ -449,6 +512,7 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
             // Empty is "not recorded", not an empty note. Section 5 wants a null
             // to mean the user did not write one.
             note: note.isEmpty ? null : note,
+            temperatureCentiCelsius: temperature,
             symptoms: {for (final key in _symptomKeys) Symptom(key: key)},
           ),
           isPeriodStart: _isPeriodStart,
@@ -623,6 +687,92 @@ class _ChipsSection extends StatelessWidget {
   }
 }
 
+/// Basal temperature and the ovulation test: recorded only
+/// (docs/cycle-logic.md §9), which the footer says outright.
+class _BodySignalsSection extends StatelessWidget {
+  const _BodySignalsSection({
+    required this.temperature,
+    required this.invalid,
+    required this.selectedKeys,
+    required this.onToggle,
+  });
+
+  final TextEditingController temperature;
+  final bool invalid;
+  final Set<String> selectedKeys;
+  final void Function(String key, bool selected) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+
+    return _Group(
+      heading: l10n.bodySignalsHeading,
+      footer: l10n.bodySignalsFooter,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.temperatureLabel,
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ),
+              SizedBox(
+                width: 120,
+                child: TextField(
+                  controller: temperature,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                  decoration: InputDecoration(
+                    hintText: formatTemperatureNumber(3650, locale),
+                    suffixText: '°C',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (invalid)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                l10n.temperatureInvalid,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          const Divider(height: 24),
+          Text(l10n.ovulationTestLabel, style: theme.textTheme.bodyLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final key in offeredOvulationTestKeys)
+                if (symptomLabel(l10n, key) case final label?)
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: selectedKeys.contains(key),
+                    onSelected: (selected) => onToggle(key, selected),
+                  ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NoteSection extends StatelessWidget {
   const _NoteSection({required this.controller});
 
@@ -636,6 +786,7 @@ class _NoteSection extends StatelessWidget {
       heading: l10n.noteHeading,
       footer: l10n.noteStaysOnDevice,
       child: TextField(
+        key: noteFieldKey,
         controller: controller,
         minLines: 4,
         maxLines: 8,

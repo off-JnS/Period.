@@ -255,5 +255,27 @@ void main() {
       expect(find.text('Sex: Protected'), findsOneWidget);
       expect(find.text('Pill taken'), findsOneWidget);
     });
+
+    testWidgets('lists the temperature and ovulation test', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            prediction: const NotEnoughCycles(have: 0, need: 2),
+            todayEntry: aDayEntry(
+              date: aDate(2024, 5, 17),
+              symptoms: {aSymptom(key: 'ovulationTest.positive')},
+            ).copyWith(temperatureCentiCelsius: 3668),
+          ),
+        ),
+      );
+      await tester.scrollUntilVisible(
+        find.text('Ovulation test: Positive'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Temperature: 36.68 °C'), findsOneWidget);
+      expect(find.text('Ovulation test: Positive'), findsOneWidget);
+    });
   });
 }

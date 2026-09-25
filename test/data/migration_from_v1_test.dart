@@ -8,6 +8,9 @@ import '../generated_migrations/schema.dart';
 import '../support/dates.dart';
 import '../support/models.dart';
 
+/// A phone still on version 1 passes through every later step in one launch;
+/// this proves the whole chain, v1 to current, keeps her data.
+///
 /// Section 5: every migration needs a test that builds the previous schema,
 /// fills it with realistic data, migrates, and asserts the data survived.
 ///
@@ -77,16 +80,17 @@ void main() {
   /// Every row of every version 1 table, in a fixed order.
   const dumps = {
     'period_starts': 'SELECT * FROM period_starts ORDER BY date',
-    'day_entries': 'SELECT * FROM day_entries ORDER BY date',
+    // Version 1's own columns; later versions add columns of their own.
+    'day_entries': 'SELECT date, flow, note FROM day_entries ORDER BY date',
     'day_symptoms': 'SELECT * FROM day_symptoms ORDER BY date, symptom_key',
   };
 
-  test('the schema after migrating equals a fresh version 2 schema', () async {
+  test('the schema after migrating equals a fresh current schema', () async {
     final connection = await verifier.startAt(1);
     final db = AppDatabase(connection);
     addTearDown(db.close);
 
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
   });
 
   test('every version 1 row survives byte for byte', () async {
@@ -101,7 +105,7 @@ void main() {
 
     final db = AppDatabase(schema.newConnection());
     addTearDown(db.close);
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
 
     for (final MapEntry(:key, :value) in dumps.entries) {
       final after = await db.customSelect(value).get();
@@ -121,7 +125,7 @@ void main() {
 
       final db = AppDatabase(schema.newConnection());
       addTearDown(db.close);
-      await verifier.migrateAndValidate(db, 2);
+      await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
 
       expect(await db.logDao.allPeriodStarts(), starts);
       for (final entry in entries) {
@@ -140,7 +144,7 @@ void main() {
 
       final db = AppDatabase(schema.newConnection());
       addTearDown(db.close);
-      await verifier.migrateAndValidate(db, 2);
+      await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
 
       // Version 1 had no settings and treated everyone as a natural cycle with
       // the fertile window off. Migrating must not change what she sees.
@@ -154,7 +158,7 @@ void main() {
 
     final db = AppDatabase(schema.newConnection());
     addTearDown(db.close);
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
 
     const chosen = CycleSettings(mode: CycleMode.pregnancy);
     await db.settingsDao.saveCycleSettings(chosen);
@@ -168,7 +172,7 @@ void main() {
     final db = AppDatabase(schema.newConnection());
     addTearDown(db.close);
 
-    await verifier.migrateAndValidate(db, 2);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
     expect(await db.logDao.allPeriodStarts(), isEmpty);
   });
 }

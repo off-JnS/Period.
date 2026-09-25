@@ -8,6 +8,7 @@ import '../../domain/models/cycle_date.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../section_card.dart';
+import 'temperature_chart.dart';
 
 /// Everything the cycles screen needs, already computed.
 ///
@@ -26,7 +27,12 @@ class AnalysisViewData {
     this.periodLengths = const {},
     this.usualPeriodLength,
     this.knownPeriodCount = 0,
+    this.temperatureChart,
   });
+
+  /// The latest cycle's temperature readings, or null when none was ever
+  /// logged. Description, so shown in every mode.
+  final TemperatureChartData? temperatureChart;
 
   /// How long each period lasted, by its start day. Missing means not worked
   /// out; see [PeriodLength] for known, ongoing and unknown.
@@ -106,6 +112,10 @@ class AnalysisScreen extends StatelessWidget {
               ],
               _PeriodLength(data: data),
               const SizedBox(height: 12),
+              if (data.temperatureChart case final chart?) ...[
+                TemperatureChartCard(data: chart),
+                const SizedBox(height: 12),
+              ],
               if (data.statisticsVisible && data.eligible.length >= 2) ...[
                 _LengthChart(cycles: data.eligible),
                 const SizedBox(height: 28),

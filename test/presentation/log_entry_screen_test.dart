@@ -103,11 +103,11 @@ void main() {
           await tester.pumpAndSettle();
           // The note is the last section and sits below the fold.
           await tester.scrollUntilVisible(
-            find.byType(TextField),
+            find.byKey(noteFieldKey),
             200,
             scrollable: find.byType(Scrollable).first,
           );
-          await tester.enterText(find.byType(TextField), 'slept badly');
+          await tester.enterText(find.byKey(noteFieldKey), 'slept badly');
           await tester.tap(find.text('Save'));
         },
       );
@@ -172,11 +172,11 @@ void main() {
         act: (tester) async {
           // The note is the last section and sits below the fold.
           await tester.scrollUntilVisible(
-            find.byType(TextField),
+            find.byKey(noteFieldKey),
             200,
             scrollable: find.byType(Scrollable).first,
           );
-          await tester.enterText(find.byType(TextField), '   ');
+          await tester.enterText(find.byKey(noteFieldKey), '   ');
           await tester.tap(find.text('Save'));
         },
       );
@@ -462,6 +462,109 @@ void main() {
         },
       );
       expect(keysOf(result), {'pill.taken'});
+    });
+  });
+
+  group('body signals', () {
+    Future<void> scrollTo(WidgetTester tester, Finder finder) =>
+        tester.scrollUntilVisible(
+          finder,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+
+    Finder temperatureField() => find.descendant(
+      of: find.ancestor(
+        of: find.text('Basal temperature'),
+        matching: find.byType(Row),
+      ),
+      matching: find.byType(TextField),
+    );
+
+    testWidgets('a typed temperature is saved in hundredths', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.text('Basal temperature'));
+          await tester.enterText(temperatureField(), '36,45');
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(
+        (result! as LogEntrySaved).draft.entry.temperatureCentiCelsius,
+        3645,
+      );
+    });
+
+    testWidgets('an implausible temperature is refused, not saved', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.text('Basal temperature'));
+          await tester.enterText(temperatureField(), '3,65');
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('between 34 and 43'), findsOneWidget);
+          // Fixing it clears the warning and lets it save.
+          await tester.enterText(temperatureField(), '36,5');
+          await tester.pumpAndSettle();
+          expect(find.textContaining('between 34 and 43'), findsNothing);
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(
+        (result! as LogEntrySaved).draft.entry.temperatureCentiCelsius,
+        3650,
+      );
+    });
+
+    testWidgets('a stored temperature shows in the language format', (
+      tester,
+    ) async {
+      await pumpAndClose(
+        tester,
+        locale: const Locale('de'),
+        entry: aDayEntry(date: day).copyWith(temperatureCentiCelsius: 3645),
+        act: (tester) async {
+          await scrollTo(tester, find.text('Basaltemperatur'));
+          expect(find.text('36,45'), findsOneWidget);
+        },
+      );
+    });
+
+    testWidgets('an ovulation test result is saved', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Positive'));
+          // scrollUntilVisible stops once any part shows; bring it fully in.
+          await tester.ensureVisible(
+            find.widgetWithText(ChoiceChip, 'Positive'),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(ChoiceChip, 'Positive'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(
+        (result! as LogEntrySaved).draft.entry.symptoms.map((s) => s.key),
+        ['ovulationTest.positive'],
+      );
+    });
+
+    testWidgets('says these are never used for any estimate', (tester) async {
+      await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.textContaining('never uses these'));
+          expect(find.textContaining('never uses these'), findsOneWidget);
+        },
+      );
     });
   });
 }

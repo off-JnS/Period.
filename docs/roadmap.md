@@ -122,7 +122,7 @@ phone. The only way to move data, since there is no cloud.
 with a password she chooses, or plain? Plain is readable by anyone who finds
 the file. Round-trip test required by §7: export → wipe → import → identical.
 
-### 6. Doctor report 🔨 — built, awaiting review
+### 6. Doctor report ✅
 
 **What:** a PDF of recent cycles, lengths, variation, period days and symptoms,
 to show a doctor. Flo charges for this.
@@ -130,14 +130,14 @@ to show a doctor. Flo charges for this.
 **How:** `pdf`, `printing` (allowlisted). Wording reviewed against §8: states
 what was recorded, never what it means.
 
-### 7. Body signals ⏳ ❓
+### 7. Body signals 🔨 — built, awaiting review
 
 **What:** basal body temperature and ovulation (LH) test results.
 
-**How:** `docs/cycle-logic.md` §4 names this as the only honest way to narrow
-the fertile window. The method (e.g. a temperature shift rule) must be written
-into the spec with sources before any code, and the owner must decide whether
-it changes the fertile window or is only logged.
+**Decided 2026-09-25:** recorded only, charted, never used by any estimate
+(`docs/cycle-logic.md` §9). Temperature in a new nullable column (schema v3,
+additive, flagged and tested); ovulation tests as keyed tags. Narrowing the
+fertile window from these would need a method in the spec first.
 
 ### 8. Apple Health / Health Connect ⏳ ❓
 

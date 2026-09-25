@@ -10,6 +10,7 @@ import '../../domain/models/day_entry.dart';
 import '../../domain/models/symptom.dart';
 import '../../l10n/app_localizations.dart';
 import '../log/entry_labels.dart';
+import '../log/temperature.dart';
 import '../section_card.dart';
 import '../grouped_page.dart';
 import 'cycle_day_ring.dart';
@@ -333,6 +334,7 @@ class _LoggedTodaySection extends StatelessWidget {
       ...offeredMoodKeys,
       ...offeredDischargeKeys,
       ...offeredSexKeys,
+      ...offeredOvulationTestKeys,
       pillTakenKey,
     };
     final symptomNames = <String>[
@@ -343,6 +345,8 @@ class _LoggedTodaySection extends StatelessWidget {
     final discharge = named(offeredDischargeKeys);
     final sex = named(offeredSexKeys);
     final pill = keys.contains(pillTakenKey);
+    final ovulationTest = named(offeredOvulationTestKeys);
+    final temperature = current?.temperatureCentiCelsius;
 
     final hasAnything =
         isPeriodStart ||
@@ -352,7 +356,9 @@ class _LoggedTodaySection extends StatelessWidget {
         moods.isNotEmpty ||
         discharge.isNotEmpty ||
         sex.isNotEmpty ||
-        pill;
+        pill ||
+        ovulationTest.isNotEmpty ||
+        temperature != null;
 
     return SectionCard(
       icon: Icons.edit_note_rounded,
@@ -391,6 +397,21 @@ class _LoggedTodaySection extends StatelessWidget {
                 style: theme.textTheme.bodyLarge,
               ),
             if (pill) Text(l10n.pillTaken, style: theme.textTheme.bodyLarge),
+            if (temperature != null)
+              Text(
+                l10n.temperatureSummary(
+                  formatTemperature(
+                    temperature,
+                    Localizations.localeOf(context).toLanguageTag(),
+                  ),
+                ),
+                style: theme.textTheme.bodyLarge,
+              ),
+            if (ovulationTest.isNotEmpty)
+              Text(
+                l10n.ovulationTestSummary(ovulationTest.single),
+                style: theme.textTheme.bodyLarge,
+              ),
             if (current?.note case final note? when note.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
