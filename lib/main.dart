@@ -5,6 +5,7 @@ import 'data/app_lock/device_authenticator.dart';
 import 'data/database/open_database.dart';
 import 'data/reminders/reminder_scheduler.dart';
 import 'data/database_key_store.dart';
+import 'data/demo_data.dart';
 import 'data/erase_all_data.dart';
 import 'data/system_clock.dart';
 import 'domain/models/app_preferences.dart';
@@ -114,6 +115,10 @@ class _PeriodAppState extends State<PeriodApp> {
   Future<void> _open() async {
     try {
       final database = await openEncryptedDatabase(keyStore: _keyStore);
+      if (demoDataRequested &&
+          (await database.logDao.allPeriodStarts()).isEmpty) {
+        await seedDemoData(database, const SystemClock().today());
+      }
       // Read before the database is handed to the screens, so the first
       // screen already has her theme and language rather than switching
       // under her a moment later.

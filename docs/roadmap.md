@@ -7,13 +7,22 @@ Measured against Flo, the category leader, but not copied from it. About half of
 Flo's features need a server or make medical claims. Those are listed at the end
 with the reason they are out, so the question does not have to be reopened.
 
-**Status key:** ✅ done · 🔨 in progress · ⏳ planned · ❓ needs a decision first
+**Status key:** ✅ done · 🔨 in progress · ⏳ planned · ⏸ postponed · ❓ needs a decision first
 
 **Decided 2026-09-25:** `http` arrives in `pubspec.lock` through `timezone`;
 allowed, because `test/network_guard_test.dart` proves the app cannot reach it
 (see CLAUDE.md §6).
 
 ---
+
+## Previewing
+
+Run a debug build with made-up history that lights up every screen:
+
+    flutter run --dart-define=PERIOD_DEMO_DATA=true
+
+Only fills an *empty* database, never in a release build
+(`lib/data/demo_data.dart`). Clear it with Settings → Delete all data.
 
 ## Already built
 
@@ -94,7 +103,7 @@ period's duration as the run of flow days from its start. Edge cases (no flow on
 the start day, still running, the next start) added there first. Nothing stored,
 no migration. Shown in every mode, pregnancy included (spec §6).
 
-### 4. Delete all data 🔨 — built, awaiting review
+### 4. Delete all data ✅
 
 **What:** a red row at the bottom of Settings; an iOS confirmation stating it
 cannot be undone; then everything is wiped — entries, starts, settings, the
@@ -104,7 +113,7 @@ install state.
 **How:** `LogDao.deleteEverything()` already clears every table. Adds removal of
 `*.backup-v*` files and cancelling reminders. Required by §9.
 
-### 5. Backup and restore ⏳
+### 5. Backup and restore ⏸ — postponed by the owner (2026-09-25)
 
 **What:** export everything to a file via the share sheet; import it on a new
 phone. The only way to move data, since there is no cloud.
