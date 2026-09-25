@@ -72,10 +72,14 @@ class AnalysisViewData {
 /// condition, and does not tell her what any of it means about her.
 class AnalysisScreen extends StatelessWidget {
   /// Creates the screen.
-  const AnalysisScreen({required this.data, super.key});
+  const AnalysisScreen({required this.data, this.onShareReport, super.key});
 
   /// The history to render.
   final AnalysisViewData data;
+
+  /// Makes and shares the PDF report, given where the tap was (the iPad
+  /// share popover points at it). Null hides the row.
+  final void Function(Rect? origin)? onShareReport;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +111,10 @@ class AnalysisScreen extends StatelessWidget {
                 const SizedBox(height: 28),
               ],
               _History(cycles: data.cycles, lengths: data.periodLengths),
+              if (onShareReport case final share?) ...[
+                const SizedBox(height: 28),
+                _ShareReport(onShare: share),
+              ],
             ],
     );
   }
@@ -456,3 +464,64 @@ class _History extends StatelessWidget {
 
 String _formatDay(String locale, CycleDate date) =>
     DateFormat.yMMMd(locale).format(DateTime(date.year, date.month, date.day));
+
+class _ShareReport extends StatelessWidget {
+  const _ShareReport({required this.onShare});
+
+  final void Function(Rect? origin) onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Builder(
+            builder: (context) => InkWell(
+              onTap: () {
+                final box = context.findRenderObject() as RenderBox?;
+                onShare(
+                  box == null
+                      ? null
+                      : box.localToGlobal(Offset.zero) & box.size,
+                );
+              },
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.ios_share_rounded,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          l10n.shareReport,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        GroupFooter(l10n.shareReportFooter),
+      ],
+    );
+  }
+}

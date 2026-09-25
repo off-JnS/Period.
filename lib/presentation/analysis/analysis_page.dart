@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../data/database/daos/log_dao.dart';
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/logic/cycle_analysis.dart';
+import '../../domain/logic/cycle_report.dart';
 import '../../domain/logic/cycle_statistics.dart';
 import '../../domain/logic/period_length.dart';
 import '../../domain/models/clock.dart';
@@ -10,6 +14,8 @@ import '../../domain/models/day_entry.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
+import '../report/report_pdf.dart';
+import '../report/share_report.dart';
 import 'analysis_screen.dart';
 
 /// Loads the cycle history and hands it to [AnalysisScreen].
@@ -23,8 +29,17 @@ class AnalysisPage extends StatefulWidget {
     required this.logDao,
     required this.settingsDao,
     required this.clock,
+    this.shareFile = systemShare,
+    this.temporaryDirectory = getTemporaryDirectory,
     super.key,
   });
+
+  /// Where the PDF is written before sharing; a parameter for tests.
+  final Future<Directory> Function() temporaryDirectory;
+
+  /// Where the finished report goes; the system share sheet unless a test
+  /// says otherwise.
+  final FileSharer shareFile;
 
   /// Supplies today, which decides whether a period is still running.
   final Clock clock;
@@ -42,6 +57,42 @@ class AnalysisPage extends StatefulWidget {
 class _AnalysisPageState extends State<AnalysisPage> {
   AnalysisViewData? _data;
   Object? _error;
+  bool _sharing = false;
+
+  /// Builds the report from what is stored now, draws it, and shares it.
+  Future<void> _shareReport(Rect? origin) async {
+    if (_sharing) return;
+    _sharing = true;
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final today = widget.clock.today();
+      final report = buildCycleReport(
+        periodStarts: await widget.logDao.allPeriodStarts(),
+        // A little before the range, so a period starting just inside it can
+        // still find its flow and its predecessor's length.
+        entries: await widget.logDao.entriesBetween(
+          today.subtractDays(reportDays + 60),
+          today,
+        ),
+        settings: await widget.settingsDao.cycleSettings(),
+        today: today,
+      );
+      final bytes = await renderReportPdf(report, l10n: l10n, locale: locale);
+      await sharePdf(
+        bytes,
+        fileName: '${l10n.reportFileName}-${today.toIso8601()}',
+        share: widget.shareFile,
+        origin: origin,
+        directory: widget.temporaryDirectory,
+      );
+    } on Object {
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.reportFailed)));
+    } finally {
+      _sharing = false;
+    }
+  }
 
   @override
   void initState() {
@@ -103,7 +154,7 @@ class _AnalysisPageState extends State<AnalysisPage> {
       );
     }
 
-    return AnalysisScreen(data: data);
+    return AnalysisScreen(data: data, onShareReport: _shareReport);
   }
 }
 

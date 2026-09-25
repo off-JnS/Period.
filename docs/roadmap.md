@@ -122,7 +122,7 @@ phone. The only way to move data, since there is no cloud.
 with a password she chooses, or plain? Plain is readable by anyone who finds
 the file. Round-trip test required by §7: export → wipe → import → identical.
 
-### 6. Doctor report ⏳
+### 6. Doctor report 🔨 — built, awaiting review
 
 **What:** a PDF of recent cycles, lengths, variation, period days and symptoms,
 to show a doctor. Flo charges for this.
