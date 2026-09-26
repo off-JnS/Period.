@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/database/daos/log_dao.dart';
 import '../../data/database/daos/settings_dao.dart';
+import '../../domain/logic/cycle_analysis.dart';
 import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/clock.dart';
@@ -11,6 +12,7 @@ import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../log/log_entry_screen.dart';
 import 'calendar_screen.dart';
+import 'day_preview.dart';
 
 /// Loads what the calendar shows and hands it to [CalendarScreen].
 ///
@@ -90,6 +92,31 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  /// Shows [date] at a glance, then opens it for editing if she asks.
+  Future<void> _previewDay(CycleDate date) async {
+    final data = _data;
+    if (data == null) return;
+    final entry = await widget.logDao.entryOn(date);
+    if (!mounted) return;
+
+    final edit = await showDayPreview(
+      context,
+      DayPreviewData(
+        date: date,
+        today: data.today,
+        entry: entry,
+        isPeriodStart: data.periodStarts.contains(date),
+        marker: data.markerOn(date),
+        // Only for days that have happened: a future cycle day would be a
+        // count along an estimate, stated as if it were a fact.
+        cycleDay: date.isAfter(data.today)
+            ? null
+            : cycleDayOn(date, data.periodStarts),
+      ),
+    );
+    if (edit && mounted) await _openDay(date);
+  }
+
   Future<void> _openDay(CycleDate date) async {
     final today = widget.clock.today();
     final entry = await widget.logDao.entryOn(date);
@@ -154,6 +181,6 @@ class _CalendarPageState extends State<CalendarPage> {
       );
     }
 
-    return CalendarScreen(data: data, onSelectDay: _openDay);
+    return CalendarScreen(data: data, onSelectDay: _previewDay);
   }
 }

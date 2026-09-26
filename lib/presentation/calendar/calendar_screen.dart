@@ -1,6 +1,3 @@
-import 'dart:math' as math;
-import 'dart:ui' show PathMetric;
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,12 +5,12 @@ import 'package:intl/intl.dart';
 
 import '../../domain/logic/calendar_month.dart';
 import '../../domain/logic/fertile_window.dart';
-import '../../domain/logic/period_length.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/day_entry.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme.dart';
+import 'calendar_markers.dart';
 import 'month_grid.dart';
 
 /// Everything the calendar needs, already computed.
@@ -65,6 +62,14 @@ class CalendarViewData {
       (fertileWindow?.contains(date) ?? false) &&
       !isPeriod(date) &&
       !isEstimated(date);
+
+  /// The band drawn on [date], if any.
+  CalendarMarker? markerOn(CycleDate date) {
+    if (isPeriod(date)) return CalendarMarker.period;
+    if (isEstimated(date)) return CalendarMarker.estimated;
+    if (isFertile(date)) return CalendarMarker.fertile;
+    return null;
+  }
 }
 
 /// Every month in one continuous scroll, the current one first on screen.
@@ -76,8 +81,7 @@ class CalendarViewData {
 /// so each state has a shape of its own: a period is a filled band, the
 /// estimated period a dashed outline, the fertile window a band with no
 /// outline, today a ring around the number, and a logged day a dot under it.
-/// Every cell also says its state aloud, and each month says in words what it
-/// holds.
+/// Every cell also says its state aloud, and tapping a day shows it in words.
 class CalendarScreen extends StatefulWidget {
   /// Creates the screen.
   const CalendarScreen({required this.data, this.onSelectDay, super.key});
@@ -85,7 +89,8 @@ class CalendarScreen extends StatefulWidget {
   /// What to draw.
   final CalendarViewData data;
 
-  /// Opens a day for logging. Never called for a day in the future.
+  /// Shows a day. Called for any day, future ones included, which have an
+  /// estimate to show even though they cannot be logged yet.
   final void Function(CycleDate date)? onSelectDay;
 
   @override
@@ -145,14 +150,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
 
     return Scaffold(
-      backgroundColor: scheme.groupedBackground,
+      backgroundColor: scheme.groupedCard,
       body: Column(
         children: [
           // A fixed bar rather than a collapsing one: the scroll runs both
           // ways from the middle, so a large title in it would sit above the
           // earliest month instead of at the top of the screen.
           Material(
-            color: scheme.groupedBackground,
+            color: scheme.groupedCard,
             child: SafeArea(
               bottom: false,
               child: Column(
@@ -273,58 +278,7 @@ class _MonthSection extends StatelessWidget {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final today = data.today;
     final isCurrent = year == today.year && month == today.month;
-
-    String day(CycleDate date) => DateFormat.MMMd(
-      locale,
-    ).format(DateTime(date.year, date.month, date.day));
-    String range(CycleDate from, CycleDate to) =>
-        l10n.estimatedRange(day(from), day(to));
-
-    bool touches(CycleDate earliest, CycleDate latest) => rangeTouchesMonth(
-      earliest: earliest,
-      latest: latest,
-      year: year,
-      month: month,
-    );
-
     final fertile = data.fertileWindow;
-    final predicted = data.predicted;
-    final summaries = <(_Marker, String)>[
-      for (final period in periodsStartingIn(
-        year: year,
-        month: month,
-        starts: data.periodStarts.toList(),
-        flowByDay: data.flowByDay,
-        today: today,
-      ))
-        (
-          _Marker.period,
-          switch (period.length) {
-            KnownPeriodLength(:final days) => l10n.calendarPeriodFinished(
-              range(period.start, period.lastDay!),
-              l10n.lengthInDays(days),
-            ),
-            OngoingPeriodLength() => l10n.calendarPeriodOngoing(
-              day(period.start),
-            ),
-            UnknownPeriodLength() => l10n.calendarPeriodStarted(
-              day(period.start),
-            ),
-          },
-        ),
-      if (fertile != null && touches(fertile.earliest, fertile.latest))
-        (
-          _Marker.fertile,
-          l10n.calendarFertileSummary(range(fertile.earliest, fertile.latest)),
-        ),
-      if (predicted != null && touches(predicted.earliest, predicted.latest))
-        (
-          _Marker.estimated,
-          l10n.calendarEstimateSummary(
-            range(predicted.earliest, predicted.latest),
-          ),
-        ),
-    ];
 
     final grid = monthGrid(
       year: year,
@@ -337,79 +291,71 @@ class _MonthSection extends StatelessWidget {
     ).format(DateTime(year, month));
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Card(
-        margin: EdgeInsets.zero,
-        // Not one merged node: each day has to be reachable and spoken on
-        // its own.
-        semanticContainer: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 14, 8, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Semantics(
-                  header: true,
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isCurrent ? scheme.primary : scheme.onSurface,
-                    ),
-                  ),
+      padding: const EdgeInsets.fromLTRB(12, 22, 12, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Semantics(
+              header: true,
+              child: Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isCurrent ? scheme.primary : scheme.onSurface,
                 ),
               ),
-              if (summaries.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                for (final (marker, text) in summaries)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: _MarkerSwatch(marker, size: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            text,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+            ),
+          ),
+          for (final week in grid.weeks)
+            Row(
+              children: [
+                for (final (column, date) in week.indexed)
+                  Expanded(
+                    child: grid.isInMonth(date)
+                        ? _DayCell(
+                            date: date,
+                            data: data,
+                            joinsLeft: column > 0,
+                            joinsRight: column < 6,
+                            inMonth: grid.isInMonth,
+                            onTap: onSelectDay,
+                          )
+                        // Days of the neighbouring months are left out: each
+                        // belongs to its own month, one scroll away.
+                        : const SizedBox.shrink(),
                   ),
               ],
-              const SizedBox(height: 10),
-              for (final week in grid.weeks)
-                Row(
-                  children: [
-                    for (final (column, date) in week.indexed)
-                      Expanded(
-                        child: grid.isInMonth(date)
-                            ? _DayCell(
-                                date: date,
-                                data: data,
-                                joinsLeft: column > 0,
-                                joinsRight: column < 6,
-                                inMonth: grid.isInMonth,
-                                onTap: onSelectDay,
-                              )
-                            // Days of the neighbouring months are left out:
-                            // each belongs to its own month, one scroll away.
-                            : const SizedBox.shrink(),
+            ),
+          // The one line of text a month may carry: section 8 wants the
+          // fertile window's caveat visible wherever the window is drawn.
+          if (fertile != null &&
+              rangeTouchesMonth(
+                earliest: fertile.earliest,
+                latest: fertile.latest,
+                year: year,
+                month: month,
+              ))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const MarkerSwatch(CalendarMarker.fertile, size: 12),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.calendarFertileNote,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
-                  ],
-                ),
-            ],
-          ),
-        ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -450,8 +396,6 @@ class _WeekdayHeader extends StatelessWidget {
   }
 }
 
-/// The kinds of band a day can carry.
-enum _Marker { period, estimated, fertile }
 
 class _DayCell extends StatelessWidget {
   const _DayCell({
@@ -473,12 +417,7 @@ class _DayCell extends StatelessWidget {
   final bool Function(CycleDate date) inMonth;
   final void Function(CycleDate date)? onTap;
 
-  _Marker? _markerOn(CycleDate day) {
-    if (data.isPeriod(day)) return _Marker.period;
-    if (data.isEstimated(day)) return _Marker.estimated;
-    if (data.isFertile(day)) return _Marker.fertile;
-    return null;
-  }
+  CalendarMarker? _markerOn(CycleDate day) => data.markerOn(day);
 
   @override
   Widget build(BuildContext context) {
@@ -507,7 +446,7 @@ class _DayCell extends StatelessWidget {
         inMonth(next) &&
         _markerOn(next) == marker;
 
-    final onBand = marker == _Marker.period;
+    final onBand = marker == CalendarMarker.period;
     final foreground = onBand ? scheme.onPrimary : scheme.onSurface;
 
     // Everything a screen reader needs, in words, because none of the shapes
@@ -519,23 +458,26 @@ class _DayCell extends StatelessWidget {
       if (isToday) l10n.todayTitle,
       if (data.periodStarts.contains(date))
         l10n.legendPeriodStart
-      else if (marker == _Marker.period)
+      else if (marker == CalendarMarker.period)
         l10n.legendPeriodDay,
-      if (isLogged && marker != _Marker.period) l10n.legendLogged,
-      if (marker == _Marker.estimated) l10n.legendEstimated,
-      if (marker == _Marker.fertile) l10n.fertileWindowHeading,
+      if (isLogged && marker != CalendarMarker.period) l10n.legendLogged,
+      if (marker == CalendarMarker.estimated) l10n.legendEstimated,
+      if (marker == CalendarMarker.fertile) l10n.fertileWindowHeading,
       if (isFuture) l10n.dayNotYetHappened,
     ].join(', ');
 
     return Semantics(
+      // Its own node, so each day is reached and read on its own rather than
+      // folded into the month around it.
+      container: true,
       label: spoken,
-      button: !isFuture && onTap != null,
+      button: onTap != null,
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        // A future day is not an observation yet, so it cannot be logged. The
-        // cell stays visible and still speaks; it simply does not respond.
-        onTap: isFuture || onTap == null
+        // Future days open too: there is an estimate to show, though the
+        // preview offers no editing until the day has happened.
+        onTap: onTap == null
             ? null
             : () {
                 HapticFeedback.selectionClick();
@@ -544,11 +486,11 @@ class _DayCell extends StatelessWidget {
         child: SizedBox(
           height: extent,
           child: CustomPaint(
-            painter: _BandPainter(
+            painter: BandPainter(
               marker: marker,
               joinsLeft: left,
               joinsRight: right,
-              colors: _MarkerColors.of(scheme),
+              colors: MarkerColors.of(scheme),
               scale: scale,
             ),
             child: Center(
@@ -605,160 +547,6 @@ class _DayCell extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MarkerColors {
-  const _MarkerColors({
-    required this.period,
-    required this.estimateLine,
-    required this.estimateWash,
-    required this.fertile,
-  });
-
-  factory _MarkerColors.of(ColorScheme scheme) => _MarkerColors(
-    period: scheme.primary,
-    estimateLine: scheme.tertiary,
-    // Solid, pre-blended onto the card: a see-through wash would darken
-    // where neighbouring days overlap.
-    estimateWash: Color.alphaBlend(
-      scheme.tertiaryContainer.withValues(alpha: 0.6),
-      scheme.groupedCard,
-    ),
-    fertile: scheme.secondaryContainer,
-  );
-
-  final Color period;
-  final Color estimateLine;
-  final Color estimateWash;
-  final Color fertile;
-}
-
-/// Draws a day's piece of a band: rounded where the band ends, square and
-/// running to the cell edge where it continues into the next day.
-class _BandPainter extends CustomPainter {
-  const _BandPainter({
-    required this.marker,
-    required this.joinsLeft,
-    required this.joinsRight,
-    required this.colors,
-    required this.scale,
-  });
-
-  final _Marker? marker;
-  final bool joinsLeft;
-  final bool joinsRight;
-  final _MarkerColors colors;
-  final double scale;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final kind = marker;
-    if (kind == null) return;
-
-    final height = math.min(size.height - 8, 36 * scale);
-    if (height <= 0) return;
-    final top = (size.height - height) / 2;
-    const inset = 3.0;
-    final radius = Radius.circular(height / 2);
-    // A joined side reaches half a pixel past the cell, so neighbouring
-    // pieces overlap instead of leaving an anti-aliased seam between days.
-    final rect = Rect.fromLTRB(
-      joinsLeft ? -0.5 : inset,
-      top,
-      joinsRight ? size.width + 0.5 : size.width - inset,
-      top + height,
-    );
-    final shape = RRect.fromRectAndCorners(
-      rect,
-      topLeft: joinsLeft ? Radius.zero : radius,
-      bottomLeft: joinsLeft ? Radius.zero : radius,
-      topRight: joinsRight ? Radius.zero : radius,
-      bottomRight: joinsRight ? Radius.zero : radius,
-    );
-
-    switch (kind) {
-      case _Marker.period:
-        canvas.drawRRect(shape, Paint()..color = colors.period);
-      case _Marker.fertile:
-        canvas.drawRRect(shape, Paint()..color = colors.fertile);
-      case _Marker.estimated:
-        canvas.drawRRect(shape, Paint()..color = colors.estimateWash);
-        _dashedOutline(canvas, rect);
-    }
-  }
-
-  /// The estimate's outline, dashed, left open where the band continues so
-  /// the dashes run on across days instead of boxing each one in.
-  void _dashedOutline(Canvas canvas, Rect rect) {
-    final inner = rect.deflate(0.9);
-    final r = inner.height / 2;
-    final leftX = joinsLeft ? inner.left : inner.left + r;
-    final rightX = joinsRight ? inner.right : inner.right - r;
-    final path = Path()
-      ..moveTo(leftX, inner.top)
-      ..lineTo(rightX, inner.top);
-    if (joinsRight) {
-      path.moveTo(rightX, inner.bottom);
-    } else {
-      path.arcToPoint(Offset(rightX, inner.bottom), radius: Radius.circular(r));
-    }
-    path.lineTo(leftX, inner.bottom);
-    if (!joinsLeft) {
-      path.arcToPoint(Offset(leftX, inner.top), radius: Radius.circular(r));
-    }
-
-    final paint = Paint()
-      ..color = colors.estimateLine
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round;
-    const dash = 4.0;
-    const gap = 3.5;
-    for (final PathMetric metric in path.computeMetrics()) {
-      for (var d = 0.0; d < metric.length; d += dash + gap) {
-        canvas.drawPath(
-          metric.extractPath(d, math.min(d + dash, metric.length)),
-          paint,
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BandPainter old) =>
-      old.marker != marker ||
-      old.joinsLeft != joinsLeft ||
-      old.joinsRight != joinsRight ||
-      old.scale != scale ||
-      old.colors.period != colors.period ||
-      old.colors.estimateLine != colors.estimateLine ||
-      old.colors.estimateWash != colors.estimateWash ||
-      old.colors.fertile != colors.fertile;
-}
-
-/// A marker on its own, for the month lines and the legend.
-class _MarkerSwatch extends StatelessWidget {
-  const _MarkerSwatch(this.marker, {this.size = 22});
-
-  final _Marker marker;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: SizedBox(
-      width: size * 1.5,
-      height: size + 8,
-      child: CustomPaint(
-        painter: _BandPainter(
-          marker: marker,
-          joinsLeft: false,
-          joinsRight: false,
-          colors: _MarkerColors.of(Theme.of(context).colorScheme),
-          scale: size / 36,
-        ),
-      ),
-    ),
-  );
 }
 
 /// Names every marker in words.
@@ -818,14 +606,14 @@ Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
                 ),
               ),
               const SizedBox(height: 8),
-              item(const _MarkerSwatch(_Marker.period), l10n.legendPeriodDay),
+              item(const MarkerSwatch(CalendarMarker.period), l10n.legendPeriodDay),
               item(
-                const _MarkerSwatch(_Marker.estimated),
+                const MarkerSwatch(CalendarMarker.estimated),
                 l10n.legendEstimated,
               ),
               if (showFertile)
                 item(
-                  const _MarkerSwatch(_Marker.fertile),
+                  const MarkerSwatch(CalendarMarker.fertile),
                   l10n.fertileWindowHeading,
                   l10n.fertileWindowCaveat,
                 ),

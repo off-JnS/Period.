@@ -4,6 +4,7 @@ import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/calendar/calendar_page.dart';
+import 'package:period/presentation/log/log_entry_screen.dart';
 
 import '../support/database.dart';
 import '../support/dates.dart';
@@ -63,7 +64,6 @@ void main() {
 
     expect(day(r'^May 5, 2024.*Period'), findsOneWidget);
     expect(day(r'^May 7, 2024.*Period'), findsNothing);
-    expect(find.text('Period May 3 – May 6 · 4 days'), findsOneWidget);
     handle.dispose();
   });
 
@@ -93,7 +93,6 @@ void main() {
 
     // Last start 22 April plus a 28-day median lands the window in late May.
     expect(day(r'^May \d+, 2024.*Estimated period'), findsWidgets);
-    expect(find.textContaining('Next period, estimated'), findsOneWidget);
     handle.dispose();
   });
 
@@ -153,6 +152,8 @@ void main() {
   Future<void> logMay6(WidgetTester tester) async {
     await tester.tap(day(r'^May 6, 2024'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Add entry'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
@@ -175,5 +176,77 @@ void main() {
 
     expect(day(r'^May 6, 2024.*Period start'), findsOneWidget);
     handle.dispose();
+  });
+
+  group('tapping a day', () {
+    testWidgets('shows what was logged, without editing anything', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await database.logDao.addPeriodStart(aDate(2024, 5, 3));
+      await database.logDao.saveEntry(
+        aDayEntry(
+          date: aDate(2024, 5, 4),
+          flow: FlowIntensity.heavy,
+          symptoms: {aSymptom(key: 'cramps')},
+          note: 'long day',
+        ),
+      );
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 4, 2024'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Saturday, May 4'), findsOneWidget);
+      expect(find.text('Cycle day 2'), findsOneWidget);
+      expect(find.text('Flow: Heavy'), findsOneWidget);
+      expect(find.text('Cramps'), findsOneWidget);
+      expect(find.text('long day'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+      // Only looking: no entry sheet yet.
+      expect(find.text('Save'), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('Edit opens the day with what was logged', (tester) async {
+      final handle = tester.ensureSemantics();
+      await database.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 5, 4), note: 'long day'),
+      );
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 4, 2024'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Save'), findsOneWidget);
+      expect(
+        tester.widget<LogEntryScreen>(find.byType(LogEntryScreen)).entry?.note,
+        'long day',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('a future day shows its estimate but cannot be edited', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      for (final start in regularPeriodStarts(
+        from: aDate(2024, 2, 26),
+        length: 28,
+        count: 3,
+      )) {
+        await database.logDao.addPeriodStart(start);
+      }
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 20, 2024'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Monday, May 20'), findsOneWidget);
+      expect(find.text('Estimated period'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      expect(find.text('Add entry'), findsNothing);
+      expect(find.textContaining('Cycle day'), findsNothing);
+      handle.dispose();
+    });
   });
 }

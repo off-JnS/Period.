@@ -56,3 +56,105 @@ String flowLabel(AppLocalizations l10n, FlowIntensity flow) => switch (flow) {
   FlowIntensity.medium => l10n.flowMedium,
   FlowIntensity.heavy => l10n.flowHeavy,
 };
+
+/// What kind of thing an [EntryLine] reports, so a caller can put an icon
+/// beside it.
+enum EntryLineKind {
+  /// The flow.
+  flow,
+
+  /// Symptoms.
+  symptoms,
+
+  /// Moods.
+  mood,
+
+  /// Discharge.
+  discharge,
+
+  /// Sex.
+  sex,
+
+  /// The pill.
+  pill,
+
+  /// Basal temperature.
+  temperature,
+
+  /// An ovulation test.
+  ovulationTest,
+
+  /// Her note, word for word.
+  note,
+}
+
+/// One line describing part of a logged day.
+typedef EntryLine = ({EntryLineKind kind, String text});
+
+/// Everything in [entry] she can read back, one line per kind, in the order
+/// the log sheet asks for them. The period start is left to the caller, which
+/// knows whether to call it "today".
+///
+/// Keys this build cannot name are skipped rather than shown raw; see
+/// [symptomLabel]. Nothing here deletes them.
+List<EntryLine> entryLines(
+  AppLocalizations l10n,
+  DayEntry? entry, {
+  required String Function(int centiCelsius) formatTemperature,
+}) {
+  if (entry == null) return const [];
+  final keys = {for (final symptom in entry.symptoms) symptom.key};
+
+  // One line per kind, each in its offered order rather than alphabetical,
+  // so moods read as a mood list and not mixed in among symptoms.
+  List<String> named(Iterable<String> offered) => [
+    for (final key in offered)
+      if (keys.contains(key)) ?symptomLabel(l10n, key),
+  ];
+  // Symptoms include keys this build no longer offers but can still name.
+  final namespaced = {
+    ...offeredMoodKeys,
+    ...offeredDischargeKeys,
+    ...offeredSexKeys,
+    ...offeredOvulationTestKeys,
+    pillTakenKey,
+  };
+  final symptoms = <String>[
+    for (final key in keys)
+      if (!namespaced.contains(key)) ?symptomLabel(l10n, key),
+  ]..sort();
+  final moods = named(offeredMoodKeys);
+  final discharge = named(offeredDischargeKeys);
+  final sex = named(offeredSexKeys);
+  final ovulationTest = named(offeredOvulationTestKeys);
+
+  return [
+    if (entry.flow case final flow?)
+      (kind: EntryLineKind.flow, text: l10n.flowSummary(flowLabel(l10n, flow))),
+    if (symptoms.isNotEmpty)
+      (kind: EntryLineKind.symptoms, text: symptoms.join(', ')),
+    if (moods.isNotEmpty)
+      (kind: EntryLineKind.mood, text: l10n.moodSummary(moods.join(', '))),
+    if (discharge.isNotEmpty)
+      (
+        kind: EntryLineKind.discharge,
+        text: l10n.dischargeSummary(discharge.first),
+      ),
+    if (sex.isNotEmpty)
+      (kind: EntryLineKind.sex, text: l10n.sexSummary(sex.first)),
+    if (keys.contains(pillTakenKey))
+      (kind: EntryLineKind.pill, text: l10n.pillTaken),
+    if (entry.temperatureCentiCelsius case final centi?)
+      (
+        kind: EntryLineKind.temperature,
+        text: l10n.temperatureSummary(formatTemperature(centi)),
+      ),
+    if (ovulationTest.isNotEmpty)
+      (
+        kind: EntryLineKind.ovulationTest,
+        text: l10n.ovulationTestSummary(ovulationTest.first),
+      ),
+    if (entry.note case final note? when note.isNotEmpty)
+      (kind: EntryLineKind.note, text: note),
+  ];
+}

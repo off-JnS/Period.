@@ -203,12 +203,15 @@ where something appears, changes or is saved. Respects Reduce Motion.
 ### 15. Scrolling calendar 🔨 — built, awaiting review
 
 **What:** every month in one continuous scroll, up into the past and down
-into the estimate, with a Today button to come back. Each period drawn as one
-filled band across its days (every day with flow, not only the start); the
-estimated period a dashed band; the fertile window, if opted in, a plain
-band. Under each month's name, one line per thing it holds — "Period May 3 –
-May 7 · 5 days", the estimate as a range, the fertile window with its caveat
-in the same line (§8). Legend behind an info button.
+into the estimate, with a Today button to come back. Minimal on purpose: a
+month is its name and its days. Each period is one filled band across its
+days (every day with flow, not only the start); the estimated period a
+dashed band; the fertile window, if opted in, a plain band, with its caveat
+the one line of text a month may carry (§8). Legend behind the ⓘ button.
+
+**Tapping a day** opens a preview — the date, cycle day, which band it is
+in, and everything logged, one line each with an icon — and an Edit (or Add
+entry) button. Future days preview their estimate but cannot be edited.
 
 **How:** the whole history is read in two queries (`LogDao.loggedDays`);
 nothing stored, no migration. Period days are what she logged

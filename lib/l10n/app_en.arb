@@ -894,5 +894,13 @@
   "@calendarFertileSummary": {
     "description": "Calendar month summary for the fertile window. The caveat is part of the line so it is always visible with the marks (CLAUDE.md §8).",
     "placeholders": { "range": { "type": "String" } }
+  },
+  "dayPreviewNothingLogged": "Nothing logged",
+  "@dayPreviewNothingLogged": {
+    "description": "Day preview from the calendar when the day has no entry."
+  },
+  "calendarFertileNote": "Fertile window: a rough estimate. Not suitable for preventing pregnancy",
+  "@calendarFertileNote": {
+    "description": "One short line under a calendar month that shows the fertile window, so the caveat is always visible with it (CLAUDE.md §8)."
   }
 }

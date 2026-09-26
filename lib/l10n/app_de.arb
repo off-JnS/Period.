@@ -261,5 +261,7 @@
   "calendarPeriodOngoing": "Periode seit {date}",
   "calendarPeriodStarted": "Periode begonnen am {date}",
   "calendarEstimateSummary": "Nächste Periode, geschätzt: {range}",
-  "calendarFertileSummary": "Fruchtbares Fenster, geschätzt: {range}. Nicht zur Schwangerschaftsverhütung geeignet"
+  "calendarFertileSummary": "Fruchtbares Fenster, geschätzt: {range}. Nicht zur Schwangerschaftsverhütung geeignet",
+  "dayPreviewNothingLogged": "Nichts eingetragen",
+  "calendarFertileNote": "Fruchtbares Fenster: eine grobe Schätzung. Nicht zur Schwangerschaftsverhütung geeignet"
 }

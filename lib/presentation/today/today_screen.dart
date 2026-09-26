@@ -8,7 +8,6 @@ import '../../domain/logic/pregnancy_week.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
 import '../../domain/models/day_entry.dart';
-import '../../domain/models/symptom.dart';
 import '../../l10n/app_localizations.dart';
 import '../log/entry_labels.dart';
 import '../log/temperature.dart';
@@ -340,48 +339,15 @@ class _LoggedTodaySection extends StatelessWidget {
     final theme = Theme.of(context);
     final current = entry;
 
-    // Symptoms this build has no name for are skipped rather than shown as raw
-    // keys; see symptomLabel. The rows stay in the database untouched.
-    final keys = {
-      for (final symptom in current?.symptoms ?? const <Symptom>{}) symptom.key,
-    };
-    // One line per kind, each in its offered order rather than alphabetical,
-    // so moods read as a mood list and not mixed in among symptoms.
-    List<String> named(Iterable<String> offered) => [
-      for (final key in offered)
-        if (keys.contains(key)) ?symptomLabel(l10n, key),
-    ];
-    // Symptoms include keys this build no longer offers but can still name;
-    // keys it cannot name at all are skipped (see symptomLabel).
-    final namespaced = {
-      ...offeredMoodKeys,
-      ...offeredDischargeKeys,
-      ...offeredSexKeys,
-      ...offeredOvulationTestKeys,
-      pillTakenKey,
-    };
-    final symptomNames = <String>[
-      for (final key in keys)
-        if (!namespaced.contains(key)) ?symptomLabel(l10n, key),
-    ]..sort();
-    final moods = named(offeredMoodKeys);
-    final discharge = named(offeredDischargeKeys);
-    final sex = named(offeredSexKeys);
-    final pill = keys.contains(pillTakenKey);
-    final ovulationTest = named(offeredOvulationTestKeys);
-    final temperature = current?.temperatureCentiCelsius;
-
-    final hasAnything =
-        isPeriodStart ||
-        current?.flow != null ||
-        (current?.note?.isNotEmpty ?? false) ||
-        symptomNames.isNotEmpty ||
-        moods.isNotEmpty ||
-        discharge.isNotEmpty ||
-        sex.isNotEmpty ||
-        pill ||
-        ovulationTest.isNotEmpty ||
-        temperature != null;
+    final lines = entryLines(
+      l10n,
+      current,
+      formatTemperature: (centi) => formatTemperature(
+        centi,
+        Localizations.localeOf(context).toLanguageTag(),
+      ),
+    );
+    final hasAnything = isPeriodStart || lines.isNotEmpty;
 
     return SectionCard(
       icon: Icons.edit_note_rounded,
@@ -397,49 +363,14 @@ class _LoggedTodaySection extends StatelessWidget {
           else ...[
             if (isPeriodStart)
               Text(l10n.periodStartSummary, style: theme.textTheme.bodyLarge),
-            if (current?.flow case final flow?)
-              Text(
-                l10n.flowSummary(flowLabel(l10n, flow)),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (symptomNames.isNotEmpty)
-              Text(symptomNames.join(', '), style: theme.textTheme.bodyLarge),
-            if (moods.isNotEmpty)
-              Text(
-                l10n.moodSummary(moods.join(', ')),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (discharge.isNotEmpty)
-              Text(
-                l10n.dischargeSummary(discharge.single),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (sex.isNotEmpty)
-              Text(
-                l10n.sexSummary(sex.single),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (pill) Text(l10n.pillTaken, style: theme.textTheme.bodyLarge),
-            if (temperature != null)
-              Text(
-                l10n.temperatureSummary(
-                  formatTemperature(
-                    temperature,
-                    Localizations.localeOf(context).toLanguageTag(),
-                  ),
-                ),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (ovulationTest.isNotEmpty)
-              Text(
-                l10n.ovulationTestSummary(ovulationTest.single),
-                style: theme.textTheme.bodyLarge,
-              ),
-            if (current?.note case final note? when note.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(note, style: theme.textTheme.bodyMedium),
-              ),
+            for (final line in lines)
+              if (line.kind == EntryLineKind.note)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(line.text, style: theme.textTheme.bodyMedium),
+                )
+              else
+                Text(line.text, style: theme.textTheme.bodyLarge),
           ],
         ],
       ),

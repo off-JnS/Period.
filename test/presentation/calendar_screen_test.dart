@@ -167,10 +167,8 @@ void main() {
     });
   });
 
-  group('each month says what it holds', () {
-    testWidgets('a finished period, with its dates and length', (
-      tester,
-    ) async {
+  group('text', () {
+    testWidgets('a month says nothing beyond its name', (tester) async {
       await pump(
         tester,
         data(
@@ -178,57 +176,22 @@ void main() {
           flowByDay: {
             for (var d = 3; d <= 7; d++) aDate(2024, 5, d): FlowIntensity.medium,
           },
-        ),
-      );
-      expect(find.text('Period May 3 – May 7 · 5 days'), findsOneWidget);
-    });
-
-    testWidgets('a period still running', (tester) async {
-      await pump(
-        tester,
-        data(
-          periodStarts: {aDate(2024, 5, 15)},
-          flowByDay: {
-            for (var d = 15; d <= 17; d++)
-              aDate(2024, 5, d): FlowIntensity.medium,
-          },
-        ),
-      );
-      expect(find.text('Period since May 15'), findsOneWidget);
-    });
-
-    testWidgets('a start with no flow logged', (tester) async {
-      await pump(tester, data(periodStarts: {aDate(2024, 5, 2)}));
-      expect(find.text('Period started May 2'), findsOneWidget);
-    });
-
-    testWidgets('the estimate, as a range and as an estimate', (tester) async {
-      await pump(
-        tester,
-        data(
           predicted: PredictedPeriod(
             earliest: aDate(2024, 5, 29),
             latest: aDate(2024, 6, 2),
           ),
         ),
       );
-      // Shown under both months the window touches.
-      expect(
-        find.text('Next period, estimated: May 29 – Jun 2'),
-        findsWidgets,
-      );
+      expect(find.textContaining('Period'), findsNothing);
+      expect(find.textContaining('estimated'), findsNothing);
     });
 
-    testWidgets('the fertile window carries its caveat in the same line', (
+    testWidgets('except the fertile window caveat, wherever it is drawn', (
       tester,
     ) async {
       await pump(
         tester,
         data(
-          predicted: PredictedPeriod(
-            earliest: aDate(2024, 5, 29),
-            latest: aDate(2024, 6, 2),
-          ),
           fertileWindow: FertileWindowEstimate(
             earliest: aDate(2024, 5, 10),
             latest: aDate(2024, 5, 19),
@@ -236,17 +199,9 @@ void main() {
         ),
       );
       expect(
-        find.textContaining(
-          'Fertile window, estimated: May 10 – May 19. Not suitable for '
-          'preventing pregnancy',
-        ),
+        find.textContaining('Not suitable for preventing pregnancy'),
         findsOneWidget,
       );
-    });
-
-    testWidgets('an empty month says nothing', (tester) async {
-      await pump(tester, data());
-      expect(find.textContaining('Period'), findsNothing);
     });
   });
 
@@ -299,12 +254,14 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('refuses a day that has not happened yet', (tester) async {
+    testWidgets('opens a future day too, which says it has not happened', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       final opened = <CycleDate>[];
       await pump(tester, data(), onSelectDay: opened.add);
-      await tester.tap(day(r'^May 20, 2024'), warnIfMissed: false);
-      expect(opened, isEmpty);
+      await tester.tap(day(r'^May 20, 2024'));
+      expect(opened, [aDate(2024, 5, 20)]);
       expect(day(r'^May 20, 2024.*Not yet'), findsOneWidget);
       handle.dispose();
     });
