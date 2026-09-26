@@ -168,24 +168,20 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ],
         const SizedBox(height: 28),
-        enter(_PredictionSection(prediction: data.prediction)),
+        enter(
+          _PredictionSection(
+            prediction: data.prediction,
+            // The irregularity hint rides on the estimate it is about, as a
+            // small mark in the card's corner rather than a block of its own.
+            onDoctorHint: data.showDoctorHint && !_hintDismissed
+                ? () => setState(() => _hintDismissed = true)
+                : null,
+          ),
+        ),
         if (data.fertileWindow case final window?) ...[
           const SizedBox(height: 12),
           enter(_FertileWindowSection(window: window)),
         ],
-        // Folds away rather than vanishing when dismissed.
-        AnimatedSize(
-          duration: _motion(context, const Duration(milliseconds: 250)),
-          curve: Curves.easeOutCubic,
-          child: data.showDoctorHint && !_hintDismissed
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: _DoctorHint(
-                    onDismiss: () => setState(() => _hintDismissed = true),
-                  ),
-                )
-              : const SizedBox(width: double.infinity),
-        ),
         const SizedBox(height: 12),
         enter(
           _LoggedTodaySection(
@@ -198,10 +194,6 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 }
-
-/// [duration], or none at all when the system asks for reduced motion.
-Duration _motion(BuildContext context, Duration duration) =>
-    MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
 
 /// Fades and slides [child] up into place once, when the screen appears,
 /// a little after the block above it.
@@ -352,19 +344,27 @@ class _DateHeader extends StatelessWidget {
 /// user to conclude the app is broken, which is why section 10 asks for
 /// predictions-off to be a state rather than an absence.
 class _PredictionSection extends StatelessWidget {
-  const _PredictionSection({required this.prediction});
+  const _PredictionSection({required this.prediction, this.onDoctorHint});
 
   final PeriodPrediction prediction;
+
+  /// When set, the doctor hint shows in the card's corner, and this hides it.
+  final VoidCallback? onDoctorHint;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final hint = switch (onDoctorHint) {
+      final hide? => _DoctorHint(onDismiss: hide),
+      null => null,
+    };
 
     return switch (prediction) {
       PredictedPeriod(:final earliest, :final latest) => _InfoCard(
         icon: CupertinoIcons.drop_fill,
         heading: l10n.nextPeriodHeading,
+        trailing: hint,
         body: l10n.estimatedRange(
           _formatDay(context, earliest),
           _formatDay(context, latest),
@@ -375,16 +375,19 @@ class _PredictionSection extends StatelessWidget {
       NotEnoughCycles(:final have, :final need) => _InfoCard(
         icon: CupertinoIcons.hourglass,
         heading: l10n.nextPeriodHeading,
+        trailing: hint,
         body: l10n.needMoreCycles(need - have),
       ),
       CyclesTooVariable() => _InfoCard(
         icon: CupertinoIcons.waveform_path,
         heading: l10n.nextPeriodHeading,
+        trailing: hint,
         body: l10n.cyclesTooVariable,
       ),
       PredictionsDisabled(:final mode) => _InfoCard(
         icon: CupertinoIcons.pause_circle,
         heading: l10n.nextPeriodHeading,
+        trailing: hint,
         body: switch (mode) {
           CycleMode.hormonalContraception => l10n.predictionsOffContraception,
           CycleMode.pregnancy => l10n.predictionsOffPregnancy,
@@ -420,11 +423,11 @@ class _FertileWindowSection extends StatelessWidget {
   }
 }
 
-/// The irregularity hint as one quiet line, not a card of its own.
+/// The irregularity hint as a small mark in the corner of the estimate card.
 ///
 /// docs/cycle-logic.md §5 wants it rare and dismissible, and CLAUDE.md §8
-/// wants it worded as "worth mentioning", never a finding: the line says only
-/// what was seen, and tapping it shows the full wording.
+/// wants it worded as "worth mentioning", never a finding. The mark takes no
+/// room of its own; tapping it shows the full wording, with a way to hide it.
 class _DoctorHint extends StatelessWidget {
   const _DoctorHint({required this.onDismiss});
 
@@ -433,67 +436,50 @@ class _DoctorHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final muted = theme.colorScheme.onSurfaceVariant;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: l10n.doctorHint,
-            excludeSemantics: true,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => showCupertinoDialog<void>(
-                context: context,
-                barrierDismissible: true,
-                builder: (context) => CupertinoAlertDialog(
-                  content: Text(l10n.doctorHint),
-                  actions: [
-                    CupertinoDialogAction(
-                      isDefaultAction: true,
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(l10n.doneButton),
-                    ),
-                  ],
+    return Semantics(
+      button: true,
+      label: l10n.doctorHintShort,
+      excludeSemantics: true,
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(44, 30),
+        onPressed: () async {
+          final hide = await showCupertinoDialog<bool>(
+            context: context,
+            barrierDismissible: true,
+            builder: (context) => CupertinoAlertDialog(
+              title: Text(l10n.doctorHintShort),
+              content: Text(l10n.doctorHint),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.dismiss),
                 ),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    children: [
-                      Icon(CupertinoIcons.info_circle, size: 17, color: muted),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          l10n.doctorHintShort,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: muted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.doneButton),
                 ),
-              ),
+              ],
             ),
+          );
+          if (hide ?? false) onDismiss();
+        },
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: scheme.primary.withValues(alpha: 0.12),
+          ),
+          child: Icon(
+            CupertinoIcons.exclamationmark,
+            size: 14,
+            color: scheme.primary,
           ),
         ),
-        Semantics(
-          button: true,
-          label: l10n.dismiss,
-          excludeSemantics: true,
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(44, 44),
-            onPressed: onDismiss,
-            child: Icon(CupertinoIcons.xmark, size: 15, color: muted),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -509,7 +495,10 @@ class _InfoCard extends StatelessWidget {
     required this.body,
     this.bodyStyle,
     this.footnote,
+    this.trailing,
   });
+
+  final Widget? trailing;
 
   final IconData icon;
   final String heading;
@@ -524,6 +513,7 @@ class _InfoCard extends StatelessWidget {
     return SectionCard(
       icon: icon,
       heading: heading,
+      trailing: trailing,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

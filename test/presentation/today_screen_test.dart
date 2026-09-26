@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
@@ -131,33 +132,40 @@ void main() {
       expect(find.textContaining('worth mentioning'), findsNothing);
     });
 
-    testWidgets('is one quiet line, not a card', (tester) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: TodayViewData(prediction: predicted, showDoctorHint: true),
-        ),
-      );
-      expect(find.text('Cycles varied more than usual'), findsOneWidget);
+    Future<void> pumpHint(WidgetTester tester) => pumpApp(
+      tester,
+      TodayScreen(
+        data: TodayViewData(prediction: predicted, showDoctorHint: true),
+      ),
+    );
+
+    Finder mark() => find.bySemanticsLabel('Cycles varied more than usual');
+
+    testWidgets('is a small mark in the estimate card, not a card', (
+      tester,
+    ) async {
+      await pumpHint(tester);
+      expect(mark(), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.exclamationmark), findsOneWidget);
+      // Inside the Next period card, taking no block of its own.
       expect(
-        find.ancestor(
-          of: find.text('Cycles varied more than usual'),
-          matching: find.byType(Card),
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Next period'),
+            matching: find.byType(Card),
+          ),
+          matching: find.byIcon(CupertinoIcons.exclamationmark),
         ),
-        findsNothing,
+        findsOneWidget,
       );
+      expect(find.textContaining('worth mentioning'), findsNothing);
     });
 
     testWidgets('tapping it gives the full wording, naming nothing', (
       tester,
     ) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: TodayViewData(prediction: predicted, showDoctorHint: true),
-        ),
-      );
-      await tester.tap(find.text('Cycles varied more than usual'));
+      await pumpHint(tester);
+      await tester.tap(mark());
       await tester.pumpAndSettle();
       final hint = tester.widget<Text>(find.textContaining('worth mentioning'));
       expect(hint.data, contains('might be worth mentioning to a doctor'));
@@ -166,19 +174,17 @@ void main() {
       expect(hint.data, isNot(contains('irregular')));
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('worth mentioning'), findsNothing);
+      // Done only closes it; the mark stays.
+      expect(mark(), findsOneWidget);
     });
 
-    testWidgets('can be dismissed', (tester) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: TodayViewData(prediction: predicted, showDoctorHint: true),
-        ),
-      );
-      await tester.tap(find.bySemanticsLabel('Dismiss'));
+    testWidgets('can be dismissed from the dialog', (tester) async {
+      await pumpHint(tester);
+      await tester.tap(mark());
       await tester.pumpAndSettle();
-      expect(find.text('Cycles varied more than usual'), findsNothing);
+      await tester.tap(find.text('Dismiss'));
+      await tester.pumpAndSettle();
+      expect(mark(), findsNothing);
     });
   });
 

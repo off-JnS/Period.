@@ -129,6 +129,12 @@ Future<void> seedDemoData(AppDatabase database, CycleDate today) async {
     add(starts[1].addDays(day), keys: {'ovulationTest.$result'});
   }
 
+  // Pregnancy tests: one on a day with sex, so the calendar shows the heart
+  // and the ± side by side, and one late in the last cycle. Both negative:
+  // the demo shows the mark, not a story.
+  add(starts[2].addDays(13), keys: {'pregnancyTest.negative'});
+  add(starts[1].addDays(24), keys: {'pregnancyTest.negative'});
+
   // Today, so the "logged today" card has something in every line.
   add(
     today,

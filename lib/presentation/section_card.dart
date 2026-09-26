@@ -47,6 +47,9 @@ class SectionCard extends StatelessWidget {
 
     return Card(
       color: color,
+      // Not one merged node: a button in the heading row, like Edit or the
+      // doctor hint, has to be reachable and pressable on its own.
+      semanticContainer: false,
       child: Padding(
         padding: padding,
         child: Column(
