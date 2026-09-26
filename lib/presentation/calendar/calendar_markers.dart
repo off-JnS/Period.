@@ -218,3 +218,65 @@ class MarkerSwatch extends StatelessWidget {
     ),
   );
 }
+
+/// The pregnancy test mark: a filled disc with a bold ± cut out of it.
+///
+/// Drawn rather than taken from the icon font, whose ± is a hairline glyph
+/// that disappears at calendar size. As solid as the heart beside it, so both
+/// are found at a glance.
+class PregnancyTestMark extends StatelessWidget {
+  /// Creates the mark.
+  const PregnancyTestMark({
+    required this.color,
+    required this.onColor,
+    this.size = 11,
+    super.key,
+  });
+
+  /// The disc.
+  final Color color;
+
+  /// The ± on it.
+  final Color onColor;
+
+  /// The disc's diameter.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: CustomPaint(painter: _PlusMinusPainter(color, onColor)),
+  );
+}
+
+class _PlusMinusPainter extends CustomPainter {
+  const _PlusMinusPainter(this.color, this.onColor);
+
+  final Color color;
+  final Color onColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final d = size.shortestSide;
+    final c = Offset(size.width / 2, size.height / 2);
+    canvas.drawCircle(c, d / 2, Paint()..color = color);
+
+    final stroke = Paint()
+      ..color = onColor
+      ..strokeWidth = math.max(d * 0.13, 1.2)
+      ..strokeCap = StrokeCap.round;
+    final arm = d * 0.2;
+    // The plus, a little above centre…
+    final plus = c.translate(0, -d * 0.1);
+    canvas
+      ..drawLine(plus.translate(-arm, 0), plus.translate(arm, 0), stroke)
+      ..drawLine(plus.translate(0, -arm), plus.translate(0, arm), stroke);
+    // …and the minus under it.
+    final minus = c.translate(0, d * 0.25);
+    canvas.drawLine(minus.translate(-arm, 0), minus.translate(arm, 0), stroke);
+  }
+
+  @override
+  bool shouldRepaint(_PlusMinusPainter old) =>
+      old.color != color || old.onColor != onColor;
+}

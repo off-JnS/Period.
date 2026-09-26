@@ -109,9 +109,12 @@ void main() {
     expect(first.temperatureCentiCelsius, isNotNull);
   });
 
-  test('a pregnancy test sits on a day with sex, for both calendar marks', () async {
-    final days = await database.logDao.loggedDays();
-    expect(days.pregnancyTest, isNotEmpty);
-    expect(days.pregnancyTest.intersection(days.sex), isNotEmpty);
-  });
+  test(
+    'a pregnancy test sits on a day with sex, for both calendar marks',
+    () async {
+      final days = await database.logDao.loggedDays();
+      expect(days.pregnancyTest, isNotEmpty);
+      expect(days.pregnancyTest.intersection(days.sex), isNotEmpty);
+    },
+  );
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_date.dart';
 import 'package:period/domain/models/day_entry.dart';
+import 'package:period/presentation/calendar/calendar_markers.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
 
 import '../support/dates.dart';
@@ -212,7 +214,7 @@ void main() {
           pregnancyTestDays: {aDate(2024, 5, 9), aDate(2024, 5, 10)},
         ),
       );
-      expect(find.byIcon(CupertinoIcons.plus_slash_minus), findsNWidgets(2));
+      expect(find.byType(PregnancyTestMark), findsNWidgets(2));
       expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
       expect(day(r'^May 9, 2024.*Sex.*Pregnancy test'), findsOneWidget);
       handle.dispose();
@@ -274,6 +276,67 @@ void main() {
         find.textContaining('Not suitable for preventing pregnancy'),
         findsWidgets,
       );
+    });
+  });
+
+  group('the filter', () {
+    CalendarViewData marked() => CalendarViewData(
+      today: today,
+      loggedDays: {aDate(2024, 5, 9), aDate(2024, 5, 10), aDate(2024, 5, 11)},
+      sexDays: {aDate(2024, 5, 9)},
+      pregnancyTestDays: {aDate(2024, 5, 10)},
+    );
+
+    double opacityOf(WidgetTester tester, String pattern) {
+      final cell = find.ancestor(
+        of: find.text(pattern),
+        matching: find.byType(AnimatedOpacity),
+      );
+      return tester.widget<AnimatedOpacity>(cell.first).opacity;
+    }
+
+    Future<void> choose(WidgetTester tester, String option) async {
+      await tester.tap(find.bySemanticsLabel('Filter'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(option).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('opens a menu with every option', (tester) async {
+      await pump(tester, marked());
+      await tester.tap(find.bySemanticsLabel('Filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show everything'), findsOneWidget);
+      expect(find.widgetWithText(MenuItemButton, 'Sex'), findsOneWidget);
+      expect(
+        find.widgetWithText(MenuItemButton, 'Pregnancy test'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sex fades every other day, and says it is on', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Sex');
+      expect(opacityOf(tester, '9'), 1);
+      expect(opacityOf(tester, '10'), lessThan(1));
+      expect(opacityOf(tester, '17'), 1, reason: 'today stays');
+      expect(find.bySemanticsLabel('Clear filter'), findsOneWidget);
+    });
+
+    testWidgets('pregnancy test picks out the test days', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Pregnancy test');
+      expect(opacityOf(tester, '10'), 1);
+      expect(opacityOf(tester, '9'), lessThan(1));
+    });
+
+    testWidgets('the tag clears it', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Sex');
+      await tester.tap(find.bySemanticsLabel('Clear filter'));
+      await tester.pumpAndSettle();
+      expect(opacityOf(tester, '10'), 1);
+      expect(find.bySemanticsLabel('Clear filter'), findsNothing);
     });
   });
 

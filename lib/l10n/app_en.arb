@@ -936,5 +936,17 @@
   "doctorHintShort": "Cycles varied more than usual",
   "@doctorHintShort": {
     "description": "Today: the one-line irregularity hint. Tapping it shows the full wording (doctorHint)."
+  },
+  "calendarFilterButton": "Filter",
+  "@calendarFilterButton": {
+    "description": "Calendar: accessible name of the filter button beside Today."
+  },
+  "calendarFilterAll": "Show everything",
+  "@calendarFilterAll": {
+    "description": "Calendar filter menu: no filter."
+  },
+  "calendarFilterClear": "Clear filter",
+  "@calendarFilterClear": {
+    "description": "Calendar: accessible name of the \u00d7 on the active-filter tag."
   }
 }

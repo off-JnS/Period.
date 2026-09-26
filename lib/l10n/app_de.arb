@@ -271,5 +271,8 @@
   "pregnancyTestNegative": "Negativ",
   "pregnancyTestPositive": "Positiv",
   "pregnancyTestSummary": "Schwangerschaftstest: {result}",
-  "doctorHintShort": "Zyklen schwankten stärker als sonst"
+  "doctorHintShort": "Zyklen schwankten stärker als sonst",
+  "calendarFilterButton": "Filtern",
+  "calendarFilterAll": "Alles anzeigen",
+  "calendarFilterClear": "Filter aufheben"
 }

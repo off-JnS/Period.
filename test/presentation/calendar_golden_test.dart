@@ -104,4 +104,25 @@ void main() {
   testWidgets('at 160% text size', (tester) async {
     await expectGolden(tester, everything, 'large_text', textScale: 1.6);
   });
+
+  testWidgets('filtered to sex', (tester) async {
+    await pumpApp(
+      tester,
+      CalendarScreen(data: everything),
+      surface: const Size(420, 900),
+    );
+    await tester.tap(find.bySemanticsLabel('Filter'));
+    await tester.pumpAndSettle();
+    // The whole app, since the menu opens in the overlay above the screen.
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('goldens/calendar_filter_menu.png'),
+    );
+    await tester.tap(find.text('Sex').last);
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(CalendarScreen),
+      matchesGoldenFile('goldens/calendar_filter_sex.png'),
+    );
+  });
 }

@@ -108,6 +108,15 @@ class CalendarScreen extends StatefulWidget {
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
+/// What the calendar can be narrowed to, so those days stand out.
+enum CalendarFilter {
+  /// Days she recorded having sex.
+  sex,
+
+  /// Days she recorded a pregnancy test.
+  pregnancyTest,
+}
+
 /// The earliest year the calendar scrolls back to.
 const _firstYear = 1900;
 
@@ -119,6 +128,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   /// The sliver the scroll is anchored on: the current month, at offset 0.
   final _centreKey = UniqueKey();
+
+  /// What the calendar is narrowed to, or null for everything.
+  CalendarFilter? _filter;
+
+  void _setFilter(CalendarFilter? filter) {
+    if (filter == _filter) return;
+    HapticFeedback.selectionClick();
+    setState(() => _filter = filter);
+  }
 
   @override
   void dispose() {
@@ -158,7 +176,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
       data: widget.data,
       firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
       onSelectDay: widget.onSelectDay,
+      filter: _filter,
     );
+
+    String filterLabel(CalendarFilter filter) => switch (filter) {
+      CalendarFilter.sex => l10n.sexHeading,
+      CalendarFilter.pregnancyTest => l10n.pregnancyTestLabel,
+    };
+    Widget filterIcon(CalendarFilter filter, {double size = 16}) =>
+        switch (filter) {
+          CalendarFilter.sex => Icon(
+            CupertinoIcons.heart_fill,
+            size: size,
+            color: scheme.primary,
+          ),
+          CalendarFilter.pregnancyTest => PregnancyTestMark(
+            size: size,
+            color: scheme.primary,
+            onColor: scheme.onPrimary,
+          ),
+        };
 
     return Scaffold(
       backgroundColor: scheme.groupedCard,
@@ -200,6 +237,83 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           ),
                         ),
+                        // A pull-down under the button, as iOS menus open.
+                        MenuAnchor(
+                          alignmentOffset: const Offset(-150, 0),
+                          style: MenuStyle(
+                            backgroundColor: WidgetStatePropertyAll(
+                              scheme.groupedCard,
+                            ),
+                            shape: WidgetStatePropertyAll(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            side: const WidgetStatePropertyAll(
+                              BorderSide.none,
+                            ),
+                            elevation: const WidgetStatePropertyAll(8),
+                            shadowColor: WidgetStatePropertyAll(
+                              Colors.black.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          menuChildren: [
+                            for (final option in [
+                              null,
+                              ...CalendarFilter.values,
+                            ])
+                              MenuItemButton(
+                                onPressed: () => _setFilter(option),
+                                leadingIcon: SizedBox(
+                                  width: 20,
+                                  child: Center(
+                                    child: option == null
+                                        ? Icon(
+                                            CupertinoIcons.calendar,
+                                            size: 18,
+                                            color: scheme.primary,
+                                          )
+                                        : filterIcon(option),
+                                  ),
+                                ),
+                                trailingIcon: option == _filter
+                                    ? Icon(
+                                        CupertinoIcons.checkmark_alt,
+                                        size: 18,
+                                        color: scheme.primary,
+                                      )
+                                    : const SizedBox(width: 18),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Text(
+                                    option == null
+                                        ? l10n.calendarFilterAll
+                                        : filterLabel(option),
+                                  ),
+                                ),
+                              ),
+                          ],
+                          builder: (context, controller, _) => Semantics(
+                            button: true,
+                            label: l10n.calendarFilterButton,
+                            excludeSemantics: true,
+                            child: CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(44, 44),
+                              onPressed: () => controller.isOpen
+                                  ? controller.close()
+                                  : controller.open(),
+                              child: Icon(
+                                _filter == null
+                                    ? CupertinoIcons
+                                          .line_horizontal_3_decrease_circle
+                                    : CupertinoIcons
+                                          .line_horizontal_3_decrease_circle_fill,
+                                color: scheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
                         Semantics(
                           button: true,
                           label: l10n.calendarLegendButton,
@@ -219,6 +333,63 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  // Which filter is on, with a way off, so a calendar that
+                  // looks emptier than usual always says why.
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: switch (_filter) {
+                      final filter? => Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 10),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  filterIcon(filter, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    filterLabel(filter),
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: scheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Semantics(
+                                    button: true,
+                                    label: l10n.calendarFilterClear,
+                                    excludeSemantics: true,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      minimumSize: const Size(36, 32),
+                                      onPressed: () => _setFilter(null),
+                                      child: Icon(
+                                        CupertinoIcons.xmark_circle_fill,
+                                        size: 18,
+                                        color: scheme.primary.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      null => const SizedBox(width: double.infinity),
+                    },
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
@@ -272,9 +443,11 @@ class _MonthSection extends StatelessWidget {
     required this.data,
     required this.firstDayOfWeekIndex,
     this.onSelectDay,
+    this.filter,
     super.key,
   });
 
+  final CalendarFilter? filter;
   final int year;
   final int month;
   final CalendarViewData data;
@@ -346,6 +519,7 @@ class _MonthSection extends StatelessWidget {
                             joinsRight: column < 6,
                             inMonth: grid.isInMonth,
                             onTap: onSelectDay,
+                            filter: filter,
                           )
                         // Days of the neighbouring months are left out: each
                         // belongs to its own month, one scroll away.
@@ -402,7 +576,11 @@ class _DayCell extends StatelessWidget {
     required this.joinsRight,
     required this.inMonth,
     this.onTap,
+    this.filter,
   });
+
+  /// When set, days that do not match fade back.
+  final CalendarFilter? filter;
 
   final CycleDate date;
   final CalendarViewData data;
@@ -431,6 +609,11 @@ class _DayCell extends StatelessWidget {
     final isLogged = data.loggedDays.contains(date);
     final hadSex = data.sexDays.contains(date);
     final hadTest = data.pregnancyTestDays.contains(date);
+    final matches = switch (filter) {
+      null => true,
+      CalendarFilter.sex => hadSex,
+      CalendarFilter.pregnancyTest => hadTest,
+    };
     final marker = _markerOn(date);
     final previous = date.subtractDays(1);
     final next = date.addDays(1);
@@ -447,7 +630,10 @@ class _DayCell extends StatelessWidget {
     // Weekend numbers in grey, as iOS Calendar sets them.
     final isWeekend = date.weekday >= DateTime.saturday;
 
-    final onBand = marker == CalendarMarker.period;
+    // Under a filter the bands step aside, so what was filtered for is all
+    // there is to look at.
+    final drawn = filter == null ? marker : null;
+    final onBand = drawn == CalendarMarker.period;
     final foreground = onBand
         ? scheme.onPrimary
         : isWeekend
@@ -499,93 +685,46 @@ class _DayCell extends StatelessWidget {
           ),
           child: SizedBox(
             height: extent,
-            child: CustomPaint(
-              painter: BandPainter(
-                marker: marker,
-                joinsLeft: left,
-                joinsRight: right,
-                fadesOut: fadesOut,
-                colors: MarkerColors.of(scheme),
-                scale: scale,
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // The number sits a little above centre, leaving room
-                  // beneath it, inside the band, for the day's mark.
-                  Align(
-                    alignment: const Alignment(0, -0.2),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Today is a filled circle, as in iOS Calendar;
-                        // inverted on a period band so it still stands out.
-                        if (isToday)
-                          Container(
-                            width: 32 * scale,
-                            height: 32 * scale,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: onBand ? scheme.onPrimary : scheme.primary,
-                            ),
-                          ),
-                        Text(
-                          '${date.day}',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 19,
-                            color: isToday
-                                ? (onBand ? scheme.primary : scheme.onPrimary)
-                                : isFuture && !onBand
-                                ? foreground.withValues(alpha: 0.45)
-                                : foreground,
-                            fontWeight: isToday || onBand
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // A shape under the number rather than a tint of the cell,
-                  // so it survives being seen by someone who cannot tell the
-                  // tints apart. A heart for sex takes the dot's place: it is
-                  // a logged day too, and one mark reads cleaner than two.
-                  if (hadSex || hadTest || isLogged)
+            // Under a filter, days that do not match fade back so the ones
+            // that do stand out; today stays, to keep her bearings.
+            child: AnimatedOpacity(
+              opacity: matches || isToday ? 1 : 0.3,
+              duration: const Duration(milliseconds: 220),
+              child: CustomPaint(
+                painter: BandPainter(
+                  marker: drawn,
+                  joinsLeft: left,
+                  joinsRight: right,
+                  fadesOut: fadesOut,
+                  colors: MarkerColors.of(scheme),
+                  scale: scale,
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // The number sits a little above centre, leaving room
+                    // beneath it, inside the band, for the day's mark.
                     Align(
-                      alignment: const Alignment(0, 0.6),
-                      child: hadSex || hadTest
-                          // Icons for the two things worth spotting at a
-                          // glance, side by side on a day with both; the
-                          // plain dot for anything else logged.
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (hadSex)
-                                  Icon(
-                                    CupertinoIcons.heart_fill,
-                                    size: 9 * scale,
-                                    color: onBand
-                                        ? scheme.onPrimary
-                                        : scheme.primary,
-                                  ),
-                                if (hadSex && hadTest)
-                                  SizedBox(width: 2 * scale),
-                                if (hadTest)
-                                  Icon(
-                                    CupertinoIcons.plus_slash_minus,
-                                    // The glyph sits small in its box, so it
-                                    // needs a larger size to match the heart.
-                                    size: 14 * scale,
-                                    color: onBand
-                                        ? scheme.onPrimary
-                                        : scheme.primary,
-                                  ),
-                              ],
-                            )
-                          : Container(
-                              width: 5 * scale,
-                              height: 5 * scale,
+                      alignment: const Alignment(0, -0.2),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // A day that matches the filter gets a soft disc.
+                          if (filter != null && matches && !isToday)
+                            Container(
+                              width: 34 * scale,
+                              height: 34 * scale,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: scheme.primary.withValues(alpha: 0.16),
+                              ),
+                            ),
+                          // Today is a filled circle, as in iOS Calendar;
+                          // inverted on a period band so it still stands out.
+                          if (isToday)
+                            Container(
+                              width: 32 * scale,
+                              height: 32 * scale,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: onBand
@@ -593,8 +732,75 @@ class _DayCell extends StatelessWidget {
                                     : scheme.primary,
                               ),
                             ),
+                          Text(
+                            '${date.day}',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 19,
+                              color: isToday
+                                  ? (onBand ? scheme.primary : scheme.onPrimary)
+                                  : isFuture && !onBand
+                                  ? foreground.withValues(alpha: 0.45)
+                                  : foreground,
+                              fontWeight: isToday || onBand
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                ],
+                    // A shape under the number rather than a tint of the cell,
+                    // so it survives being seen by someone who cannot tell the
+                    // tints apart. A heart for sex takes the dot's place: it is
+                    // a logged day too, and one mark reads cleaner than two.
+                    if (hadSex || hadTest || isLogged)
+                      Align(
+                        alignment: const Alignment(0, 0.6),
+                        child: hadSex || hadTest
+                            // Icons for the two things worth spotting at a
+                            // glance, side by side on a day with both; the
+                            // plain dot for anything else logged.
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (hadSex)
+                                    Icon(
+                                      CupertinoIcons.heart_fill,
+                                      size: 9 * scale,
+                                      color: onBand
+                                          ? scheme.onPrimary
+                                          : scheme.primary,
+                                    ),
+                                  if (hadSex && hadTest)
+                                    SizedBox(width: 2 * scale),
+                                  if (hadTest)
+                                    PregnancyTestMark(
+                                      size: 11 * scale,
+                                      color: onBand
+                                          ? scheme.onPrimary
+                                          : scheme.primary,
+                                      onColor: onBand
+                                          ? scheme.primary
+                                          : scheme.onPrimary,
+                                    ),
+                                ],
+                              )
+                            : Container(
+                                width: 5 * scale,
+                                height: 5 * scale,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: onBand
+                                      ? scheme.onPrimary
+                                      : scheme.primary,
+                                ),
+                              ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -706,10 +912,10 @@ Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
                 l10n.sexHeading,
               ),
               item(
-                Icon(
-                  CupertinoIcons.plus_slash_minus,
-                  size: 17,
+                PregnancyTestMark(
+                  size: 14,
                   color: scheme.primary,
+                  onColor: scheme.onPrimary,
                 ),
                 l10n.pregnancyTestLabel,
               ),
