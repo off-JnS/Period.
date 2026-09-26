@@ -200,6 +200,20 @@ already has data.
 **What:** an icon beside every row, heading and option; gentle animations
 where something appears, changes or is saved. Respects Reduce Motion.
 
+### 15. Scrolling calendar 🔨 — built, awaiting review
+
+**What:** every month in one continuous scroll, up into the past and down
+into the estimate, with a Today button to come back. Each period drawn as one
+filled band across its days (every day with flow, not only the start); the
+estimated period a dashed band; the fertile window, if opted in, a plain
+band. Under each month's name, one line per thing it holds — "Period May 3 –
+May 7 · 5 days", the estimate as a range, the fertile window with its caveat
+in the same line (§8). Legend behind an info button.
+
+**How:** the whole history is read in two queries (`LogDao.loggedDays`);
+nothing stored, no migration. Period days are what she logged
+(`calendar_month.dart`), never inferred.
+
 ---
 
 ## Not building, and why

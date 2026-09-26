@@ -32,7 +32,7 @@ void main() {
       onAddEntry: () {},
     ),
     'Calendar': CalendarScreen(
-      data: CalendarViewData(year: 2024, month: 5, today: aDate(2024, 5, 17)),
+      data: CalendarViewData(today: aDate(2024, 5, 17)),
     ),
     'Your cycles': AnalysisScreen(
       data: analysisFrom(

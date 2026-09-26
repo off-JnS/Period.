@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
+import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/calendar/calendar_page.dart';
 
@@ -32,9 +33,11 @@ void main() {
     );
   }
 
+  Finder day(String pattern) => find.bySemanticsLabel(RegExp(pattern));
+
   testWidgets('opens on the current month', (tester) async {
     await pumpPage(tester);
-    expect(find.textContaining('May'), findsOneWidget);
+    expect(find.text('May'), findsOneWidget);
   });
 
   testWidgets('marks a stored period start', (tester) async {
@@ -42,24 +45,36 @@ void main() {
     await database.logDao.addPeriodStart(aDate(2024, 5, 3));
     await pumpPage(tester);
 
-    expect(
-      find.bySemanticsLabel(RegExp(r'May 3, 2024.*Period start')),
-      findsOneWidget,
-    );
+    expect(day(r'^May 3, 2024.*Period start'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('marks every day of a period, and says how long it was', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await database.logDao.addPeriodStart(aDate(2024, 5, 3));
+    for (var i = 0; i < 4; i++) {
+      await database.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 5, 3 + i), flow: FlowIntensity.medium),
+      );
+    }
+    await pumpPage(tester);
+
+    expect(day(r'^May 5, 2024.*Period'), findsOneWidget);
+    expect(day(r'^May 7, 2024.*Period'), findsNothing);
+    expect(find.text('Period May 3 – May 6 · 4 days'), findsOneWidget);
     handle.dispose();
   });
 
   testWidgets('marks a stored entry', (tester) async {
     final handle = tester.ensureSemantics();
     await database.logDao.saveEntry(
-      aDayEntry(date: aDate(2024, 5, 9), flow: FlowIntensity.light),
+      aDayEntry(date: aDate(2024, 5, 9), note: 'tired'),
     );
     await pumpPage(tester);
 
-    expect(
-      find.bySemanticsLabel(RegExp(r'May 9, 2024.*Logged')),
-      findsOneWidget,
-    );
+    expect(day(r'^May 9, 2024.*Logged'), findsOneWidget);
     handle.dispose();
   });
 
@@ -77,67 +92,88 @@ void main() {
     await pumpPage(tester);
 
     // Last start 22 April plus a 28-day median lands the window in late May.
+    expect(day(r'^May \d+, 2024.*Estimated period'), findsWidgets);
+    expect(find.textContaining('Next period, estimated'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('shows the fertile window only when she opted in', (
+    tester,
+  ) async {
+    for (final start in regularPeriodStarts(
+      from: aDate(2024, 2, 26),
+      length: 28,
+      count: 3,
+    )) {
+      await database.logDao.addPeriodStart(start);
+    }
+    await pumpPage(tester);
+    expect(find.textContaining('Fertile window'), findsNothing);
+
+    await database.settingsDao.saveCycleSettings(
+      const CycleSettings(fertileWindowOptedIn: true),
+    );
+    await tester.pumpWidget(const SizedBox());
+    await pumpPage(tester);
+    // The caveat travels with the marks, never behind a tap.
     expect(
-      find.bySemanticsLabel(RegExp(r'May \d+, 2024.*Estimated period')),
+      find.textContaining('Not suitable for preventing pregnancy'),
       findsWidgets,
     );
-    handle.dispose();
   });
 
-  testWidgets('steps to another month and reads it', (tester) async {
+  testWidgets('scrolls back to an earlier month and shows what is there', (
+    tester,
+  ) async {
     final handle = tester.ensureSemantics();
-    await database.logDao.addPeriodStart(aDate(2024, 4, 11));
+    await database.logDao.addPeriodStart(aDate(2023, 11, 11));
     await pumpPage(tester);
 
-    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('April'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(RegExp(r'April 11, 2024.*Period start')),
-      findsOneWidget,
+    await tester.scrollUntilVisible(
+      find.text('November 2023'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    expect(day(r'^November 11, 2023.*Period start'), findsOneWidget);
     handle.dispose();
   });
 
-  testWidgets('logging a past day from the grid persists it', (tester) async {
+  testWidgets('Today brings the current month back', (tester) async {
     await pumpPage(tester);
-
-    // The 6th: in the past, and unique in a Sunday-first May 2024 grid.
-    await tester.tap(
-      find
-          .ancestor(of: find.text('6'), matching: find.byType(InkResponse))
-          .first,
-    );
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 3000));
     await tester.pumpAndSettle();
+    expect(find.text('May'), findsNothing);
 
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.text('May'), findsOneWidget);
+  });
+
+  Future<void> logMay6(WidgetTester tester) async {
+    await tester.tap(day(r'^May 6, 2024'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('logging a past day from the grid persists it', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpPage(tester);
+    await logMay6(tester);
 
     expect(await database.logDao.allPeriodStarts(), [aDate(2024, 5, 6)]);
+    handle.dispose();
   });
 
   testWidgets('the grid shows it immediately afterwards', (tester) async {
     final handle = tester.ensureSemantics();
     await pumpPage(tester);
+    await logMay6(tester);
 
-    await tester.tap(
-      find
-          .ancestor(of: find.text('6'), matching: find.byType(InkResponse))
-          .first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.bySemanticsLabel(RegExp(r'May 6, 2024.*Period start')),
-      findsOneWidget,
-    );
+    expect(day(r'^May 6, 2024.*Period start'), findsOneWidget);
     handle.dispose();
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/database/daos/log_dao.dart';
 import '../../data/database/daos/settings_dao.dart';
+import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/clock.dart';
 import '../../domain/models/cycle_date.dart';
@@ -10,9 +11,8 @@ import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../log/log_entry_screen.dart';
 import 'calendar_screen.dart';
-import 'month_grid.dart';
 
-/// Loads a month and hands it to [CalendarScreen].
+/// Loads what the calendar shows and hands it to [CalendarScreen].
 ///
 /// The same split as `TodayPage`: the database stops here. The estimated window
 /// is recomputed from the stored period starts on every load rather than being
@@ -46,51 +46,41 @@ class CalendarPage extends StatefulWidget {
 }
 
 class _CalendarPageState extends State<CalendarPage> {
-  late int _year;
-  late int _month;
   CalendarViewData? _data;
   Object? _error;
 
   @override
   void initState() {
     super.initState();
-    final today = widget.clock.today();
-    _year = today.year;
-    _month = today.month;
     _load();
   }
 
+  /// Reads the whole history at once. The calendar scrolls through all of
+  /// it, and two small queries over every logged day cost less than reading
+  /// month by month as she scrolls.
   Future<void> _load() async {
     try {
       final today = widget.clock.today();
       final starts = await widget.logDao.allPeriodStarts();
       final settings = await widget.settingsDao.cycleSettings();
-
-      // Only the days on screen are read, including the neighbouring-month days
-      // the grid shows, so a long history does not make opening a month slower.
-      final grid = monthGrid(
-        year: _year,
-        month: _month,
-        // Any week start covers at least the month itself; the exact locale
-        // offset only matters for layout, which the screen does.
-        firstDayOfWeekIndex: 1,
-      );
-      final entries = await widget.logDao.entriesBetween(
-        grid.days.first.subtractDays(7),
-        grid.days.last.addDays(7),
+      final days = await widget.logDao.loggedDays();
+      final prediction = predictNextPeriod(
+        periodStarts: starts,
+        settings: settings,
       );
 
       if (!mounted) return;
       setState(() {
         _error = null;
         _data = CalendarViewData(
-          year: _year,
-          month: _month,
           today: today,
           periodStarts: starts.toSet(),
-          loggedDays: {for (final entry in entries) entry.date},
-          predicted: predictedWindowOrNull(
-            predictNextPeriod(periodStarts: starts, settings: settings),
+          flowByDay: days.flow,
+          loggedDays: days.logged,
+          predicted: predictedWindowOrNull(prediction),
+          fertileWindow: estimateFertileWindow(
+            prediction: prediction,
+            optedIn: settings.fertileWindowOptedIn,
           ),
         );
       });
@@ -98,15 +88,6 @@ class _CalendarPageState extends State<CalendarPage> {
       if (!mounted) return;
       setState(() => _error = error);
     }
-  }
-
-  void _step(int months) {
-    final total = (_year * 12 + _month - 1) + months;
-    setState(() {
-      _year = total ~/ 12;
-      _month = total % 12 + 1;
-    });
-    _load();
   }
 
   Future<void> _openDay(CycleDate date) async {
@@ -173,11 +154,6 @@ class _CalendarPageState extends State<CalendarPage> {
       );
     }
 
-    return CalendarScreen(
-      data: data,
-      onPreviousMonth: () => _step(-1),
-      onNextMonth: () => _step(1),
-      onSelectDay: _openDay,
-    );
+    return CalendarScreen(data: data, onSelectDay: _openDay);
   }
 }

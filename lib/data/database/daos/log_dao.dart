@@ -92,6 +92,41 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
     ];
   }
 
+  /// Every day she logged anything on, and the flow of those that have one.
+  ///
+  /// Two plain queries over the whole history, rather than [entriesBetween]'s
+  /// query per day: the calendar scrolls through all of it, and needs only
+  /// which days carry something and which carry bleeding, not what.
+  Future<({Set<CycleDate> logged, Map<CycleDate, FlowIntensity> flow})>
+  loggedDays() async {
+    final entries = await (selectOnly(
+      dayEntries,
+    )..addColumns([dayEntries.date, dayEntries.flow])).get();
+    final symptomDays = await (selectOnly(
+      daySymptoms,
+      distinct: true,
+    )..addColumns([daySymptoms.date])).get();
+
+    final flow = <CycleDate, FlowIntensity>{};
+    final logged = <CycleDate>{};
+    for (final row in entries) {
+      final date = dayEntries.date.converter.fromSql(
+        row.read(dayEntries.date)!,
+      );
+      logged.add(date);
+      final raw = row.read(dayEntries.flow);
+      if (raw != null) {
+        flow[date] = dayEntries.flow.converter.fromSql(raw)!;
+      }
+    }
+    for (final row in symptomDays) {
+      logged.add(
+        daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
+      );
+    }
+    return (logged: logged, flow: flow);
+  }
+
   /// Writes [entry], replacing whatever was logged on that day.
   ///
   /// The entry and its symptoms are written in one transaction, so a day is

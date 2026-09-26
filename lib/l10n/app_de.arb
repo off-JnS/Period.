@@ -253,5 +253,13 @@
   "conditionThyroid": "Schilddrüsenerkrankung",
   "conditionPmdd": "PMDS",
   "reportProfileHeading": "Eigene Angaben",
-  "reportAge": "Alter dieses Jahr"
+  "reportAge": "Alter dieses Jahr",
+  "calendarLegendButton": "Zeichenerklärung",
+  "legendPeriodDay": "Periode",
+  "legendTapHint": "Tippe auf einen vergangenen Tag oder heute, um ihn einzutragen.",
+  "calendarPeriodFinished": "Periode {range} · {length}",
+  "calendarPeriodOngoing": "Periode seit {date}",
+  "calendarPeriodStarted": "Periode begonnen am {date}",
+  "calendarEstimateSummary": "Nächste Periode, geschätzt: {range}",
+  "calendarFertileSummary": "Fruchtbares Fenster, geschätzt: {range}. Nicht zur Schwangerschaftsverhütung geeignet"
 }

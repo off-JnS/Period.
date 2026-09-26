@@ -857,5 +857,42 @@
   "reportAge": "Age this year",
   "@reportAge": {
     "description": "Report row."
+  },
+  "calendarLegendButton": "What the marks mean",
+  "@calendarLegendButton": {
+    "description": "Calendar: accessible name of the info button, and the title of the sheet it opens."
+  },
+  "legendPeriodDay": "Period",
+  "@legendPeriodDay": {
+    "description": "Calendar legend: a filled band marks every day of a period she logged."
+  },
+  "legendTapHint": "Tap a past day or today to log it.",
+  "@legendTapHint": {
+    "description": "Calendar legend sheet: how to log from the calendar."
+  },
+  "calendarPeriodFinished": "Period {range} · {length}",
+  "@calendarPeriodFinished": {
+    "description": "Calendar month summary for a finished period, e.g. 'Period Sep 3 – Sep 7 · 5 days'.",
+    "placeholders": { "range": { "type": "String" }, "length": { "type": "String" } }
+  },
+  "calendarPeriodOngoing": "Period since {date}",
+  "@calendarPeriodOngoing": {
+    "description": "Calendar month summary for a period still running.",
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "calendarPeriodStarted": "Period started {date}",
+  "@calendarPeriodStarted": {
+    "description": "Calendar month summary for a start with no flow logged, so no length is known.",
+    "placeholders": { "date": { "type": "String" } }
+  },
+  "calendarEstimateSummary": "Next period, estimated: {range}",
+  "@calendarEstimateSummary": {
+    "description": "Calendar month summary for the estimated window. Always a range and always 'estimated' (CLAUDE.md §8).",
+    "placeholders": { "range": { "type": "String" } }
+  },
+  "calendarFertileSummary": "Fertile window, estimated: {range}. Not suitable for preventing pregnancy",
+  "@calendarFertileSummary": {
+    "description": "Calendar month summary for the fertile window. The caveat is part of the line so it is always visible with the marks (CLAUDE.md §8).",
+    "placeholders": { "range": { "type": "String" } }
   }
 }

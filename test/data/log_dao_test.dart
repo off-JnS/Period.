@@ -312,4 +312,47 @@ void main() {
     await db.logDao.saveEntry(aDayEntry(date: day, flow: FlowIntensity.light));
     expect((await db.logDao.entryOn(day))!.temperatureCentiCelsius, isNull);
   });
+
+  group('loggedDays', () {
+    test('is empty with nothing logged', () async {
+      final days = await db.logDao.loggedDays();
+      expect(days.logged, isEmpty);
+      expect(days.flow, isEmpty);
+    });
+
+    test('lists every logged day and the flow of those with one', () async {
+      await db.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 3, 1), flow: FlowIntensity.heavy),
+      );
+      await db.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 3, 2), flow: FlowIntensity.none),
+      );
+      await db.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 3, 9), note: 'tired'),
+      );
+      await db.logDao.saveEntry(
+        aDayEntry(date: aDate(2023, 12, 31), symptoms: {aSymptom()}),
+      );
+
+      final days = await db.logDao.loggedDays();
+      expect(days.logged, {
+        aDate(2024, 3, 1),
+        aDate(2024, 3, 2),
+        aDate(2024, 3, 9),
+        aDate(2023, 12, 31),
+      });
+      expect(days.flow, {
+        aDate(2024, 3, 1): FlowIntensity.heavy,
+        aDate(2024, 3, 2): FlowIntensity.none,
+      });
+    });
+
+    test('forgets a deleted day', () async {
+      await db.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 3, 1), flow: FlowIntensity.light),
+      );
+      await db.logDao.deleteEntry(aDate(2024, 3, 1));
+      expect((await db.logDao.loggedDays()).logged, isEmpty);
+    });
+  });
 }
