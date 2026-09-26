@@ -82,6 +82,10 @@ const offeredDischargeKeys = <String>[
 /// "safe" (CLAUDE.md §8, docs/cycle-logic.md §7).
 const offeredSexKeys = <String>['sex.none', 'sex.protected', 'sex.unprotected'];
 
+/// The sex keys that mean she had sex, protected or not. `sex.none` is a
+/// recorded "no", not an absence of a record.
+const hadSexKeys = <String>['sex.protected', 'sex.unprotected'];
+
 /// The pill was taken that day. Offered in the hormonal contraception mode.
 const pillTakenKey = 'pill.taken';
 

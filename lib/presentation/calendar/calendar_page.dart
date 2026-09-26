@@ -79,6 +79,7 @@ class _CalendarPageState extends State<CalendarPage> {
           periodStarts: starts.toSet(),
           flowByDay: days.flow,
           loggedDays: days.logged,
+          sexDays: days.sex,
           predicted: predictedWindowOrNull(prediction),
           fertileWindow: estimateFertileWindow(
             prediction: prediction,

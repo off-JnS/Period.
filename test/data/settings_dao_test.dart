@@ -220,9 +220,7 @@ void main() {
 
     test('every method and condition round-trips', () async {
       for (final method in ContraceptionMethod.values) {
-        await database.settingsDao.saveProfile(
-          Profile(contraception: method),
-        );
+        await database.settingsDao.saveProfile(Profile(contraception: method));
         expect((await read()).contraception, method);
       }
       await database.settingsDao.saveProfile(
@@ -237,8 +235,9 @@ void main() {
       );
       await database.settingsDao.saveProfile(const Profile());
       expect(await read(), const Profile());
-      final keys = (await database.select(database.appSettings).get())
-          .map((row) => row.settingKey);
+      final keys = (await database.select(database.appSettings).get()).map(
+        (row) => row.settingKey,
+      );
       expect(keys.where((key) => key.startsWith('profile_')), isEmpty);
     });
 
@@ -248,10 +247,7 @@ void main() {
       await storeRaw(SettingKeys.profilePeriodLength, 'five');
       await storeRaw(SettingKeys.profileContraception, 'tomorrowPill');
       await storeRaw(SettingKeys.profileConditions, 'pcos,,somethingNew');
-      expect(
-        await read(),
-        const Profile(conditions: {KnownCondition.pcos}),
-      );
+      expect(await read(), const Profile(conditions: {KnownCondition.pcos}));
     });
 
     test('does not disturb the other settings', () async {

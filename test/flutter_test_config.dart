@@ -61,7 +61,8 @@ Future<void> _loadFonts() async {
 Directory _packageDirectory(String package, String subdirectory) {
   final config = File('.dart_tool/package_config.json');
   final packages =
-      (jsonDecode(config.readAsStringSync()) as Map<String, Object?>)['packages']
+      (jsonDecode(config.readAsStringSync())
+              as Map<String, Object?>)['packages']
           as List<Object?>;
   final entry = packages.cast<Map<String, Object?>>().firstWhere(
     (entry) => entry['name'] == package,

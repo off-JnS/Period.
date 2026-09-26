@@ -165,7 +165,10 @@ Instead:
 - Predictions are windows, never single dates. "26.–30." not "28th".
 - Say "estimated", "based on your entries", "usually".
 - The fertile window view always carries a visible note that it is an estimate and
-  not suitable for contraception.
+  not suitable for contraception. In the calendar (owner's decision, 2026-09-26)
+  that note is a dialog she confirms when turning the window on, plus the text
+  beside the switch, the ⓘ legend and each fertile day's preview, rather than
+  a line under every month.
 - Irregularity hints are phrased as "this might be worth mentioning to a doctor",
   never as a finding.
 

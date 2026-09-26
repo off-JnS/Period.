@@ -46,31 +46,33 @@ void main() {
       expect(periods.single.lastDay, aDate(2024, 9, 7));
     });
 
-    test('a period crossing into the next month belongs to its start month',
-        () {
-      final start = aDate(2024, 8, 30);
-      final flowByDay = flow(run(start, 5));
-      final starts = [start];
+    test(
+      'a period crossing into the next month belongs to its start month',
+      () {
+        final start = aDate(2024, 8, 30);
+        final flowByDay = flow(run(start, 5));
+        final starts = [start];
 
-      final august = periodsStartingIn(
-        year: 2024,
-        month: 8,
-        starts: starts,
-        flowByDay: flowByDay,
-        today: today,
-      );
-      expect(august.single.lastDay, aDate(2024, 9, 3));
-      expect(
-        periodsStartingIn(
+        final august = periodsStartingIn(
           year: 2024,
-          month: 9,
+          month: 8,
           starts: starts,
           flowByDay: flowByDay,
           today: today,
-        ),
-        isEmpty,
-      );
-    });
+        );
+        expect(august.single.lastDay, aDate(2024, 9, 3));
+        expect(
+          periodsStartingIn(
+            year: 2024,
+            month: 9,
+            starts: starts,
+            flowByDay: flowByDay,
+            today: today,
+          ),
+          isEmpty,
+        );
+      },
+    );
 
     test('an ongoing period has no last day yet', () {
       final start = aDate(2024, 9, 18);
@@ -129,10 +131,7 @@ void main() {
     final start = aDate(2024, 9, 3);
 
     test('a start is a period day even with no flow logged', () {
-      expect(
-        isPeriodDay(start, starts: {start}, flowByDay: const {}),
-        isTrue,
-      );
+      expect(isPeriodDay(start, starts: {start}, flowByDay: const {}), isTrue);
     });
 
     test('light, medium and heavy flow are period days; none is not', () {
@@ -158,12 +157,8 @@ void main() {
   });
 
   group('rangeTouchesMonth', () {
-    bool touches(CycleDate from, CycleDate to) => rangeTouchesMonth(
-      earliest: from,
-      latest: to,
-      year: 2024,
-      month: 9,
-    );
+    bool touches(CycleDate from, CycleDate to) =>
+        rangeTouchesMonth(earliest: from, latest: to, year: 2024, month: 9);
 
     test('inside, straddling either end, and outside', () {
       expect(touches(aDate(2024, 9, 10), aDate(2024, 9, 14)), isTrue);

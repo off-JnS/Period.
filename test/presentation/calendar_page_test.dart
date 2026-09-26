@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
@@ -107,17 +108,22 @@ void main() {
       await database.logDao.addPeriodStart(start);
     }
     await pumpPage(tester);
-    expect(find.textContaining('Fertile window'), findsNothing);
+    await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+    await tester.pumpAndSettle();
+    expect(find.text('Estimated fertile window'), findsNothing);
 
     await database.settingsDao.saveCycleSettings(
       const CycleSettings(fertileWindowOptedIn: true),
     );
     await tester.pumpWidget(const SizedBox());
     await pumpPage(tester);
-    // The caveat travels with the marks, never behind a tap.
+    // The caveat comes with the legend now that the window is drawn.
+    await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+    await tester.pumpAndSettle();
+    expect(find.text('Estimated fertile window'), findsOneWidget);
     expect(
       find.textContaining('Not suitable for preventing pregnancy'),
-      findsWidgets,
+      findsOneWidget,
     );
   });
 
@@ -248,5 +254,24 @@ void main() {
       expect(find.textContaining('Cycle day'), findsNothing);
       handle.dispose();
     });
+  });
+
+  testWidgets('shows a heart on a day she recorded sex, not on a "no"', (
+    tester,
+  ) async {
+    await database.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 5, 9),
+        symptoms: {aSymptom(key: 'sex.protected')},
+      ),
+    );
+    await database.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 5, 10),
+        symptoms: {aSymptom(key: 'sex.none')},
+      ),
+    );
+    await pumpPage(tester);
+    expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
   });
 }

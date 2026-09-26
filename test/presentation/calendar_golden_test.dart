@@ -37,6 +37,7 @@ void main() {
       aDate(2024, 5, 14),
       today,
     },
+    sexDays: {aDate(2024, 5, 11), aDate(2024, 5, 5)},
     predicted: PredictedPeriod(
       earliest: aDate(2024, 5, 29),
       latest: aDate(2024, 6, 2),
@@ -78,12 +79,7 @@ void main() {
   });
 
   testWidgets('dark mode', (tester) async {
-    await expectGolden(
-      tester,
-      everything,
-      'dark',
-      brightness: Brightness.dark,
-    );
+    await expectGolden(tester, everything, 'dark', brightness: Brightness.dark);
   });
 
   testWidgets('German, which starts the week on Monday', (tester) async {

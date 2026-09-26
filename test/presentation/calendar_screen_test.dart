@@ -63,9 +63,7 @@ void main() {
       expect(day('^April 30, 2024'), findsNothing);
     });
 
-    testWidgets('names months of other years with their year', (
-      tester,
-    ) async {
+    testWidgets('names months of other years with their year', (tester) async {
       await pump(tester, data());
       await tester.scrollUntilVisible(
         find.text('December 2023'),
@@ -91,10 +89,7 @@ void main() {
       tester,
     ) async {
       await pump(tester, data());
-      await tester.drag(
-        find.byType(CustomScrollView),
-        const Offset(0, 20000),
-      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 20000));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.textContaining('20'), findsWidgets);
@@ -174,7 +169,8 @@ void main() {
         data(
           periodStarts: {aDate(2024, 5, 3)},
           flowByDay: {
-            for (var d = 3; d <= 7; d++) aDate(2024, 5, d): FlowIntensity.medium,
+            for (var d = 3; d <= 7; d++)
+              aDate(2024, 5, d): FlowIntensity.medium,
           },
           predicted: PredictedPeriod(
             earliest: aDate(2024, 5, 29),
@@ -186,9 +182,8 @@ void main() {
       expect(find.textContaining('estimated'), findsNothing);
     });
 
-    testWidgets('except the fertile window caveat, wherever it is drawn', (
-      tester,
-    ) async {
+    testWidgets('not even for the fertile window, whose caveat lives in the '
+        'legend, the preview and the switch', (tester) async {
       await pump(
         tester,
         data(
@@ -200,8 +195,25 @@ void main() {
       );
       expect(
         find.textContaining('Not suitable for preventing pregnancy'),
-        findsOneWidget,
+        findsNothing,
       );
+    });
+
+    testWidgets('a day she had sex carries a heart and says so', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        CalendarViewData(
+          today: today,
+          loggedDays: {aDate(2024, 5, 9)},
+          sexDays: {aDate(2024, 5, 9)},
+        ),
+      );
+      expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+      expect(day(r'^May 9, 2024.*Sex'), findsOneWidget);
+      handle.dispose();
     });
   });
 
@@ -216,6 +228,7 @@ void main() {
         'Estimated period',
         'Today',
         'Logged',
+        'Sex',
       ]) {
         expect(find.text(label), findsWidgets, reason: label);
       }

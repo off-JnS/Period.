@@ -21,14 +21,19 @@ class MarkerColors {
   /// The colours for [scheme].
   factory MarkerColors.of(ColorScheme scheme) => MarkerColors(
     period: scheme.primary,
-    estimateLine: scheme.tertiary,
+    // Every band is a shade of the app's own rose; the shapes tell them
+    // apart (filled, dashed, plain), the shade only agrees with them.
+    estimateLine: scheme.primary.withValues(alpha: 0.75),
     // Solid, pre-blended onto the card: a see-through wash would darken
     // where neighbouring days overlap.
     estimateWash: Color.alphaBlend(
-      scheme.tertiaryContainer.withValues(alpha: 0.6),
+      scheme.primary.withValues(alpha: 0.10),
       scheme.groupedCard,
     ),
-    fertile: scheme.secondaryContainer,
+    fertile: Color.alphaBlend(
+      scheme.primary.withValues(alpha: 0.20),
+      scheme.groupedCard,
+    ),
   );
 
   final Color period;
@@ -69,7 +74,7 @@ class BandPainter extends CustomPainter {
     final kind = marker;
     if (kind == null) return;
 
-    final height = math.min(size.height - 8, 36 * scale);
+    final height = math.min(size.height - 8, 46 * scale);
     if (height <= 0) return;
     final top = (size.height - height) / 2;
     const inset = 3.0;

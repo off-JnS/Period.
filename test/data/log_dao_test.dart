@@ -355,4 +355,29 @@ void main() {
       expect((await db.logDao.loggedDays()).logged, isEmpty);
     });
   });
+
+  test('loggedDays lists the days she had sex, protected or not', () async {
+    await db.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 3, 1),
+        symptoms: {aSymptom(key: 'sex.protected')},
+      ),
+    );
+    await db.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 3, 2),
+        symptoms: {aSymptom(key: 'sex.unprotected')},
+      ),
+    );
+    await db.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 3, 3),
+        symptoms: {aSymptom(key: 'sex.none')},
+      ),
+    );
+    expect((await db.logDao.loggedDays()).sex, {
+      aDate(2024, 3, 1),
+      aDate(2024, 3, 2),
+    });
+  });
 }

@@ -92,12 +92,19 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
     ];
   }
 
-  /// Every day she logged anything on, and the flow of those that have one.
+  /// Every day she logged anything on, the flow of those that have one, and
+  /// the days she recorded having sex.
   ///
   /// Two plain queries over the whole history, rather than [entriesBetween]'s
   /// query per day: the calendar scrolls through all of it, and needs only
   /// which days carry something and which carry bleeding, not what.
-  Future<({Set<CycleDate> logged, Map<CycleDate, FlowIntensity> flow})>
+  Future<
+    ({
+      Set<CycleDate> logged,
+      Map<CycleDate, FlowIntensity> flow,
+      Set<CycleDate> sex,
+    })
+  >
   loggedDays() async {
     final entries = await (selectOnly(
       dayEntries,
@@ -106,6 +113,12 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
       daySymptoms,
       distinct: true,
     )..addColumns([daySymptoms.date])).get();
+
+    final sexDays =
+        await (selectOnly(daySymptoms, distinct: true)
+              ..addColumns([daySymptoms.date])
+              ..where(daySymptoms.symptomKey.isIn(hadSexKeys)))
+            .get();
 
     final flow = <CycleDate, FlowIntensity>{};
     final logged = <CycleDate>{};
@@ -124,7 +137,14 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
         daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
       );
     }
-    return (logged: logged, flow: flow);
+    return (
+      logged: logged,
+      flow: flow,
+      sex: {
+        for (final row in sexDays)
+          daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
+      },
+    );
   }
 
   /// Writes [entry], replacing whatever was logged on that day.

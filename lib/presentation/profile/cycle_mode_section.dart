@@ -73,10 +73,17 @@ class CycleModeSection extends StatelessWidget {
                 SwitchGroup(
                   title: l10n.fertileWindowHeading,
                   value: settings.fertileWindowOptedIn,
-                  onChanged: (value) =>
-                      change(settings.copyWith(fertileWindowOptedIn: value)),
-                  // Section 8: the caveat sits beside the switch, visible
-                  // before she turns it on, never behind a tap.
+                  onChanged: (value) async {
+                    // Turning it on shows the caveat first, as a dialog she
+                    // has to answer: the calendar draws the window without
+                    // repeating it, so this is where it has to land.
+                    if (value && !await _confirmFertileWindow(context)) {
+                      return;
+                    }
+                    change(settings.copyWith(fertileWindowOptedIn: value));
+                  },
+                  // Section 8: the caveat also sits beside the switch,
+                  // visible before she turns it on, never behind a tap.
                   footer: l10n.fertileWindowCaveat,
                 ),
               ],
@@ -112,3 +119,26 @@ String modeFooter(AppLocalizations l10n, CycleMode mode) => switch (mode) {
   CycleMode.perimenopause => l10n.modePerimenopauseFooter,
 };
 
+/// Asks before the fertile window is turned on, stating what it is not.
+Future<bool> _confirmFertileWindow(BuildContext context) async {
+  final l10n = AppLocalizations.of(context);
+  final confirmed = await showCupertinoDialog<bool>(
+    context: context,
+    builder: (context) => CupertinoAlertDialog(
+      title: Text(l10n.fertileWindowHeading),
+      content: Text(l10n.fertileWindowCaveat),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        CupertinoDialogAction(
+          isDefaultAction: true,
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(l10n.fertileWindowTurnOn),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}

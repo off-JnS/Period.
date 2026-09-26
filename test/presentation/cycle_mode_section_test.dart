@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/cycle_mode.dart';
@@ -175,11 +176,46 @@ void main() {
       }
     });
 
-    testWidgets('turning it on reports the opt-in', (tester) async {
+    testWidgets('turning it on asks first, stating the caveat', (tester) async {
       final changes = await pumpScreen(tester, const CycleSettings());
       await tester.tap(find.text('Estimated fertile window'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(CupertinoAlertDialog),
+          matching: find.textContaining(
+            'Not suitable for preventing pregnancy',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(changes, isEmpty);
+
+      await tester.tap(find.text('Turn on'));
+      await tester.pumpAndSettle();
       expect(changes, [const CycleSettings(fertileWindowOptedIn: true)]);
+    });
+
+    testWidgets('Cancel leaves it off', (tester) async {
+      final changes = await pumpScreen(tester, const CycleSettings());
+      await tester.tap(find.text('Estimated fertile window'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(changes, isEmpty);
+    });
+
+    testWidgets('turning it off needs no dialog', (tester) async {
+      final changes = await pumpScreen(
+        tester,
+        const CycleSettings(fertileWindowOptedIn: true),
+      );
+      await tester.tap(find.text('Estimated fertile window'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoAlertDialog), findsNothing);
+      expect(changes, [const CycleSettings()]);
     });
   });
 
@@ -193,5 +229,4 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Trotzdem Schätzungen zeigen'), findsOneWidget);
   });
-
 }

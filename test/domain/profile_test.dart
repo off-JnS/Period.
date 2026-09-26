@@ -90,10 +90,7 @@ void main() {
     test('is empty until something is said', () {
       expect(const Profile().isEmpty, isTrue);
       expect(const Profile(birthYear: 1990).isEmpty, isFalse);
-      expect(
-        const Profile(conditions: {KnownCondition.pcos}).isEmpty,
-        isFalse,
-      );
+      expect(const Profile(conditions: {KnownCondition.pcos}).isEmpty, isFalse);
       expect(
         const Profile(contraception: ContraceptionMethod.none).isEmpty,
         isFalse,

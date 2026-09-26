@@ -26,6 +26,7 @@ class CalendarViewData {
     this.periodStarts = const {},
     this.flowByDay = const {},
     this.loggedDays = const {},
+    this.sexDays = const {},
     this.predicted,
     this.fertileWindow,
   });
@@ -42,6 +43,9 @@ class CalendarViewData {
 
   /// Days she logged anything on.
   final Set<CycleDate> loggedDays;
+
+  /// Days she recorded having sex, protected or not.
+  final Set<CycleDate> sexDays;
 
   /// The estimated next-period window, when there is one.
   final PredictedPeriod? predicted;
@@ -274,13 +278,11 @@ class _MonthSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
     final today = data.today;
     final isCurrent = year == today.year && month == today.month;
-    final fertile = data.fertileWindow;
 
     final grid = monthGrid(
       year: year,
@@ -345,33 +347,6 @@ class _MonthSection extends StatelessWidget {
                         : const SizedBox.shrink(),
                   ),
               ],
-            ),
-          // The one line of text a month may carry: section 8 wants the
-          // fertile window's caveat visible wherever the window is drawn.
-          if (fertile != null &&
-              rangeTouchesMonth(
-                earliest: fertile.earliest,
-                latest: fertile.latest,
-                year: year,
-                month: month,
-              ))
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const MarkerSwatch(CalendarMarker.fertile, size: 12),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      l10n.calendarFertileNote,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
         ],
       ),
@@ -444,11 +419,12 @@ class _DayCell extends StatelessWidget {
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
-    final extent = 54.0 * scale;
+    final extent = 58.0 * scale;
 
     final isToday = date == data.today;
     final isFuture = date.isAfter(data.today);
     final isLogged = data.loggedDays.contains(date);
+    final hadSex = data.sexDays.contains(date);
     final marker = _markerOn(date);
     final previous = date.subtractDays(1);
     final next = date.addDays(1);
@@ -483,6 +459,7 @@ class _DayCell extends StatelessWidget {
       else if (marker == CalendarMarker.period)
         l10n.legendPeriodDay,
       if (isLogged && marker != CalendarMarker.period) l10n.legendLogged,
+      if (hadSex) l10n.sexHeading,
       if (marker == CalendarMarker.estimated) l10n.legendEstimated,
       if (marker == CalendarMarker.fertile) l10n.fertileWindowHeading,
       if (isFuture) l10n.dayNotYetHappened,
@@ -524,54 +501,70 @@ class _DayCell extends StatelessWidget {
                 colors: MarkerColors.of(scheme),
                 scale: scale,
               ),
-              child: Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Today is a filled circle, as in iOS Calendar; inverted
-                    // on a period band so it still stands out there.
-                    if (isToday)
-                      Container(
-                        width: 34 * scale,
-                        height: 34 * scale,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: onBand ? scheme.onPrimary : scheme.primary,
-                        ),
-                      ),
-                    Text(
-                      '${date.day}',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontSize: 19,
-                        color: isToday
-                            ? (onBand ? scheme.primary : scheme.onPrimary)
-                            : isFuture && !onBand
-                            ? foreground.withValues(alpha: 0.45)
-                            : foreground,
-                        fontWeight: isToday || onBand
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    // A shape under the number rather than a tint of the cell,
-                    // so it survives being seen by someone who cannot tell the
-                    // tints apart.
-                    if (isLogged)
-                      Positioned(
-                        bottom: -11 * scale,
-                        child: Container(
-                          width: 5 * scale,
-                          height: 5 * scale,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: onBand ? scheme.onPrimary : scheme.primary,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // The number sits a little above centre, leaving room
+                  // beneath it, inside the band, for the day's mark.
+                  Align(
+                    alignment: const Alignment(0, -0.2),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Today is a filled circle, as in iOS Calendar;
+                        // inverted on a period band so it still stands out.
+                        if (isToday)
+                          Container(
+                            width: 32 * scale,
+                            height: 32 * scale,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: onBand ? scheme.onPrimary : scheme.primary,
+                            ),
+                          ),
+                        Text(
+                          '${date.day}',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 19,
+                            color: isToday
+                                ? (onBand ? scheme.primary : scheme.onPrimary)
+                                : isFuture && !onBand
+                                ? foreground.withValues(alpha: 0.45)
+                                : foreground,
+                            fontWeight: isToday || onBand
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
-                      ),
-                  ],
-                ),
+                      ],
+                    ),
+                  ),
+                  // A shape under the number rather than a tint of the cell,
+                  // so it survives being seen by someone who cannot tell the
+                  // tints apart. A heart for sex takes the dot's place: it is
+                  // a logged day too, and one mark reads cleaner than two.
+                  if (hadSex || isLogged)
+                    Align(
+                      alignment: const Alignment(0, 0.6),
+                      child: hadSex
+                          ? Icon(
+                              CupertinoIcons.heart_fill,
+                              size: 9 * scale,
+                              color: onBand ? scheme.onPrimary : scheme.primary,
+                            )
+                          : Container(
+                              width: 5 * scale,
+                              height: 5 * scale,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: onBand
+                                    ? scheme.onPrimary
+                                    : scheme.primary,
+                              ),
+                            ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -673,6 +666,14 @@ Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
                   ),
                 ),
                 l10n.legendLogged,
+              ),
+              item(
+                Icon(
+                  CupertinoIcons.heart_fill,
+                  size: 12,
+                  color: scheme.primary,
+                ),
+                l10n.sexHeading,
               ),
               const SizedBox(height: 8),
               Text(

@@ -71,6 +71,8 @@ void main() {
       await pumpPage(tester);
       await tester.tap(find.text('Estimated fertile window'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Turn on'));
+      await tester.pumpAndSettle();
 
       expect(
         (await database.settingsDao.cycleSettings()).fertileWindowOptedIn,
@@ -165,11 +167,11 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Hormonal IUD'));
       await tester.pumpAndSettle();
 
+      expect((await stored()).contraception, ContraceptionMethod.hormonalIud);
       expect(
-        (await stored()).contraception,
-        ContraceptionMethod.hormonalIud,
+        find.textContaining('Switch to the contraception mode?'),
+        findsOne,
       );
-      expect(find.textContaining('Switch to the contraception mode?'), findsOne);
       expect(
         (await database.settingsDao.cycleSettings()).mode,
         CycleMode.natural,
@@ -181,7 +183,10 @@ void main() {
         (await database.settingsDao.cycleSettings()).mode,
         CycleMode.hormonalContraception,
       );
-      expect(find.textContaining('Switch to the contraception mode?'), findsNothing);
+      expect(
+        find.textContaining('Switch to the contraception mode?'),
+        findsNothing,
+      );
       expect(affected, 1);
     });
 
@@ -193,10 +198,10 @@ void main() {
       await tester.pump();
       await tester.tap(find.bySemanticsLabel('Endometriosis'));
       await tester.pumpAndSettle();
-      expect(
-        (await stored()).conditions,
-        {KnownCondition.pcos, KnownCondition.endometriosis},
-      );
+      expect((await stored()).conditions, {
+        KnownCondition.pcos,
+        KnownCondition.endometriosis,
+      });
 
       await tester.tap(find.bySemanticsLabel('PCOS'));
       await tester.pumpAndSettle();
