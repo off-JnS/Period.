@@ -13,5 +13,7 @@ IconData entryLineIcon(EntryLineKind kind) => switch (kind) {
   EntryLineKind.pill => CupertinoIcons.capsule,
   EntryLineKind.temperature => CupertinoIcons.thermometer,
   EntryLineKind.ovulationTest => CupertinoIcons.lab_flask,
+  // A test's two outcomes, rather than anything that reads as a verdict.
+  EntryLineKind.pregnancyTest => CupertinoIcons.plus_slash_minus,
   EntryLineKind.note => CupertinoIcons.text_quote,
 };

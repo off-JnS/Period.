@@ -133,7 +133,8 @@ class ProfileScreen extends StatelessWidget {
                   current: profile.birthYear,
                   initial: currentYear - 25,
                   format: (year) => '$year',
-                  onPicked: (year) => _change(profile.copyWith(birthYear: year)),
+                  onPicked: (year) =>
+                      _change(profile.copyWith(birthYear: year)),
                 ),
               ),
               const Divider(indent: 56),
@@ -289,7 +290,9 @@ class _Header extends StatelessWidget {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              age == null ? l10n.profileEmptyPrompt : l10n.profileAgeThisYear(age),
+              age == null
+                  ? l10n.profileEmptyPrompt
+                  : l10n.profileAgeThisYear(age),
               key: ValueKey(age),
               textAlign: TextAlign.center,
               style: age == null

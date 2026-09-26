@@ -27,6 +27,7 @@ class CalendarViewData {
     this.flowByDay = const {},
     this.loggedDays = const {},
     this.sexDays = const {},
+    this.pregnancyTestDays = const {},
     this.predicted,
     this.fertileWindow,
   });
@@ -46,6 +47,10 @@ class CalendarViewData {
 
   /// Days she recorded having sex, protected or not.
   final Set<CycleDate> sexDays;
+
+  /// Days she recorded a pregnancy test, whatever the result: the mark says
+  /// a test was taken, never what it showed.
+  final Set<CycleDate> pregnancyTestDays;
 
   /// The estimated next-period window, when there is one.
   final PredictedPeriod? predicted;
@@ -425,6 +430,7 @@ class _DayCell extends StatelessWidget {
     final isFuture = date.isAfter(data.today);
     final isLogged = data.loggedDays.contains(date);
     final hadSex = data.sexDays.contains(date);
+    final hadTest = data.pregnancyTestDays.contains(date);
     final marker = _markerOn(date);
     final previous = date.subtractDays(1);
     final next = date.addDays(1);
@@ -460,6 +466,7 @@ class _DayCell extends StatelessWidget {
         l10n.legendPeriodDay,
       if (isLogged && marker != CalendarMarker.period) l10n.legendLogged,
       if (hadSex) l10n.sexHeading,
+      if (hadTest) l10n.pregnancyTestLabel,
       if (marker == CalendarMarker.estimated) l10n.legendEstimated,
       if (marker == CalendarMarker.fertile) l10n.fertileWindowHeading,
       if (isFuture) l10n.dayNotYetHappened,
@@ -544,14 +551,37 @@ class _DayCell extends StatelessWidget {
                   // so it survives being seen by someone who cannot tell the
                   // tints apart. A heart for sex takes the dot's place: it is
                   // a logged day too, and one mark reads cleaner than two.
-                  if (hadSex || isLogged)
+                  if (hadSex || hadTest || isLogged)
                     Align(
                       alignment: const Alignment(0, 0.6),
-                      child: hadSex
-                          ? Icon(
-                              CupertinoIcons.heart_fill,
-                              size: 9 * scale,
-                              color: onBand ? scheme.onPrimary : scheme.primary,
+                      child: hadSex || hadTest
+                          // Icons for the two things worth spotting at a
+                          // glance, side by side on a day with both; the
+                          // plain dot for anything else logged.
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (hadSex)
+                                  Icon(
+                                    CupertinoIcons.heart_fill,
+                                    size: 9 * scale,
+                                    color: onBand
+                                        ? scheme.onPrimary
+                                        : scheme.primary,
+                                  ),
+                                if (hadSex && hadTest)
+                                  SizedBox(width: 2 * scale),
+                                if (hadTest)
+                                  Icon(
+                                    CupertinoIcons.plus_slash_minus,
+                                    // The glyph sits small in its box, so it
+                                    // needs a larger size to match the heart.
+                                    size: 14 * scale,
+                                    color: onBand
+                                        ? scheme.onPrimary
+                                        : scheme.primary,
+                                  ),
+                              ],
                             )
                           : Container(
                               width: 5 * scale,
@@ -674,6 +704,14 @@ Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
                   color: scheme.primary,
                 ),
                 l10n.sexHeading,
+              ),
+              item(
+                Icon(
+                  CupertinoIcons.plus_slash_minus,
+                  size: 17,
+                  color: scheme.primary,
+                ),
+                l10n.pregnancyTestLabel,
               ),
               const SizedBox(height: 8),
               Text(

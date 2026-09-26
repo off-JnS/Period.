@@ -78,7 +78,11 @@ class BandPainter extends CustomPainter {
     if (height <= 0) return;
     final top = (size.height - height) / 2;
     const inset = 3.0;
-    final radius = Radius.circular(height / 2);
+    // Never rounder than the cell is wide: at large text sizes the band
+    // grows taller than a day is wide, and a full half-height cap would
+    // overlap itself.
+    final cap = math.min(height / 2, size.width / 2 - inset);
+    final radius = Radius.circular(cap);
     // A joined side reaches half a pixel past the cell, so neighbouring
     // pieces overlap instead of leaving an anti-aliased seam between days.
     final openRight = joinsRight || fadesOut;
@@ -115,28 +119,48 @@ class BandPainter extends CustomPainter {
         canvas.drawRRect(shape, fill(colors.fertile));
       case CalendarMarker.estimated:
         canvas.drawRRect(shape, fill(colors.estimateWash));
-        _dashedOutline(canvas, rect, fill(colors.estimateLine), openRight);
+        _dashedOutline(canvas, rect, cap, fill(colors.estimateLine), openRight);
     }
   }
 
   /// The estimate's outline, dashed, left open where the band continues so
   /// the dashes run on across days instead of boxing each one in.
-  void _dashedOutline(Canvas canvas, Rect rect, Paint paint, bool openRight) {
+  void _dashedOutline(
+    Canvas canvas,
+    Rect rect,
+    double cap,
+    Paint paint,
+    bool openRight,
+  ) {
     final inner = rect.deflate(0.9);
-    final r = inner.height / 2;
+    final r = math.max(cap - 0.9, 0.0);
     final leftX = joinsLeft ? inner.left : inner.left + r;
     final rightX = openRight ? inner.right : inner.right - r;
     final path = Path()
       ..moveTo(leftX, inner.top)
       ..lineTo(rightX, inner.top);
+    // The ends are a quarter arc, a straight side and a quarter arc, which
+    // is a plain semicircle when the band is no taller than it is round.
     if (openRight) {
       path.moveTo(rightX, inner.bottom);
     } else {
-      path.arcToPoint(Offset(rightX, inner.bottom), radius: Radius.circular(r));
+      path
+        ..arcToPoint(
+          Offset(inner.right, inner.top + r),
+          radius: Radius.circular(r),
+        )
+        ..lineTo(inner.right, inner.bottom - r)
+        ..arcToPoint(Offset(rightX, inner.bottom), radius: Radius.circular(r));
     }
     path.lineTo(leftX, inner.bottom);
     if (!joinsLeft) {
-      path.arcToPoint(Offset(leftX, inner.top), radius: Radius.circular(r));
+      path
+        ..arcToPoint(
+          Offset(inner.left, inner.bottom - r),
+          radius: Radius.circular(r),
+        )
+        ..lineTo(inner.left, inner.top + r)
+        ..arcToPoint(Offset(leftX, inner.top), radius: Radius.circular(r));
     }
 
     paint

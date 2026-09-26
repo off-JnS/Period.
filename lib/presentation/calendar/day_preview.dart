@@ -145,7 +145,10 @@ class DayPreview extends StatelessWidget {
                       ? Column(
                           children: [
                             for (final line in lines)
-                              _Line(icon: entryLineIcon(line.kind), text: line.text),
+                              _Line(
+                                icon: entryLineIcon(line.kind),
+                                text: line.text,
+                              ),
                           ],
                         )
                       : Padding(

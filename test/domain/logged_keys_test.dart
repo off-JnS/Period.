@@ -11,6 +11,7 @@ void main() {
     ...offeredDischargeKeys,
     ...offeredSexKeys,
     ...offeredOvulationTestKeys,
+    ...offeredPregnancyTestKeys,
     pillTakenKey,
   ];
 

@@ -214,8 +214,9 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
       contraception: ContraceptionMethod.values
           .asNameMap()[values[SettingKeys.profileContraception]],
       conditions: {
-        for (final name
-            in (values[SettingKeys.profileConditions] ?? '').split(','))
+        for (final name in (values[SettingKeys.profileConditions] ?? '').split(
+          ',',
+        ))
           ?conditionNames[name],
       },
     );
@@ -224,9 +225,8 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   /// Stores [profile], replacing whatever was there. A field she cleared is
   /// deleted rather than kept as an empty value.
   Future<void> saveProfile(Profile profile) async {
-    Future<void> putOrClear(String key, Object? value) => value == null
-        ? _clear(key)
-        : _put(key, '$value');
+    Future<void> putOrClear(String key, Object? value) =>
+        value == null ? _clear(key) : _put(key, '$value');
 
     await transaction(() async {
       await putOrClear(SettingKeys.profileBirthYear, profile.birthYear);
@@ -254,9 +254,8 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  Future<void> _clear(String key) => (delete(
-    appSettings,
-  )..where((row) => row.settingKey.equals(key))).go();
+  Future<void> _clear(String key) =>
+      (delete(appSettings)..where((row) => row.settingKey.equals(key))).go();
 
   Future<Map<String, String>> _values() async {
     final rows = await select(appSettings).get();

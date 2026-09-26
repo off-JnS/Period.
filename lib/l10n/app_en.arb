@@ -915,5 +915,26 @@
   "countdownPastWindow": "later than estimated",
   "@countdownPastWindow": {
     "description": "Chip beside today's date once the estimated window has passed with no new period start. Plain, with no reason given."
+  },
+  "pregnancyTestLabel": "Pregnancy test",
+  "@pregnancyTestLabel": {
+    "description": "Label above the pregnancy test chips in the log sheet."
+  },
+  "pregnancyTestNegative": "Negative",
+  "@pregnancyTestNegative": {
+    "description": "Pregnancy test chip."
+  },
+  "pregnancyTestPositive": "Positive",
+  "@pregnancyTestPositive": {
+    "description": "Pregnancy test chip. Recorded only; the app draws no conclusion from it."
+  },
+  "pregnancyTestSummary": "Pregnancy test: {result}",
+  "@pregnancyTestSummary": {
+    "description": "Line describing a logged day.",
+    "placeholders": { "result": { "type": "String" } }
+  },
+  "doctorHintShort": "Cycles varied more than usual",
+  "@doctorHintShort": {
+    "description": "Today: the one-line irregularity hint. Tapping it shows the full wording (doctorHint)."
   }
 }

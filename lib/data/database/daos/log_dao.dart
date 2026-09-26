@@ -93,7 +93,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
   }
 
   /// Every day she logged anything on, the flow of those that have one, and
-  /// the days she recorded having sex.
+  /// the days she recorded having sex or taking a pregnancy test.
   ///
   /// Two plain queries over the whole history, rather than [entriesBetween]'s
   /// query per day: the calendar scrolls through all of it, and needs only
@@ -103,6 +103,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
       Set<CycleDate> logged,
       Map<CycleDate, FlowIntensity> flow,
       Set<CycleDate> sex,
+      Set<CycleDate> pregnancyTest,
     })
   >
   loggedDays() async {
@@ -114,11 +115,25 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
       distinct: true,
     )..addColumns([daySymptoms.date])).get();
 
-    final sexDays =
-        await (selectOnly(daySymptoms, distinct: true)
-              ..addColumns([daySymptoms.date])
-              ..where(daySymptoms.symptomKey.isIn(hadSexKeys)))
+    final marked =
+        await (selectOnly(daySymptoms)
+              ..addColumns([daySymptoms.date, daySymptoms.symptomKey])
+              ..where(
+                daySymptoms.symptomKey.isIn([
+                  ...hadSexKeys,
+                  ...offeredPregnancyTestKeys,
+                ]),
+              ))
             .get();
+    final sex = <CycleDate>{};
+    final pregnancyTest = <CycleDate>{};
+    for (final row in marked) {
+      final date = daySymptoms.date.converter.fromSql(
+        row.read(daySymptoms.date)!,
+      );
+      final key = row.read(daySymptoms.symptomKey)!;
+      (hadSexKeys.contains(key) ? sex : pregnancyTest).add(date);
+    }
 
     final flow = <CycleDate, FlowIntensity>{};
     final logged = <CycleDate>{};
@@ -137,14 +152,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
         daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
       );
     }
-    return (
-      logged: logged,
-      flow: flow,
-      sex: {
-        for (final row in sexDays)
-          daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
-      },
-    );
+    return (logged: logged, flow: flow, sex: sex, pregnancyTest: pregnancyTest);
   }
 
   /// Writes [entry], replacing whatever was logged on that day.

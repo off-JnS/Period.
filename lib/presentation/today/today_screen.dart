@@ -179,7 +179,7 @@ class _TodayScreenState extends State<TodayScreen> {
           curve: Curves.easeOutCubic,
           child: data.showDoctorHint && !_hintDismissed
               ? Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 4),
                   child: _DoctorHint(
                     onDismiss: () => setState(() => _hintDismissed = true),
                   ),
@@ -420,6 +420,11 @@ class _FertileWindowSection extends StatelessWidget {
   }
 }
 
+/// The irregularity hint as one quiet line, not a card of its own.
+///
+/// docs/cycle-logic.md §5 wants it rare and dismissible, and CLAUDE.md §8
+/// wants it worded as "worth mentioning", never a finding: the line says only
+/// what was seen, and tapping it shows the full wording.
 class _DoctorHint extends StatelessWidget {
   const _DoctorHint({required this.onDismiss});
 
@@ -429,16 +434,66 @@ class _DoctorHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
 
-    return SectionCard(
-      icon: CupertinoIcons.info_circle,
-      heading: l10n.doctorHint,
-      accent: theme.colorScheme.onSurface,
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
-      child: Align(
-        alignment: AlignmentDirectional.centerEnd,
-        child: TextButton(onPressed: onDismiss, child: Text(l10n.dismiss)),
-      ),
+    return Row(
+      children: [
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: l10n.doctorHint,
+            excludeSemantics: true,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => showCupertinoDialog<void>(
+                context: context,
+                barrierDismissible: true,
+                builder: (context) => CupertinoAlertDialog(
+                  content: Text(l10n.doctorHint),
+                  actions: [
+                    CupertinoDialogAction(
+                      isDefaultAction: true,
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(l10n.doneButton),
+                    ),
+                  ],
+                ),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    children: [
+                      Icon(CupertinoIcons.info_circle, size: 17, color: muted),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          l10n.doctorHintShort,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Semantics(
+          button: true,
+          label: l10n.dismiss,
+          excludeSemantics: true,
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(44, 44),
+            onPressed: onDismiss,
+            child: Icon(CupertinoIcons.xmark, size: 15, color: muted),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -540,13 +540,12 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Positive'));
+          await scrollTo(tester, find.text('Pregnancy test'));
+          final chip = find.widgetWithText(ChoiceChip, 'Positive').first;
           // scrollUntilVisible stops once any part shows; bring it fully in.
-          await tester.ensureVisible(
-            find.widgetWithText(ChoiceChip, 'Positive'),
-          );
+          await tester.ensureVisible(chip);
           await tester.pumpAndSettle();
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Positive'));
+          await tester.tap(chip);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -554,6 +553,30 @@ void main() {
       expect(
         (result! as LogEntrySaved).draft.entry.symptoms.map((s) => s.key),
         ['ovulationTest.positive'],
+      );
+    });
+
+    testWidgets('a pregnancy test result is saved, one at a time', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await scrollTo(tester, find.text('Pregnancy test'));
+          final positive = find.widgetWithText(ChoiceChip, 'Positive').last;
+          final negative = find.widgetWithText(ChoiceChip, 'Negative').last;
+          await tester.ensureVisible(positive);
+          await tester.pumpAndSettle();
+          await tester.tap(negative);
+          await tester.pumpAndSettle();
+          await tester.tap(positive);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(
+        (result! as LogEntrySaved).draft.entry.symptoms.map((s) => s.key),
+        ['pregnancyTest.positive'],
       );
     });
 

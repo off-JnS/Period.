@@ -327,6 +327,10 @@ then the app draws no conclusion from them, and says so beside the chart.
   entered. Accepted range 34.00–43.00 °C: anything outside is a typo, not a
   reading, and is refused at entry rather than stored.
 - **Ovulation test** is *negative* or *positive*, one per day, like discharge.
+- **Pregnancy test** likewise: *negative* or *positive*, one per day. Recorded
+  and shown back (a ± mark in the calendar), nothing more: no estimate reads
+  it, the app states no conclusion from it, and a positive result does not
+  switch to the pregnancy mode — that stays her choice (§6).
 - The chart shows the readings of one cycle by cycle day. It marks positive
   tests with a shape as well as a colour (CLAUDE.md §9) and draws no line,
   band or label that interprets them.

@@ -767,6 +767,22 @@ class _BodySignalsSection extends StatelessWidget {
                   ),
             ],
           ),
+          const Divider(height: 24),
+          Text(l10n.pregnancyTestLabel, style: theme.textTheme.bodyLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final key in offeredPregnancyTestKeys)
+                if (symptomLabel(l10n, key) case final label?)
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: selectedKeys.contains(key),
+                    onSelected: (selected) => onToggle(key, selected),
+                  ),
+            ],
+          ),
         ],
       ),
     );

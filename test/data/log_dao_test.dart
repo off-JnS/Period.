@@ -380,4 +380,28 @@ void main() {
       aDate(2024, 3, 2),
     });
   });
+
+  test(
+    'loggedDays lists the days with a pregnancy test, either result',
+    () async {
+      await db.logDao.saveEntry(
+        aDayEntry(
+          date: aDate(2024, 3, 1),
+          symptoms: {aSymptom(key: 'pregnancyTest.negative')},
+        ),
+      );
+      await db.logDao.saveEntry(
+        aDayEntry(
+          date: aDate(2024, 3, 5),
+          symptoms: {
+            aSymptom(key: 'pregnancyTest.positive'),
+            aSymptom(key: 'sex.protected'),
+          },
+        ),
+      );
+      final days = await db.logDao.loggedDays();
+      expect(days.pregnancyTest, {aDate(2024, 3, 1), aDate(2024, 3, 5)});
+      expect(days.sex, {aDate(2024, 3, 5)});
+    },
+  );
 }

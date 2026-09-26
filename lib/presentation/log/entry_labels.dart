@@ -43,6 +43,8 @@ String? symptomLabel(AppLocalizations l10n, String key) => switch (key) {
   pillTakenKey => l10n.pillTaken,
   'ovulationTest.negative' => l10n.ovulationTestNegative,
   'ovulationTest.positive' => l10n.ovulationTestPositive,
+  'pregnancyTest.negative' => l10n.pregnancyTestNegative,
+  'pregnancyTest.positive' => l10n.pregnancyTestPositive,
   _ => null,
 };
 
@@ -84,6 +86,9 @@ enum EntryLineKind {
   /// An ovulation test.
   ovulationTest,
 
+  /// A pregnancy test.
+  pregnancyTest,
+
   /// Her note, word for word.
   note,
 }
@@ -117,6 +122,7 @@ List<EntryLine> entryLines(
     ...offeredDischargeKeys,
     ...offeredSexKeys,
     ...offeredOvulationTestKeys,
+    ...offeredPregnancyTestKeys,
     pillTakenKey,
   };
   final symptoms = <String>[
@@ -127,6 +133,7 @@ List<EntryLine> entryLines(
   final discharge = named(offeredDischargeKeys);
   final sex = named(offeredSexKeys);
   final ovulationTest = named(offeredOvulationTestKeys);
+  final pregnancyTest = named(offeredPregnancyTestKeys);
 
   return [
     if (entry.flow case final flow?)
@@ -153,6 +160,11 @@ List<EntryLine> entryLines(
       (
         kind: EntryLineKind.ovulationTest,
         text: l10n.ovulationTestSummary(ovulationTest.first),
+      ),
+    if (pregnancyTest.isNotEmpty)
+      (
+        kind: EntryLineKind.pregnancyTest,
+        text: l10n.pregnancyTestSummary(pregnancyTest.first),
       ),
     if (entry.note case final note? when note.isNotEmpty)
       (kind: EntryLineKind.note, text: note),

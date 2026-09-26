@@ -96,9 +96,18 @@ const offeredOvulationTestKeys = <String>[
   'ovulationTest.positive',
 ];
 
+/// Pregnancy test result. At most one per day. Recorded only: nothing reads
+/// it, nothing concludes from it, and it never changes the mode by itself
+/// (docs/cycle-logic.md §9).
+const offeredPregnancyTestKeys = <String>[
+  'pregnancyTest.negative',
+  'pregnancyTest.positive',
+];
+
 /// The groups of which at most one key may be logged on a day.
 const singleChoiceGroups = <List<String>>[
   offeredDischargeKeys,
   offeredSexKeys,
   offeredOvulationTestKeys,
+  offeredPregnancyTestKeys,
 ];

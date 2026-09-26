@@ -131,7 +131,24 @@ void main() {
       expect(find.textContaining('worth mentioning'), findsNothing);
     });
 
-    testWidgets('suggests a conversation without naming anything', (
+    testWidgets('is one quiet line, not a card', (tester) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(prediction: predicted, showDoctorHint: true),
+        ),
+      );
+      expect(find.text('Cycles varied more than usual'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text('Cycles varied more than usual'),
+          matching: find.byType(Card),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('tapping it gives the full wording, naming nothing', (
       tester,
     ) async {
       await pumpApp(
@@ -140,11 +157,16 @@ void main() {
           data: TodayViewData(prediction: predicted, showDoctorHint: true),
         ),
       );
+      await tester.tap(find.text('Cycles varied more than usual'));
+      await tester.pumpAndSettle();
       final hint = tester.widget<Text>(find.textContaining('worth mentioning'));
       expect(hint.data, contains('might be worth mentioning to a doctor'));
       // Section 8: never a finding, never a condition.
       expect(hint.data, isNot(contains('abnormal')));
       expect(hint.data, isNot(contains('irregular')));
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('worth mentioning'), findsNothing);
     });
 
     testWidgets('can be dismissed', (tester) async {
@@ -154,9 +176,9 @@ void main() {
           data: TodayViewData(prediction: predicted, showDoctorHint: true),
         ),
       );
-      await tester.tap(find.text('Dismiss'));
+      await tester.tap(find.bySemanticsLabel('Dismiss'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('worth mentioning'), findsNothing);
+      expect(find.text('Cycles varied more than usual'), findsNothing);
     });
   });
 

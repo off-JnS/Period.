@@ -79,7 +79,8 @@ class MultiCheckList<T> extends StatelessWidget {
     isChecked: selected.contains,
     label: label,
     icon: icon,
-    onTap: (option) => () => onToggled(option),
+    onTap: (option) =>
+        () => onToggled(option),
     exclusive: false,
   );
 }
@@ -149,10 +150,7 @@ class _CheckCard<T> extends StatelessWidget {
                                   size: 22,
                                   color: theme.colorScheme.primary,
                                 )
-                              : const SizedBox(
-                                  key: ValueKey(false),
-                                  width: 22,
-                                ),
+                              : const SizedBox(key: ValueKey(false), width: 22),
                         ),
                       ],
                     ),

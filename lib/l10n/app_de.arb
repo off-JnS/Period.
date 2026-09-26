@@ -266,5 +266,10 @@
   "fertileWindowTurnOn": "Einschalten",
   "countdownUpcoming": "in {from}–{to} Tagen",
   "countdownInWindow": "kann jederzeit beginnen",
-  "countdownPastWindow": "später als geschätzt"
+  "countdownPastWindow": "später als geschätzt",
+  "pregnancyTestLabel": "Schwangerschaftstest",
+  "pregnancyTestNegative": "Negativ",
+  "pregnancyTestPositive": "Positiv",
+  "pregnancyTestSummary": "Schwangerschaftstest: {result}",
+  "doctorHintShort": "Zyklen schwankten stärker als sonst"
 }

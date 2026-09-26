@@ -199,6 +199,25 @@ void main() {
       );
     });
 
+    testWidgets('a pregnancy test carries a ± beside any heart, and says so', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        CalendarViewData(
+          today: today,
+          loggedDays: {aDate(2024, 5, 9), aDate(2024, 5, 10)},
+          sexDays: {aDate(2024, 5, 9)},
+          pregnancyTestDays: {aDate(2024, 5, 9), aDate(2024, 5, 10)},
+        ),
+      );
+      expect(find.byIcon(CupertinoIcons.plus_slash_minus), findsNWidgets(2));
+      expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+      expect(day(r'^May 9, 2024.*Sex.*Pregnancy test'), findsOneWidget);
+      handle.dispose();
+    });
+
     testWidgets('a day she had sex carries a heart and says so', (
       tester,
     ) async {
@@ -229,6 +248,7 @@ void main() {
         'Today',
         'Logged',
         'Sex',
+        'Pregnancy test',
       ]) {
         expect(find.text(label), findsWidgets, reason: label);
       }

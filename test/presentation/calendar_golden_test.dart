@@ -38,6 +38,7 @@ void main() {
       today,
     },
     sexDays: {aDate(2024, 5, 11), aDate(2024, 5, 5)},
+    pregnancyTestDays: {aDate(2024, 5, 11), aDate(2024, 5, 14)},
     predicted: PredictedPeriod(
       earliest: aDate(2024, 5, 29),
       latest: aDate(2024, 6, 2),

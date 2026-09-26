@@ -45,7 +45,10 @@ void main() {
   });
 
   test('after the window, later than estimated', () {
-    expect(countdownTo(window, aDate(2024, 5, 31)), const CountdownPastWindow());
+    expect(
+      countdownTo(window, aDate(2024, 5, 31)),
+      const CountdownPastWindow(),
+    );
     expect(countdownTo(window, aDate(2024, 7, 1)), const CountdownPastWindow());
   });
 
@@ -61,7 +64,10 @@ void main() {
   });
 
   test('no countdown without a window', () {
-    expect(countdownTo(const NotEnoughCycles(have: 1, need: 2), anyDate()), isNull);
+    expect(
+      countdownTo(const NotEnoughCycles(have: 1, need: 2), anyDate()),
+      isNull,
+    );
     expect(countdownTo(const CyclesTooVariable(9), anyDate()), isNull);
     expect(
       countdownTo(const PredictionsDisabled(CycleMode.pregnancy), anyDate()),
