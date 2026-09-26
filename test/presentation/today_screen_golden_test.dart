@@ -220,4 +220,42 @@ void main() {
       'pregnancy_week',
     );
   });
+
+  group('the date and countdown at the top', () {
+    for (final (name, today) in [
+      ('countdown_upcoming', aDate(2024, 4, 14)),
+      ('countdown_in_window', aDate(2024, 4, 27)),
+      ('countdown_past', aDate(2024, 5, 3)),
+    ]) {
+      testWidgets(name, (tester) async {
+        await expectGolden(
+          tester,
+          TodayViewData(
+            today: today,
+            countdown: countdownTo(predicted, today),
+            cycleDay: 20,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+          name,
+        );
+      });
+    }
+
+    testWidgets('German', (tester) async {
+      final today = aDate(2024, 4, 14);
+      await expectGolden(
+        tester,
+        TodayViewData(
+          today: today,
+          countdown: countdownTo(predicted, today),
+          cycleDay: 20,
+          typicalCycleLength: 28,
+          prediction: predicted,
+        ),
+        'countdown_german',
+        locale: const Locale('de'),
+      );
+    });
+  });
 }

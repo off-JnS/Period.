@@ -902,5 +902,18 @@
   "fertileWindowTurnOn": "Turn on",
   "@fertileWindowTurnOn": {
     "description": "Confirms turning on the fertile window in the dialog that states its caveat first."
+  },
+  "countdownUpcoming": "in {from}–{to} days",
+  "@countdownUpcoming": {
+    "description": "Small chip beside today's date on Today: how far away the estimated window is, always as a range (docs/cycle-logic.md §3).",
+    "placeholders": { "from": { "type": "int" }, "to": { "type": "int" } }
+  },
+  "countdownInWindow": "could start any day",
+  "@countdownInWindow": {
+    "description": "Chip beside today's date while today is inside the estimated window. No number: every day in it is equally likely."
+  },
+  "countdownPastWindow": "later than estimated",
+  "@countdownPastWindow": {
+    "description": "Chip beside today's date once the estimated window has passed with no new period start. Plain, with no reason given."
   }
 }

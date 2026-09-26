@@ -335,4 +335,70 @@ void main() {
       expect(find.text('88'), findsOneWidget);
     });
   });
+
+  group('the date and countdown', () {
+    Future<void> pumpOn(WidgetTester tester, PeriodPrediction prediction) =>
+        pumpApp(
+          tester,
+          TodayScreen(
+            data: TodayViewData(
+              today: aDate(2024, 4, 14),
+              countdown: countdownTo(prediction, aDate(2024, 4, 14)),
+              prediction: prediction,
+            ),
+          ),
+        );
+
+    testWidgets('shows the date and the window counted in days', (
+      tester,
+    ) async {
+      await pumpOn(tester, predicted);
+      expect(find.text('Sunday, April 14'), findsOneWidget);
+      expect(find.text('in 12–16 days'), findsOneWidget);
+      expect(find.bySemanticsLabel('Next period: in 12–16 days'), findsOne);
+    });
+
+    testWidgets('inside the window says it could start any day', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        TodayScreen(
+          data: TodayViewData(
+            today: aDate(2024, 4, 27),
+            countdown: countdownTo(predicted, aDate(2024, 4, 27)),
+            prediction: predicted,
+          ),
+        ),
+      );
+      expect(find.text('could start any day'), findsOneWidget);
+    });
+
+    testWidgets('has no countdown without a window', (tester) async {
+      await pumpOn(tester, const NotEnoughCycles(have: 1, need: 2));
+      expect(find.text('Sunday, April 14'), findsOneWidget);
+      expect(find.textContaining('days'), findsNothing);
+    });
+
+    testWidgets('appears at once with reduced motion', (tester) async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: appHarness(
+            TodayScreen(
+              data: TodayViewData(
+                today: aDate(2024, 4, 14),
+                countdown: countdownTo(predicted, aDate(2024, 4, 14)),
+                prediction: predicted,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      // No frames to wait for: nothing is still fading in.
+      expect(tester.hasRunningAnimations, isFalse);
+      expect(find.text('in 12–16 days'), findsOneWidget);
+    });
+  });
 }

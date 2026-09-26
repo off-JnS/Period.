@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,7 @@ import '../../domain/models/cycle_date.dart';
 import '../../domain/models/cycle_mode.dart';
 import '../../domain/models/day_entry.dart';
 import '../../l10n/app_localizations.dart';
+import '../log/entry_icons.dart';
 import '../log/entry_labels.dart';
 import '../log/temperature.dart';
 import '../section_card.dart';
@@ -30,7 +32,17 @@ class TodayViewData {
     this.todayEntry,
     this.isTodayPeriodStart = false,
     this.pregnancy,
+    this.today,
+    this.countdown,
   });
+
+  /// The day it is, shown as the date at the top. Null leaves the date out,
+  /// as a test of one card alone does.
+  final CycleDate? today;
+
+  /// How far away the estimated window is, shown beside the date. Null when
+  /// there is no window (docs/cycle-logic.md §3).
+  final PeriodCountdown? countdown;
 
   /// In pregnancy mode, how far along -- or why that cannot be said. Null in
   /// every other mode.
@@ -99,18 +111,30 @@ class _TodayScreenState extends State<TodayScreen> {
     // A grouped page scrolls rather than fitting a fixed column: at 200% text
     // size, or in German, this content is taller than a phone screen and must
     // not clip.
+    // Each block slides up into place on arrival, one after another, so the
+    // eye follows the page from the ring down.
+    var order = 0;
+    Widget enter(Widget child) => _Entrance(index: order++, child: child);
+
+    // A grouped page scrolls rather than fitting a fixed column: at 200% text
+    // size, or in German, this content is taller than a phone screen and must
+    // not clip.
     return GroupedPage(
       title: l10n.todayTitle,
       children: [
-        const SizedBox(height: 8),
-        Center(
-          child: switch (data.pregnancy) {
-            PregnancyCounting(:final week) => PregnancyWeekRing(week: week),
-            _ => CycleDayRing(
-              day: data.cycleDay,
-              expectedLength: data.typicalCycleLength,
-            ),
-          },
+        if (data.today case final today?)
+          enter(_DateHeader(today: today, countdown: data.countdown)),
+        const SizedBox(height: 16),
+        enter(
+          Center(
+            child: switch (data.pregnancy) {
+              PregnancyCounting(:final week) => PregnancyWeekRing(week: week),
+              _ => CycleDayRing(
+                day: data.cycleDay,
+                expectedLength: data.typicalCycleLength,
+              ),
+            },
+          ),
         ),
         if (data.pregnancy case final pregnancy?) ...[
           const SizedBox(height: 12),
@@ -132,32 +156,192 @@ class _TodayScreenState extends State<TodayScreen> {
           // not readable, and section 9's refusal to let shape or colour carry
           // meaning on its own applies to an action as much as to a calendar
           // cell. The screen's one prominent button, as the HIG asks.
-          FilledButton.icon(
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              onAdd();
-            },
-            icon: const Icon(Icons.add_rounded),
-            label: Text(l10n.addEntry),
+          enter(
+            FilledButton.icon(
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                onAdd();
+              },
+              icon: const Icon(CupertinoIcons.add),
+              label: Text(l10n.addEntry),
+            ),
           ),
         ],
         const SizedBox(height: 28),
-        _PredictionSection(prediction: data.prediction),
+        enter(_PredictionSection(prediction: data.prediction)),
         if (data.fertileWindow case final window?) ...[
           const SizedBox(height: 12),
-          _FertileWindowSection(window: window),
+          enter(_FertileWindowSection(window: window)),
         ],
-        if (data.showDoctorHint && !_hintDismissed) ...[
-          const SizedBox(height: 12),
-          _DoctorHint(onDismiss: () => setState(() => _hintDismissed = true)),
-        ],
+        // Folds away rather than vanishing when dismissed.
+        AnimatedSize(
+          duration: _motion(context, const Duration(milliseconds: 250)),
+          curve: Curves.easeOutCubic,
+          child: data.showDoctorHint && !_hintDismissed
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _DoctorHint(
+                    onDismiss: () => setState(() => _hintDismissed = true),
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
         const SizedBox(height: 12),
-        _LoggedTodaySection(
-          entry: data.todayEntry,
-          isPeriodStart: data.isTodayPeriodStart,
-          onEdit: widget.onEditToday,
+        enter(
+          _LoggedTodaySection(
+            entry: data.todayEntry,
+            isPeriodStart: data.isTodayPeriodStart,
+            onEdit: widget.onEditToday,
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// [duration], or none at all when the system asks for reduced motion.
+Duration _motion(BuildContext context, Duration duration) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+
+/// Fades and slides [child] up into place once, when the screen appears,
+/// a little after the block above it.
+class _Entrance extends StatefulWidget {
+  const _Entrance({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_Entrance> createState() => _EntranceState();
+}
+
+class _EntranceState extends State<_Entrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _progress;
+
+  static const _step = 70;
+  static const _length = 420;
+
+  @override
+  void initState() {
+    super.initState();
+    final delay = widget.index * _step;
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: delay + _length),
+    );
+    _progress = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(delay / (delay + _length), 1, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controller.isAnimating || _controller.isCompleted) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _progress,
+    child: widget.child,
+    builder: (context, child) => Opacity(
+      opacity: _progress.value,
+      child: Transform.translate(
+        offset: Offset(0, 16 * (1 - _progress.value)),
+        child: child,
+      ),
+    ),
+  );
+}
+
+/// Today's date, with how far away the estimated window is beside it.
+class _DateHeader extends StatelessWidget {
+  const _DateHeader({required this.today, this.countdown});
+
+  final CycleDate today;
+  final PeriodCountdown? countdown;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+
+    final countdownText = switch (countdown) {
+      CountdownUpcoming(:final fromDays, :final toDays) =>
+        l10n.countdownUpcoming(fromDays, toDays),
+      CountdownInWindow() => l10n.countdownInWindow,
+      CountdownPastWindow() => l10n.countdownPastWindow,
+      null => null,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            DateFormat.MMMMEEEEd(locale)
+                .format(DateTime(today.year, today.month, today.day)),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (countdownText != null)
+            Semantics(
+              container: true,
+              label: '${l10n.nextPeriodHeading}: $countdownText',
+              excludeSemantics: true,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 11, 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.drop_fill,
+                        size: 14,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          countdownText,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -179,7 +363,7 @@ class _PredictionSection extends StatelessWidget {
 
     return switch (prediction) {
       PredictedPeriod(:final earliest, :final latest) => _InfoCard(
-        icon: Icons.water_drop_rounded,
+        icon: CupertinoIcons.drop_fill,
         heading: l10n.nextPeriodHeading,
         body: l10n.estimatedRange(
           _formatDay(context, earliest),
@@ -189,17 +373,17 @@ class _PredictionSection extends StatelessWidget {
         footnote: l10n.estimatedFromYourEntries,
       ),
       NotEnoughCycles(:final have, :final need) => _InfoCard(
-        icon: Icons.more_horiz,
+        icon: CupertinoIcons.hourglass,
         heading: l10n.nextPeriodHeading,
         body: l10n.needMoreCycles(need - have),
       ),
       CyclesTooVariable() => _InfoCard(
-        icon: Icons.show_chart,
+        icon: CupertinoIcons.waveform_path,
         heading: l10n.nextPeriodHeading,
         body: l10n.cyclesTooVariable,
       ),
       PredictionsDisabled(:final mode) => _InfoCard(
-        icon: Icons.pause_circle_outline,
+        icon: CupertinoIcons.pause_circle,
         heading: l10n.nextPeriodHeading,
         body: switch (mode) {
           CycleMode.hormonalContraception => l10n.predictionsOffContraception,
@@ -223,7 +407,7 @@ class _FertileWindowSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return _InfoCard(
-      icon: Icons.eco_outlined,
+      icon: CupertinoIcons.sparkles,
       heading: l10n.fertileWindowHeading,
       body: l10n.estimatedRange(
         _formatDay(context, window.earliest),
@@ -247,7 +431,7 @@ class _DoctorHint extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SectionCard(
-      icon: Icons.info_outline_rounded,
+      icon: CupertinoIcons.info_circle,
       heading: l10n.doctorHint,
       accent: theme.colorScheme.onSurface,
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 4),
@@ -350,7 +534,7 @@ class _LoggedTodaySection extends StatelessWidget {
     final hasAnything = isPeriodStart || lines.isNotEmpty;
 
     return SectionCard(
-      icon: Icons.edit_note_rounded,
+      icon: CupertinoIcons.square_pencil,
       heading: l10n.loggedTodayHeading,
       trailing: onEdit == null
           ? null
@@ -362,16 +546,42 @@ class _LoggedTodaySection extends StatelessWidget {
             Text(l10n.nothingLoggedToday, style: theme.textTheme.bodyLarge)
           else ...[
             if (isPeriodStart)
-              Text(l10n.periodStartSummary, style: theme.textTheme.bodyLarge),
+              _IconLine(
+                icon: CupertinoIcons.drop_fill,
+                text: l10n.periodStartSummary,
+              ),
             for (final line in lines)
-              if (line.kind == EntryLineKind.note)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(line.text, style: theme.textTheme.bodyMedium),
-                )
-              else
-                Text(line.text, style: theme.textTheme.bodyLarge),
+              _IconLine(icon: entryLineIcon(line.kind), text: line.text),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One logged thing, with its icon, as the calendar's day preview shows it.
+class _IconLine extends StatelessWidget {
+  const _IconLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon, size: 18, color: theme.colorScheme.primary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
         ],
       ),
     );

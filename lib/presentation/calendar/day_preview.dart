@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../domain/models/cycle_date.dart';
 import '../../domain/models/day_entry.dart';
 import '../../l10n/app_localizations.dart';
+import '../log/entry_icons.dart';
 import '../log/entry_labels.dart';
 import '../log/temperature.dart';
 import '../theme.dart';
@@ -144,7 +145,7 @@ class DayPreview extends StatelessWidget {
                       ? Column(
                           children: [
                             for (final line in lines)
-                              _Line(icon: _iconFor(line.kind), text: line.text),
+                              _Line(icon: entryLineIcon(line.kind), text: line.text),
                           ],
                         )
                       : Padding(
@@ -176,18 +177,6 @@ class DayPreview extends StatelessWidget {
       ),
     );
   }
-
-  static IconData _iconFor(EntryLineKind kind) => switch (kind) {
-    EntryLineKind.flow => CupertinoIcons.drop,
-    EntryLineKind.symptoms => CupertinoIcons.bandage,
-    EntryLineKind.mood => CupertinoIcons.smiley,
-    EntryLineKind.discharge => CupertinoIcons.drop_triangle,
-    EntryLineKind.sex => CupertinoIcons.heart,
-    EntryLineKind.pill => CupertinoIcons.capsule,
-    EntryLineKind.temperature => CupertinoIcons.thermometer,
-    EntryLineKind.ovulationTest => CupertinoIcons.lab_flask,
-    EntryLineKind.note => CupertinoIcons.text_quote,
-  };
 }
 
 class _StatusChip extends StatelessWidget {

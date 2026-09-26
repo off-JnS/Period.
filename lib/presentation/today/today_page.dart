@@ -120,6 +120,8 @@ class _TodayPageState extends State<TodayPage> {
       showDoctorHint:
           settings.cycleStatisticsVisible &&
           shouldSuggestSeeingADoctor(eligible),
+      today: today,
+      countdown: countdownTo(prediction, today),
       todayEntry: todayEntry,
       isTodayPeriodStart: periodStarts.contains(today),
       pregnancy: settings.mode == CycleMode.pregnancy

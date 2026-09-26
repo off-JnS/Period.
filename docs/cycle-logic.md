@@ -133,6 +133,20 @@ band and call it a prediction.
 **Display** is a range — "26.–30." — with wording like "estimated, based on your
 entries", per §8. Never a single date. Never a countdown that implies certainty.
 
+**Countdown.** Today may say how far away the window is, but only as the
+window itself, counted in days — "in 12–16 days" — never a single number.
+Three states, from the window alone:
+
+- before the window opens: *in {days to first day}–{days to last day} days*;
+- inside the window: *could start any day* — no number, since every day in
+  it is equally a candidate;
+- past the window with no new start recorded: *later than estimated*,
+  stated plainly and without a reason. Lateness has many causes, and naming
+  any of them would be a diagnosis (§7, CLAUDE.md §8).
+
+No countdown at all when there is no window (predictions off, too few or
+too variable cycles).
+
 ---
 
 ## 4. The fertile window

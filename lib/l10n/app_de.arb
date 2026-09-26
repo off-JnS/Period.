@@ -263,5 +263,8 @@
   "calendarEstimateSummary": "Nächste Periode, geschätzt: {range}",
   "calendarFertileSummary": "Fruchtbares Fenster, geschätzt: {range}. Nicht zur Schwangerschaftsverhütung geeignet",
   "dayPreviewNothingLogged": "Nichts eingetragen",
-  "fertileWindowTurnOn": "Einschalten"
+  "fertileWindowTurnOn": "Einschalten",
+  "countdownUpcoming": "in {from}–{to} Tagen",
+  "countdownInWindow": "kann jederzeit beginnen",
+  "countdownPastWindow": "später als geschätzt"
 }

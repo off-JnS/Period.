@@ -101,23 +101,32 @@ class CycleDayRing extends StatelessWidget {
       child: SizedBox(
         width: diameter,
         height: diameter,
-        child: CustomPaint(
-          painter: _RingPainter(
-            progress: progress,
-            track: scheme.surfaceContainerHighest,
-            glow: scheme.primaryContainer,
-            arcStart: Color.lerp(scheme.primary, scheme.surface, 0.55)!,
-            arc: scheme.primary,
-            overrun: scheme.onPrimaryContainer,
-            knob: scheme.surfaceContainerLowest,
-            strokeWidth: 14 * scale,
-          ),
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.all(30 * scale),
-              // Scales the text down rather than clipping it when a long
-              // German caption meets a large text setting.
-              child: FittedBox(fit: BoxFit.scaleDown, child: centre),
+        // The arc sweeps round to today when the ring appears, and eases to
+        // a new day when the data changes, rather than jumping.
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: progress ?? 0),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 900),
+          curve: Curves.easeOutCubic,
+          builder: (context, animated, _) => CustomPaint(
+            painter: _RingPainter(
+              progress: progress == null ? null : animated,
+              track: scheme.surfaceContainerHighest,
+              glow: scheme.primaryContainer,
+              arcStart: Color.lerp(scheme.primary, scheme.surface, 0.55)!,
+              arc: scheme.primary,
+              overrun: scheme.onPrimaryContainer,
+              knob: scheme.surfaceContainerLowest,
+              strokeWidth: 14 * scale,
+            ),
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(30 * scale),
+                // Scales the text down rather than clipping it when a long
+                // German caption meets a large text setting.
+                child: FittedBox(fit: BoxFit.scaleDown, child: centre),
+              ),
             ),
           ),
         ),
