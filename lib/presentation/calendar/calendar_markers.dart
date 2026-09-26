@@ -37,8 +37,13 @@ class MarkerColors {
   final Color fertile;
 }
 
-/// Draws a day's piece of a band: rounded where the band ends, square and
-/// running to the cell edge where it continues into the next day.
+/// Draws a day's piece of a band: rounded where the band begins, square and
+/// running to the cell edge where it continues into the next day, and fading
+/// out on its last day.
+///
+/// The fade is the point: a period, an estimate or a fertile window does not
+/// stop on the stroke of midnight, and a hard edge would claim it does. The
+/// day number sits on the solid part, so it stays legible.
 class BandPainter extends CustomPainter {
   const BandPainter({
     required this.marker,
@@ -46,7 +51,12 @@ class BandPainter extends CustomPainter {
     required this.joinsRight,
     required this.colors,
     required this.scale,
+    this.fadesOut = false,
   });
+
+  /// Whether this is the band's last day, so it fades out to the right
+  /// rather than ending in a rounded cap.
+  final bool fadesOut;
 
   final CalendarMarker? marker;
   final bool joinsLeft;
@@ -66,42 +76,55 @@ class BandPainter extends CustomPainter {
     final radius = Radius.circular(height / 2);
     // A joined side reaches half a pixel past the cell, so neighbouring
     // pieces overlap instead of leaving an anti-aliased seam between days.
+    final openRight = joinsRight || fadesOut;
     final rect = Rect.fromLTRB(
       joinsLeft ? -0.5 : inset,
       top,
-      joinsRight ? size.width + 0.5 : size.width - inset,
+      openRight ? size.width + (joinsRight ? 0.5 : 0) : size.width - inset,
       top + height,
     );
     final shape = RRect.fromRectAndCorners(
       rect,
       topLeft: joinsLeft ? Radius.zero : radius,
       bottomLeft: joinsLeft ? Radius.zero : radius,
-      topRight: joinsRight ? Radius.zero : radius,
-      bottomRight: joinsRight ? Radius.zero : radius,
+      topRight: openRight ? Radius.zero : radius,
+      bottomRight: openRight ? Radius.zero : radius,
     );
+
+    // Solid under the number, then fading to nothing at the cell's edge.
+    Paint fill(Color color) {
+      final paint = Paint()..color = color;
+      if (fadesOut) {
+        paint.shader = LinearGradient(
+          colors: [color, color, color.withValues(alpha: 0)],
+          stops: const [0, 0.58, 1],
+        ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+      }
+      return paint;
+    }
 
     switch (kind) {
       case CalendarMarker.period:
-        canvas.drawRRect(shape, Paint()..color = colors.period);
+        canvas.drawRRect(shape, fill(colors.period));
       case CalendarMarker.fertile:
-        canvas.drawRRect(shape, Paint()..color = colors.fertile);
+        canvas.drawRRect(shape, fill(colors.fertile));
       case CalendarMarker.estimated:
-        canvas.drawRRect(shape, Paint()..color = colors.estimateWash);
-        _dashedOutline(canvas, rect);
+        canvas.drawRRect(shape, fill(colors.estimateWash));
+        _dashedOutline(canvas, rect, fill(colors.estimateLine), openRight);
     }
   }
 
   /// The estimate's outline, dashed, left open where the band continues so
   /// the dashes run on across days instead of boxing each one in.
-  void _dashedOutline(Canvas canvas, Rect rect) {
+  void _dashedOutline(Canvas canvas, Rect rect, Paint paint, bool openRight) {
     final inner = rect.deflate(0.9);
     final r = inner.height / 2;
     final leftX = joinsLeft ? inner.left : inner.left + r;
-    final rightX = joinsRight ? inner.right : inner.right - r;
+    final rightX = openRight ? inner.right : inner.right - r;
     final path = Path()
       ..moveTo(leftX, inner.top)
       ..lineTo(rightX, inner.top);
-    if (joinsRight) {
+    if (openRight) {
       path.moveTo(rightX, inner.bottom);
     } else {
       path.arcToPoint(Offset(rightX, inner.bottom), radius: Radius.circular(r));
@@ -111,8 +134,7 @@ class BandPainter extends CustomPainter {
       path.arcToPoint(Offset(leftX, inner.top), radius: Radius.circular(r));
     }
 
-    final paint = Paint()
-      ..color = colors.estimateLine
+    paint
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round;
@@ -133,6 +155,7 @@ class BandPainter extends CustomPainter {
       old.marker != marker ||
       old.joinsLeft != joinsLeft ||
       old.joinsRight != joinsRight ||
+      old.fadesOut != fadesOut ||
       old.scale != scale ||
       old.colors.period != colors.period ||
       old.colors.estimateLine != colors.estimateLine ||
@@ -151,13 +174,14 @@ class MarkerSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
     child: SizedBox(
-      width: size * 1.5,
+      width: size * 2,
       height: size + 8,
       child: CustomPaint(
         painter: BandPainter(
           marker: marker,
           joinsLeft: false,
           joinsRight: false,
+          fadesOut: true,
           colors: MarkerColors.of(Theme.of(context).colorScheme),
           scale: size / 36,
         ),
@@ -165,4 +189,3 @@ class MarkerSwatch extends StatelessWidget {
     ),
   );
 }
-

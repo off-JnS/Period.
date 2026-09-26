@@ -76,7 +76,11 @@ class DayPreview extends StatelessWidget {
 
     final status = <(CalendarMarker?, IconData?, String)>[
       if (data.cycleDay case final day?)
-        (null, CupertinoIcons.arrow_2_circlepath, l10n.cycleDayAccessibility(day)),
+        (
+          null,
+          CupertinoIcons.arrow_2_circlepath,
+          l10n.cycleDayAccessibility(day),
+        ),
       if (data.isPeriodStart)
         (CalendarMarker.period, null, l10n.legendPeriodStart)
       else if (data.marker == CalendarMarker.period)
@@ -96,9 +100,8 @@ class DayPreview extends StatelessWidget {
             Semantics(
               header: true,
               child: Text(
-                DateFormat.MMMMEEEEd(
-                  locale,
-                ).format(DateTime(date.year, date.month, date.day)),
+                DateFormat.MMMMEEEEd(locale)
+                    .format(DateTime(date.year, date.month, date.day)),
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -257,10 +260,8 @@ Future<bool> showDayPreview(BuildContext context, DayPreviewData data) async {
     showDragHandle: true,
     isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.groupedCard,
-    builder: (context) => DayPreview(
-      data: data,
-      onEdit: () => Navigator.of(context).pop(true),
-    ),
+    builder: (context) =>
+        DayPreview(data: data, onEdit: () => Navigator.of(context).pop(true)),
   );
   return edit ?? false;
 }

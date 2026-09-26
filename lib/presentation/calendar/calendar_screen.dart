@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -210,7 +212,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
                     child: _WeekdayHeader(
                       firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
                       narrowWeekdays: materialL10n.narrowWeekdays,
@@ -291,22 +293,38 @@ class _MonthSection extends StatelessWidget {
     ).format(DateTime(year, month));
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 22, 12, 6),
+      padding: const EdgeInsets.fromLTRB(8, 20, 8, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            child: Semantics(
-              header: true,
-              child: Text(
-                title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: isCurrent ? scheme.primary : scheme.onSurface,
+          // Above the column of the 1st, as iOS Calendar places it, so the
+          // name leads straight into the month's first day.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final lead = grid.days.indexWhere(grid.isInMonth);
+              final column = constraints.maxWidth / 7;
+              return Padding(
+                padding: EdgeInsetsDirectional.only(
+                  start: math
+                      .min(
+                        lead * column + column / 2 - 12,
+                        constraints.maxWidth / 2,
+                      )
+                      .clamp(4.0, double.infinity),
+                  bottom: 6,
                 ),
-              ),
-            ),
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isCurrent ? scheme.primary : scheme.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           for (final week in grid.weeks)
             Row(
@@ -396,7 +414,6 @@ class _WeekdayHeader extends StatelessWidget {
   }
 }
 
-
 class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.date,
@@ -427,7 +444,7 @@ class _DayCell extends StatelessWidget {
     final locale = Localizations.localeOf(context).toLanguageTag();
 
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
-    final extent = 46.0 * scale;
+    final extent = 54.0 * scale;
 
     final isToday = date == data.today;
     final isFuture = date.isAfter(data.today);
@@ -440,21 +457,26 @@ class _DayCell extends StatelessWidget {
         joinsLeft &&
         inMonth(previous) &&
         _markerOn(previous) == marker;
-    final right =
-        marker != null &&
-        joinsRight &&
-        inMonth(next) &&
-        _markerOn(next) == marker;
+    // Whether the band carries on the next day at all, even if into the next
+    // row or month. Only where it truly stops does it fade out.
+    final continues = marker != null && _markerOn(next) == marker;
+    final right = continues && joinsRight && inMonth(next);
+    final fadesOut = marker != null && !continues;
+    // Weekend numbers in grey, as iOS Calendar sets them.
+    final isWeekend = date.weekday >= DateTime.saturday;
 
     final onBand = marker == CalendarMarker.period;
-    final foreground = onBand ? scheme.onPrimary : scheme.onSurface;
+    final foreground = onBand
+        ? scheme.onPrimary
+        : isWeekend
+        ? scheme.onSurfaceVariant
+        : scheme.onSurface;
 
     // Everything a screen reader needs, in words, because none of the shapes
     // below mean anything to one.
     final spoken = <String>[
-      DateFormat.yMMMMd(
-        locale,
-      ).format(DateTime(date.year, date.month, date.day)),
+      DateFormat.yMMMMd(locale)
+          .format(DateTime(date.year, date.month, date.day)),
       if (isToday) l10n.todayTitle,
       if (data.periodStarts.contains(date))
         l10n.legendPeriodStart
@@ -483,63 +505,73 @@ class _DayCell extends StatelessWidget {
                 HapticFeedback.selectionClick();
                 onTap!(date);
               },
-        child: SizedBox(
-          height: extent,
-          child: CustomPaint(
-            painter: BandPainter(
-              marker: marker,
-              joinsLeft: left,
-              joinsRight: right,
-              colors: MarkerColors.of(scheme),
-              scale: scale,
+        // A hairline above every day, as iOS draws above each week: the
+        // first row's starts at the 1st, not at the edge.
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: scheme.outlineVariant, width: 0.5),
             ),
-            child: Center(
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  if (isToday)
-                    Container(
-                      width: 32 * scale,
-                      height: 32 * scale,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: onBand ? scheme.onPrimary : scheme.primary,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  Text(
-                    '${date.day}',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isFuture && !onBand
-                          ? foreground.withValues(alpha: 0.4)
-                          : isToday && !onBand
-                          ? scheme.primary
-                          : foreground,
-                      fontWeight: isToday || onBand
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  // A shape under the number rather than a tint of the cell,
-                  // so it survives being seen by someone who cannot tell the
-                  // tints apart.
-                  if (isLogged)
-                    Positioned(
-                      bottom: -10 * scale,
-                      child: Container(
-                        width: 5 * scale,
-                        height: 5 * scale,
+          ),
+          child: SizedBox(
+            height: extent,
+            child: CustomPaint(
+              painter: BandPainter(
+                marker: marker,
+                joinsLeft: left,
+                joinsRight: right,
+                fadesOut: fadesOut,
+                colors: MarkerColors.of(scheme),
+                scale: scale,
+              ),
+              child: Center(
+                child: Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Today is a filled circle, as in iOS Calendar; inverted
+                    // on a period band so it still stands out there.
+                    if (isToday)
+                      Container(
+                        width: 34 * scale,
+                        height: 34 * scale,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: onBand ? scheme.onPrimary : scheme.primary,
                         ),
                       ),
+                    Text(
+                      '${date.day}',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 19,
+                        color: isToday
+                            ? (onBand ? scheme.primary : scheme.onPrimary)
+                            : isFuture && !onBand
+                            ? foreground.withValues(alpha: 0.45)
+                            : foreground,
+                        fontWeight: isToday || onBand
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                ],
+                    // A shape under the number rather than a tint of the cell,
+                    // so it survives being seen by someone who cannot tell the
+                    // tints apart.
+                    if (isLogged)
+                      Positioned(
+                        bottom: -11 * scale,
+                        child: Container(
+                          width: 5 * scale,
+                          height: 5 * scale,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: onBand ? scheme.onPrimary : scheme.primary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -606,7 +638,10 @@ Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
                 ),
               ),
               const SizedBox(height: 8),
-              item(const MarkerSwatch(CalendarMarker.period), l10n.legendPeriodDay),
+              item(
+                const MarkerSwatch(CalendarMarker.period),
+                l10n.legendPeriodDay,
+              ),
               item(
                 const MarkerSwatch(CalendarMarker.estimated),
                 l10n.legendEstimated,
