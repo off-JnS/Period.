@@ -204,9 +204,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
               page: _page,
               pageCount: _pageCount,
               onBack: _page == 0 ? null : () => _goTo(_page - 1),
-              onSkip: _finishing
-                  ? null
-                  : () => _finish(keepPeriodStart: false),
+              onSkip: _finishing ? null : () => _finish(keepPeriodStart: false),
             ),
             Expanded(
               child: PageView(
@@ -215,19 +213,22 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 // rows would too easily turn it by accident.
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  const _WelcomePage(),
-                  _AboutPage(
-                    profile: _profile,
-                    settings: _settings,
-                    currentYear: _today.year,
-                    onProfileChanged: _changeProfile,
-                    onSettingsChanged: _changeSettings,
-                  ),
-                  _LastPeriodPage(
-                    today: _today,
-                    date: _lastPeriod,
-                    onChanged: (date) => setState(() => _lastPeriod = date),
-                  ),
+                  for (final (index, page) in [
+                    const _WelcomePage(),
+                    _AboutPage(
+                      profile: _profile,
+                      settings: _settings,
+                      currentYear: _today.year,
+                      onProfileChanged: _changeProfile,
+                      onSettingsChanged: _changeSettings,
+                    ),
+                    _LastPeriodPage(
+                      today: _today,
+                      date: _lastPeriod,
+                      onChanged: (date) => setState(() => _lastPeriod = date),
+                    ),
+                  ].indexed)
+                    _Parallax(controller: _pages, index: index, child: page),
                 ],
               ),
             ),
@@ -243,18 +244,42 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   ),
                 ),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    switch (_page) {
-                      0 => l10n.onboardingStart,
-                      _ when last => l10n.onboardingFinish,
-                      _ => l10n.onboardingContinue,
-                    },
-                    key: ValueKey(_page),
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween(
+                        begin: const Offset(0, 0.4),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
                     ),
+                  ),
+                  child: Row(
+                    key: ValueKey(_page),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          switch (_page) {
+                            0 => l10n.onboardingStart,
+                            _ when last => l10n.onboardingFinish,
+                            _ => l10n.onboardingContinue,
+                          },
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        last
+                            ? CupertinoIcons.checkmark_alt
+                            : CupertinoIcons.arrow_right,
+                        size: 18,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -286,7 +311,7 @@ class _TopBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return SizedBox(
-      height: 52,
+      height: 60,
       child: Row(
         children: [
           SizedBox(
@@ -303,9 +328,8 @@ class _TopBar extends StatelessWidget {
                   onPressed: onBack,
                   child: Icon(
                     CupertinoIcons.chevron_back,
-                    semanticLabel: MaterialLocalizations.of(
-                      context,
-                    ).backButtonTooltip,
+                    semanticLabel: MaterialLocalizations.of(context)
+                        .backButtonTooltip,
                   ),
                 ),
               ),
@@ -315,23 +339,38 @@ class _TopBar extends StatelessWidget {
             child: Semantics(
               label: l10n.onboardingProgress(page + 1, pageCount),
               excludeSemantics: true,
-              child: Row(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  for (var i = 0; i < pageCount; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == page ? 22 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: i <= page
-                            ? scheme.primary
-                            : scheme.primary.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (var i = 0; i < pageCount; i++)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: i == page ? 22 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: i <= page
+                                ? scheme.primary
+                                : scheme.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Text(
+                      l10n.onboardingProgress(page + 1, pageCount),
+                      key: ValueKey(page),
+                      style: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -396,16 +435,79 @@ class _Appear extends StatelessWidget {
   }
 }
 
-/// The large tinted circle at the top of each page.
-class _Badge extends StatelessWidget {
+/// Fades and slightly shrinks a page as it slides out, and brings the next
+/// one in the same way, so a turn reads as moving forward rather than a
+/// flat slide.
+class _Parallax extends StatelessWidget {
+  const _Parallax({
+    required this.controller,
+    required this.index,
+    required this.child,
+  });
+
+  final PageController controller;
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.of(context).disableAnimations) return child;
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, child) {
+        final page = controller.hasClients && controller.position.haveDimensions
+            ? controller.page ?? controller.initialPage.toDouble()
+            : controller.initialPage.toDouble();
+        final distance = (page - index).abs().clamp(0.0, 1.0);
+        return Opacity(
+          opacity: 1 - distance * 0.7,
+          child: Transform.scale(scale: 1 - distance * 0.06, child: child),
+        );
+      },
+    );
+  }
+}
+
+/// The large tinted circle at the top of each page. It pops in, then sends
+/// out two soft rings and settles: enough to draw the eye, then still.
+class _Badge extends StatefulWidget {
   const _Badge(this.icon, {this.size = 88});
 
   final IconData icon;
   final double size;
 
   @override
+  State<_Badge> createState() => _BadgeState();
+}
+
+class _BadgeState extends State<_Badge> with SingleTickerProviderStateMixin {
+  late final _rings = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!MediaQuery.of(context).disableAnimations && !_rings.isAnimating) {
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (mounted) _rings.forward(from: 0);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _rings.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final size = widget.size;
+    final icon = widget.icon;
     final circle = Container(
       width: size,
       height: size,
@@ -425,14 +527,48 @@ class _Badge extends StatelessWidget {
     if (MediaQuery.of(context).disableAnimations) {
       return ExcludeSemantics(child: circle);
     }
+    // Room around the circle for the rings, so they never shift the layout.
+    final outer = size * 1.5;
     return ExcludeSemantics(
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.6, end: 1),
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeOutBack,
-        builder: (context, scale, child) =>
-            Transform.scale(scale: scale, child: child),
-        child: circle,
+      child: SizedBox(
+        width: outer,
+        height: outer,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            for (final delay in const [0.0, 0.35])
+              AnimatedBuilder(
+                animation: _rings,
+                builder: (context, _) {
+                  final t = ((_rings.value - delay) / (1 - delay)).clamp(
+                    0.0,
+                    1.0,
+                  );
+                  if (t == 0 || t == 1) return const SizedBox.shrink();
+                  final eased = Curves.easeOutCubic.transform(t);
+                  return Container(
+                    width: size + (outer - size) * eased,
+                    height: size + (outer - size) * eased,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: scheme.primary.withValues(alpha: 0.35 * (1 - t)),
+                        width: 2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.6, end: 1),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOutBack,
+              builder: (context, scale, child) =>
+                  Transform.scale(scale: scale, child: child),
+              child: circle,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -457,6 +593,7 @@ class _Heading extends StatelessWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
             ),
           ),
         ),
@@ -466,6 +603,7 @@ class _Heading extends StatelessWidget {
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyLarge?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
+            height: 1.35,
           ),
         ),
       ],
@@ -515,9 +653,8 @@ class _WelcomePage extends StatelessWidget {
 
     return _PageScroll(
       children: [
-        const SizedBox(height: 12),
-        const Center(child: _Badge(CupertinoIcons.drop_fill, size: 104)),
-        const SizedBox(height: 24),
+        const Center(child: _Badge(CupertinoIcons.drop_fill, size: 96)),
+        const SizedBox(height: 8),
         _Appear(
           order: 1,
           child: _Heading(
@@ -525,12 +662,24 @@ class _WelcomePage extends StatelessWidget {
             body: l10n.onboardingWelcomeBody,
           ),
         ),
-        const SizedBox(height: 28),
-        for (final (index, (icon, title, body)) in promises.indexed)
-          _Appear(
-            order: index + 2,
-            child: _Promise(icon: icon, title: title, body: body),
+        const SizedBox(height: 24),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: [
+                for (final (index, (icon, title, body))
+                    in promises.indexed) ...[
+                  if (index > 0) const Divider(indent: 72),
+                  _Appear(
+                    order: index + 2,
+                    child: _Promise(icon: icon, title: title, body: body),
+                  ),
+                ],
+              ],
+            ),
           ),
+        ),
       ],
     );
   }
@@ -548,7 +697,7 @@ class _Promise extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
       child: MergeSemantics(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,6 +729,7 @@ class _Promise extends StatelessWidget {
                     body,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
+                      height: 1.3,
                     ),
                   ),
                 ],
@@ -615,8 +765,8 @@ class _AboutPage extends StatelessWidget {
 
     return _PageScroll(
       children: [
-        const Center(child: _Badge(CupertinoIcons.person_fill)),
-        const SizedBox(height: 20),
+        const Center(child: _Badge(CupertinoIcons.person_fill, size: 80)),
+        const SizedBox(height: 4),
         _Appear(
           order: 1,
           child: _Heading(
@@ -624,7 +774,7 @@ class _AboutPage extends StatelessWidget {
             body: l10n.onboardingAboutBody,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         _Appear(
           order: 2,
           child: AboutMeCard(
@@ -643,9 +793,7 @@ class _AboutPage extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 16),
                   child: ContraceptionOffer(
                     onAccept: () => onSettingsChanged(
-                      settings.copyWith(
-                        mode: CycleMode.hormonalContraception,
-                      ),
+                      settings.copyWith(mode: CycleMode.hormonalContraception),
                     ),
                   ),
                 )
@@ -653,6 +801,52 @@ class _AboutPage extends StatelessWidget {
         ),
         _Appear(order: 3, child: GroupFooter(l10n.aboutMeFooter)),
       ],
+    );
+  }
+}
+
+/// A line under the first-day row: a reassurance until she picks, then what
+/// will happen with the day she picked.
+class _Hint extends StatelessWidget {
+  const _Hint({
+    required this.icon,
+    required this.text,
+    required this.done,
+    super.key,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(
+            child: Icon(
+              icon,
+              size: 20,
+              color: done ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: done ? scheme.onSurface : scheme.onSurfaceVariant,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -674,11 +868,15 @@ class _LastPeriodPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final picked = date;
+    final when = picked == null
+        ? ''
+        : DateFormat.MMMMd(locale)
+              .format(DateTime(picked.year, picked.month, picked.day));
 
     return _PageScroll(
       children: [
-        const Center(child: _Badge(CupertinoIcons.calendar)),
-        const SizedBox(height: 20),
+        const Center(child: _Badge(CupertinoIcons.calendar, size: 80)),
+        const SizedBox(height: 4),
         _Appear(
           order: 1,
           child: _Heading(
@@ -695,13 +893,33 @@ class _LastPeriodPage extends StatelessWidget {
               key: OnboardingKeys.lastPeriod,
               icon: CupertinoIcons.drop,
               label: l10n.onboardingLastPeriodLabel,
-              value: picked == null
-                  ? l10n.notSet
-                  : DateFormat.MMMd(
-                      locale,
-                    ).format(DateTime(picked.year, picked.month, picked.day)),
+              value: picked == null ? l10n.onboardingLastPeriodChoose : when,
               placeholder: picked == null,
               onTap: () => _pickDate(context),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _Appear(
+          order: 3,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.96, end: 1.0).animate(animation),
+                child: child,
+              ),
+            ),
+            child: _Hint(
+              key: ValueKey(picked),
+              icon: picked == null
+                  ? CupertinoIcons.info_circle
+                  : CupertinoIcons.checkmark_circle_fill,
+              text: picked == null
+                  ? l10n.onboardingLastPeriodUnsure
+                  : l10n.onboardingLastPeriodPicked(when),
+              done: picked != null,
             ),
           ),
         ),

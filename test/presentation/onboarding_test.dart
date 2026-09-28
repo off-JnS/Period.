@@ -64,6 +64,15 @@ void main() {
     expect(find.text('Get started'), findsOneWidget);
   });
 
+  testWidgets('the last page reassures until a day is picked', (tester) async {
+    await pumpFlow(tester);
+    await next(tester);
+    await next(tester);
+
+    expect(find.text('Choose a date'), findsOneWidget);
+    expect(find.textContaining('Not sure?'), findsOneWidget);
+  });
+
   testWidgets('walking through saves the profile, the first entry and done', (
     tester,
   ) async {
@@ -93,7 +102,11 @@ void main() {
     );
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
-    expect(find.text('Sep 28'), findsOneWidget);
+    expect(find.text('September 28'), findsOneWidget);
+    expect(
+      find.text('September 28 becomes your first period entry.'),
+      findsOneWidget,
+    );
 
     expect(find.text('Start tracking'), findsOneWidget);
     await next(tester);

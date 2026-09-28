@@ -1013,7 +1013,7 @@
   "@onboardingAboutTitle": {
     "description": "Onboarding: profile page title, also the back label of its pickers."
   },
-  "onboardingAboutBody": "All optional, and you can change it any time in Profile.",
+  "onboardingAboutBody": "All optional. Tap a row to answer, and change it any time in Profile.",
   "@onboardingAboutBody": {
     "description": "Onboarding: line under the profile page title."
   },
@@ -1021,7 +1021,7 @@
   "@onboardingLastPeriodTitle": {
     "description": "Onboarding: last page title."
   },
-  "onboardingLastPeriodBody": "This becomes your first entry. Not sure? Skip it and log your next period when it comes.",
+  "onboardingLastPeriodBody": "This becomes your first entry in the calendar.",
   "@onboardingLastPeriodBody": {
     "description": "Onboarding: line under the last page title."
   },
@@ -1032,5 +1032,22 @@
   "onboardingSaveFailed": "Your entry could not be saved. Please try again.",
   "@onboardingSaveFailed": {
     "description": "Onboarding: shown when finishing could not be stored."
+  },
+  "onboardingLastPeriodChoose": "Choose a date",
+  "@onboardingLastPeriodChoose": {
+    "description": "Onboarding: first-day row value before a date is picked."
+  },
+  "onboardingLastPeriodUnsure": "Not sure? Skip it and log your next period when it comes.",
+  "@onboardingLastPeriodUnsure": {
+    "description": "Onboarding: hint under the first-day row before a date is picked."
+  },
+  "onboardingLastPeriodPicked": "{date} becomes your first period entry.",
+  "@onboardingLastPeriodPicked": {
+    "description": "Onboarding: hint once a date is picked. date is like 'September 28'.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
   }
 }

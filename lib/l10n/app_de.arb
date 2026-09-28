@@ -289,9 +289,12 @@
   "onboardingPromiseEstimateTitle": "Schätzungen, keine Gewissheiten",
   "onboardingPromiseEstimateBody": "Vorhersagen sind Zeitfenster auf Basis deiner eigenen Einträge. Zur Verhütung sind sie nicht geeignet.",
   "onboardingAboutTitle": "Über dich",
-  "onboardingAboutBody": "Alles freiwillig und jederzeit im Profil änderbar.",
+  "onboardingAboutBody": "Alles freiwillig. Tippe auf eine Zeile zum Antworten, ändern kannst du es jederzeit im Profil.",
   "onboardingLastPeriodTitle": "Wann hat deine letzte Periode begonnen?",
-  "onboardingLastPeriodBody": "Das wird dein erster Eintrag. Unsicher? Überspring es und trag deine nächste Periode ein, wenn sie kommt.",
+  "onboardingLastPeriodBody": "Das wird dein erster Eintrag im Kalender.",
   "onboardingLastPeriodLabel": "Erster Tag",
-  "onboardingSaveFailed": "Dein Eintrag konnte nicht gespeichert werden. Bitte versuch es noch einmal."
+  "onboardingSaveFailed": "Dein Eintrag konnte nicht gespeichert werden. Bitte versuch es noch einmal.",
+  "onboardingLastPeriodChoose": "Datum wählen",
+  "onboardingLastPeriodUnsure": "Unsicher? Überspring es und trag deine nächste Periode ein, wenn sie kommt.",
+  "onboardingLastPeriodPicked": "Der {date} wird dein erster Periodeneintrag."
 }

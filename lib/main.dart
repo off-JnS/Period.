@@ -131,6 +131,9 @@ class _PeriodAppState extends State<PeriodApp> {
   Future<void> _open() async {
     try {
       final database = await openEncryptedDatabase(keyStore: _keyStore);
+      // Asked before any example data goes in, so a fresh install with the
+      // demo flag still counts as a first launch.
+      final onboarding = await _needsOnboarding(database);
       if (demoDataRequested &&
           (await database.logDao.allPeriodStarts()).isEmpty) {
         await seedDemoData(database, const SystemClock().today());
@@ -139,7 +142,6 @@ class _PeriodAppState extends State<PeriodApp> {
       // screen already has her theme and language rather than switching
       // under her a moment later.
       final preferences = await database.settingsDao.appPreferences();
-      final onboarding = await _needsOnboarding(database);
       final lock = AppLock(
         authenticator: LocalAuthDeviceAuthenticator(),
         enabled: await database.settingsDao.appLockEnabled(),
