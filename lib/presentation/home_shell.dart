@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../data/database/daos/log_dao.dart';
 import '../data/database/daos/settings_dao.dart';
@@ -175,7 +174,6 @@ class _HomeShellState extends State<HomeShell> {
         ),
         onTap: (index) {
           if (index == _tab) return;
-          HapticFeedback.selectionClick();
           setState(() => _tab = index);
         },
         items: [

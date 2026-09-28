@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../data/database/daos/settings_dao.dart';
 import '../../domain/models/app_preferences.dart';
@@ -122,7 +121,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (lock != null && !await lock.confirmOwner(reason: l10n.eraseAllReason)) {
       return;
     }
-    unawaited(HapticFeedback.heavyImpact());
     await erase(l10n.eraseAllDone, l10n.eraseAllFailed);
   }
 

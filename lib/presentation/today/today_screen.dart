@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/logic/fertile_window.dart';
@@ -159,7 +158,6 @@ class _TodayScreenState extends State<TodayScreen> {
           enter(
             FilledButton.icon(
               onPressed: () {
-                HapticFeedback.selectionClick();
                 onAdd();
               },
               icon: const Icon(CupertinoIcons.add),

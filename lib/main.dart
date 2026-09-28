@@ -13,6 +13,7 @@ import 'domain/models/app_preferences.dart';
 import 'l10n/app_localizations.dart';
 import 'presentation/home_shell.dart';
 import 'presentation/lock/app_lock.dart';
+import 'presentation/no_haptics.dart';
 import 'presentation/reminders/reminder_sync.dart';
 import 'presentation/widget/widget_sync.dart';
 import 'presentation/preferences_mapping.dart';
@@ -21,7 +22,9 @@ Future<void> main() async {
   // The database is opened from inside the app rather than here, so that a
   // failure to open it can be reported in the user's own language instead of on
   // a grey screen.
-  WidgetsFlutterBinding.ensureInitialized();
+  // Flutter's binding with every vibration request dropped: the app has no
+  // haptic feedback at all.
+  NoHapticsBinding.ensureInitialized();
   runApp(const PeriodApp());
 }
 

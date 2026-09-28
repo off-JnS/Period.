@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/logic/calendar_month.dart';
@@ -134,7 +133,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _setFilter(CalendarFilter? filter) {
     if (filter == _filter) return;
-    HapticFeedback.selectionClick();
     setState(() => _filter = filter);
   }
 
@@ -148,7 +146,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// years away, where a glide would only be a blur.
   void _scrollToToday() {
     if (!_controller.hasClients) return;
-    HapticFeedback.selectionClick();
     if (_controller.offset.abs() > 4000) {
       _controller.jumpTo(0);
     } else {
@@ -249,9 +246,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            side: const WidgetStatePropertyAll(
-                              BorderSide.none,
-                            ),
+                            side: const WidgetStatePropertyAll(BorderSide.none),
                             elevation: const WidgetStatePropertyAll(8),
                             shadowColor: WidgetStatePropertyAll(
                               Colors.black.withValues(alpha: 0.25),
@@ -672,7 +667,6 @@ class _DayCell extends StatelessWidget {
         onTap: onTap == null
             ? null
             : () {
-                HapticFeedback.selectionClick();
                 onTap!(date);
               },
         // A hairline above every day, as iOS draws above each week: the

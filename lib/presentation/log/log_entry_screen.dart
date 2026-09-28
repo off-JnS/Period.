@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../domain/models/cycle_date.dart';
@@ -249,8 +248,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    void toggled() => HapticFeedback.selectionClick();
-
     _reportUnsavedChanges();
 
     // Leaving with changes asks first -- through Cancel, and through the
@@ -296,7 +293,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
             _PeriodSection(
               isPeriodStart: _isPeriodStart,
               onChanged: (value) {
-                toggled();
                 setState(() => _isPeriodStart = value);
               },
             ),
@@ -304,7 +300,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
             _FlowSection(
               flow: _flow,
               onChanged: (value) {
-                toggled();
                 setState(() => _flow = value);
               },
             ),
@@ -314,7 +309,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               keys: offeredSymptomKeys,
               selectedKeys: _symptomKeys,
               onToggle: (key, selected) {
-                toggled();
                 _toggle(key, selected: selected);
               },
             ),
@@ -324,7 +318,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               keys: offeredMoodKeys,
               selectedKeys: _symptomKeys,
               onToggle: (key, selected) {
-                toggled();
                 _toggle(key, selected: selected);
               },
             ),
@@ -336,7 +329,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               singleChoice: true,
               footer: l10n.singleChoiceHint,
               onToggle: (key, selected) {
-                toggled();
                 _toggle(key, selected: selected);
               },
             ),
@@ -348,7 +340,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               singleChoice: true,
               footer: '${l10n.sexFooter} ${l10n.singleChoiceHint}',
               onToggle: (key, selected) {
-                toggled();
                 _toggle(key, selected: selected);
               },
             ),
@@ -361,7 +352,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   value: _symptomKeys.contains(pillTakenKey),
                   onChanged: (taken) {
-                    toggled();
                     _toggle(pillTakenKey, selected: taken);
                   },
                   title: Text(l10n.pillTaken),
@@ -374,7 +364,6 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
               invalid: _temperatureInvalid,
               selectedKeys: _symptomKeys,
               onToggle: (key, selected) {
-                toggled();
                 _toggle(key, selected: selected);
               },
             ),

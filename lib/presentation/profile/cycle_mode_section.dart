@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/models/cycle_mode.dart';
 import '../../l10n/app_localizations.dart';
@@ -30,7 +29,6 @@ class CycleModeSection extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     void change(CycleSettings next) {
-      HapticFeedback.selectionClick();
       onChanged(next);
     }
 

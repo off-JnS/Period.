@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/logic/profile.dart';
 import '../../domain/models/cycle_mode.dart';
@@ -68,7 +67,6 @@ class ProfileScreen extends StatelessWidget {
   final VoidCallback? onOpenSettings;
 
   void _change(Profile next) {
-    HapticFeedback.selectionClick();
     onProfileChanged(next);
   }
 
@@ -103,7 +101,6 @@ class ProfileScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 20),
                   child: _ContraceptionOffer(
                     onAccept: () {
-                      HapticFeedback.mediumImpact();
                       onSettingsChanged(
                         settings.copyWith(
                           mode: CycleMode.hormonalContraception,
@@ -469,7 +466,6 @@ Future<void> _pickNumber(
                   ),
                   onSelectedItemChanged: (value) {
                     index = value;
-                    HapticFeedback.selectionClick();
                   },
                   children: [
                     for (final value in values)

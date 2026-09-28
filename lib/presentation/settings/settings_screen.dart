@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../domain/models/app_preferences.dart';
 import '../../domain/models/reminder_settings.dart';
@@ -78,7 +77,6 @@ class SettingsScreen extends StatelessWidget {
     void changePreferences(AppPreferences next) {
       final report = onPreferencesChanged;
       if (report == null) return;
-      HapticFeedback.selectionClick();
       report(next);
     }
 
@@ -104,7 +102,6 @@ class SettingsScreen extends StatelessWidget {
               onChanged: onLockChanged == null
                   ? null
                   : (value) {
-                      HapticFeedback.selectionClick();
                       onLockChanged!(value);
                     },
               title: Text(l10n.appLockToggle),
@@ -125,7 +122,6 @@ class SettingsScreen extends StatelessWidget {
               onChanged: onWidgetDetailedChanged == null
                   ? null
                   : (value) {
-                      HapticFeedback.selectionClick();
                       onWidgetDetailedChanged!(value);
                     },
               title: Text(l10n.widgetDetailedToggle),
@@ -208,7 +204,6 @@ class _RemindersCard extends StatelessWidget {
   void _change(ReminderSettings next) {
     final report = onChanged;
     if (report == null) return;
-    HapticFeedback.selectionClick();
     report(next);
   }
 

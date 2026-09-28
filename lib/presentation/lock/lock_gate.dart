@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../theme.dart';
@@ -134,7 +133,6 @@ class _LockScreen extends StatelessWidget {
                   onPressed: busy
                       ? null
                       : () {
-                          HapticFeedback.selectionClick();
                           onUnlock();
                         },
                   icon: const Icon(Icons.lock_open_rounded),
