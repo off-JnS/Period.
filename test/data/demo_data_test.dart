@@ -117,4 +117,16 @@ void main() {
       expect(days.pregnancyTest.intersection(days.sex), isNotEmpty);
     },
   );
+
+  test(
+    'the profile is filled in, without offering the contraception mode',
+    () async {
+      final profile = await database.settingsDao.profile(
+        currentYear: today.year,
+      );
+      expect(profile.birthYear, today.year - 28);
+      expect(profile.usualCycleLength, isNotNull);
+      expect(profile.contraception?.hormonal, isFalse);
+    },
+  );
 }

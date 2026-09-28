@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../domain/models/cycle_date.dart';
 import '../domain/models/cycle_mode.dart';
 import '../domain/models/day_entry.dart';
+import '../domain/models/profile.dart';
 import '../domain/models/symptom.dart';
 import 'database/database.dart';
 
@@ -152,6 +153,18 @@ Future<void> seedDemoData(AppDatabase database, CycleDate today) async {
   for (final entry in days.values) {
     await log.saveEntry(entry);
   }
+
+  // A filled-in profile, so that screen and the report's "Stated by me"
+  // section have something to show. Condoms rather than a hormonal method,
+  // so the natural-cycle estimates above still apply.
+  await database.settingsDao.saveProfile(
+    Profile(
+      birthYear: today.year - 28,
+      usualCycleLength: 29,
+      usualPeriodLength: 5,
+      contraception: ContraceptionMethod.condom,
+    ),
+  );
 
   // The fertile window is opt-in; on here so the preview shows it.
   await database.settingsDao.saveCycleSettings(
