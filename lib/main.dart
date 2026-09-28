@@ -14,6 +14,7 @@ import 'l10n/app_localizations.dart';
 import 'presentation/home_shell.dart';
 import 'presentation/lock/app_lock.dart';
 import 'presentation/no_haptics.dart';
+import 'presentation/onboarding/onboarding_flow.dart';
 import 'presentation/reminders/reminder_sync.dart';
 import 'presentation/widget/widget_sync.dart';
 import 'presentation/preferences_mapping.dart';
@@ -61,6 +62,9 @@ class _PeriodAppState extends State<PeriodApp> {
   /// The optional app lock, once the database says whether it is on. Until
   /// then only the loading screen shows, which holds nothing of hers.
   AppLock? _lock;
+
+  /// Whether the first-launch introduction shows instead of the app.
+  bool _onboarding = false;
 
   /// Keeps reminders scheduled; created with the database it reads.
   ReminderSync? _reminders;
@@ -135,6 +139,7 @@ class _PeriodAppState extends State<PeriodApp> {
       // screen already has her theme and language rather than switching
       // under her a moment later.
       final preferences = await database.settingsDao.appPreferences();
+      final onboarding = await _needsOnboarding(database);
       final lock = AppLock(
         authenticator: LocalAuthDeviceAuthenticator(),
         enabled: await database.settingsDao.appLockEnabled(),
@@ -147,6 +152,7 @@ class _PeriodAppState extends State<PeriodApp> {
       }
       setState(() {
         _preferences = preferences;
+        _onboarding = onboarding;
         _lock = lock;
         _reminders = ReminderSync(
           logDao: database.logDao,
@@ -167,6 +173,20 @@ class _PeriodAppState extends State<PeriodApp> {
       if (!mounted) return;
       setState(() => _error = error);
     }
+  }
+
+  /// The introduction shows once, on a fresh install: never after it was
+  /// finished or skipped, and never over data already there (an install
+  /// from before it existed is marked done instead). The debug flag shows it
+  /// every time.
+  Future<bool> _needsOnboarding(AppDatabase database) async {
+    if (onboardingAlwaysRequested) return true;
+    if (await database.settingsDao.onboardingDone()) return false;
+    final hasData =
+        (await database.logDao.allPeriodStarts()).isNotEmpty ||
+        (await database.logDao.loggedDays()).logged.isNotEmpty;
+    if (hasData) await database.settingsDao.saveOnboardingDone();
+    return !hasData;
   }
 
   @override
@@ -191,18 +211,30 @@ class _PeriodAppState extends State<PeriodApp> {
               body: Center(child: CircularProgressIndicator.adaptive()),
             );
           }
-          return HomeShell(
-            logDao: database.logDao,
-            settingsDao: database.settingsDao,
-            clock: const SystemClock(),
-            appLock: _lock,
-            reminderSync: _reminders,
-            widgetSync: _widget,
-            onEraseEverything: _eraseEverything,
-            // Applied at once, from the Settings screen: the whole app
-            // re-themes or re-translates in place, on the same tab.
-            onPreferencesChanged: (preferences) =>
-                setState(() => _preferences = preferences),
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 450),
+            child: _onboarding
+                ? OnboardingFlow(
+                    key: const ValueKey('onboarding'),
+                    settingsDao: database.settingsDao,
+                    logDao: database.logDao,
+                    clock: const SystemClock(),
+                    onFinished: () => setState(() => _onboarding = false),
+                  )
+                : HomeShell(
+                    key: const ValueKey('home'),
+                    logDao: database.logDao,
+                    settingsDao: database.settingsDao,
+                    clock: const SystemClock(),
+                    appLock: _lock,
+                    reminderSync: _reminders,
+                    widgetSync: _widget,
+                    onEraseEverything: _eraseEverything,
+                    // Applied at once, from the Settings screen: the whole app
+                    // re-themes or re-translates in place, on the same tab.
+                    onPreferencesChanged: (preferences) =>
+                        setState(() => _preferences = preferences),
+                  ),
           );
         },
       ),

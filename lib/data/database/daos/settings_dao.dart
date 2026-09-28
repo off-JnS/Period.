@@ -59,6 +59,9 @@ abstract final class SettingKeys {
 
   /// Her [KnownCondition]s, by enum name, comma-separated.
   static const profileConditions = 'profile_conditions';
+
+  /// `true` once she finished or skipped the first-launch introduction.
+  static const onboardingDone = 'onboarding_done';
 }
 
 /// Reads and writes the user's settings.
@@ -183,6 +186,13 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   /// Turns the widget's details on or off.
   Future<void> saveWidgetDetailed({required bool detailed}) =>
       _put(SettingKeys.widgetDetailed, '$detailed');
+
+  /// Whether she has finished or skipped the first-launch introduction.
+  Future<bool> onboardingDone() async =>
+      (await _values())[SettingKeys.onboardingDone] == 'true';
+
+  /// Records that the introduction is behind her, so it never shows again.
+  Future<void> saveOnboardingDone() => _put(SettingKeys.onboardingDone, 'true');
 
   /// What she has said about herself. Anything missing, out of range or not
   /// understood reads as unsaid rather than being trusted or thrown over.

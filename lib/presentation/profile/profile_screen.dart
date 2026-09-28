@@ -66,10 +66,6 @@ class ProfileScreen extends StatelessWidget {
   /// Opens Settings. Null hides the gear.
   final VoidCallback? onOpenSettings;
 
-  void _change(Profile next) {
-    onProfileChanged(next);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -99,7 +95,7 @@ class ProfileScreen extends StatelessWidget {
           child: offer
               ? Padding(
                   padding: const EdgeInsets.only(top: 20),
-                  child: _ContraceptionOffer(
+                  child: ContraceptionOffer(
                     onAccept: () {
                       onSettingsChanged(
                         settings.copyWith(
@@ -113,121 +109,158 @@ class ProfileScreen extends StatelessWidget {
         ),
         const SizedBox(height: 28),
         GroupHeader(l10n.aboutMeHeading),
-        Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              ValueRow(
-                key: ProfileKeys.birthYear,
-                icon: CupertinoIcons.gift,
-                label: l10n.birthYearLabel,
-                value: profile.birthYear?.toString() ?? l10n.notSet,
-                placeholder: profile.birthYear == null,
-                onTap: () => _pickNumber(
-                  context,
-                  title: l10n.birthYearLabel,
-                  values: birthYearChoices(currentYear),
-                  current: profile.birthYear,
-                  initial: currentYear - 25,
-                  format: (year) => '$year',
-                  onPicked: (year) =>
-                      _change(profile.copyWith(birthYear: year)),
-                ),
-              ),
-              const Divider(indent: 56),
-              ValueRow(
-                key: ProfileKeys.cycleLength,
-                icon: CupertinoIcons.arrow_2_circlepath,
-                label: l10n.usualCycleLabel,
-                value: _days(l10n, profile.usualCycleLength),
-                placeholder: profile.usualCycleLength == null,
-                onTap: () => _pickNumber(
-                  context,
-                  title: l10n.usualCycleLabel,
-                  values: [
-                    for (
-                      var days = Profile.minCycleLength;
-                      days <= Profile.maxCycleLength;
-                      days++
-                    )
-                      days,
-                  ],
-                  current: profile.usualCycleLength,
-                  initial: 28,
-                  format: l10n.lengthInDays,
-                  onPicked: (days) =>
-                      _change(profile.copyWith(usualCycleLength: days)),
-                ),
-              ),
-              const Divider(indent: 56),
-              ValueRow(
-                key: ProfileKeys.periodLength,
-                icon: CupertinoIcons.drop,
-                label: l10n.usualPeriodLabel,
-                value: _days(l10n, profile.usualPeriodLength),
-                placeholder: profile.usualPeriodLength == null,
-                onTap: () => _pickNumber(
-                  context,
-                  title: l10n.usualPeriodLabel,
-                  values: [
-                    for (
-                      var days = Profile.minPeriodLength;
-                      days <= Profile.maxPeriodLength;
-                      days++
-                    )
-                      days,
-                  ],
-                  current: profile.usualPeriodLength,
-                  initial: 5,
-                  format: l10n.lengthInDays,
-                  onPicked: (days) =>
-                      _change(profile.copyWith(usualPeriodLength: days)),
-                ),
-              ),
-              const Divider(indent: 56),
-              ValueRow(
-                key: ProfileKeys.contraception,
-                icon: CupertinoIcons.shield,
-                label: l10n.contraceptionLabel,
-                value: switch (profile.contraception) {
-                  final method? => methodLabel(l10n, method),
-                  null => l10n.notSet,
-                },
-                placeholder: profile.contraception == null,
-                onTap: () => Navigator.of(context).push(
-                  CupertinoPageRoute<void>(
-                    builder: (_) => _ContraceptionPicker(
-                      current: profile.contraception,
-                      onPicked: (method) =>
-                          _change(profile.copyWith(contraception: method)),
-                    ),
-                  ),
-                ),
-              ),
-              const Divider(indent: 56),
-              ValueRow(
-                key: ProfileKeys.conditions,
-                icon: CupertinoIcons.heart_circle,
-                label: l10n.conditionsLabel,
-                value: conditionsSummary(l10n, profile.conditions),
-                placeholder: profile.conditions.isEmpty,
-                onTap: () => Navigator.of(context).push(
-                  CupertinoPageRoute<void>(
-                    builder: (_) => _ConditionsPicker(
-                      initial: profile.conditions,
-                      onChanged: (conditions) =>
-                          _change(profile.copyWith(conditions: conditions)),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        AboutMeCard(
+          profile: profile,
+          currentYear: currentYear,
+          onChanged: onProfileChanged,
+          backLabel: l10n.profileTitle,
         ),
         GroupFooter(l10n.aboutMeFooter),
         const SizedBox(height: 28),
         CycleModeSection(settings: settings, onChanged: onSettingsChanged),
       ],
+    );
+  }
+}
+
+/// The rows she answers about herself: birth year, usual lengths,
+/// contraception and diagnosed conditions. Shared by Profile and onboarding.
+class AboutMeCard extends StatelessWidget {
+  /// Creates the card.
+  const AboutMeCard({
+    required this.profile,
+    required this.currentYear,
+    required this.onChanged,
+    required this.backLabel,
+    super.key,
+  });
+
+  /// What she has said so far.
+  final Profile profile;
+
+  /// This calendar year, for the birth years on offer.
+  final int currentYear;
+
+  /// Called with the whole new profile on any change.
+  final ValueChanged<Profile> onChanged;
+
+  /// The title the pushed pickers name on their back button.
+  final String backLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ValueRow(
+            key: ProfileKeys.birthYear,
+            icon: CupertinoIcons.gift,
+            label: l10n.birthYearLabel,
+            value: profile.birthYear?.toString() ?? l10n.notSet,
+            placeholder: profile.birthYear == null,
+            onTap: () => _pickNumber(
+              context,
+              title: l10n.birthYearLabel,
+              values: birthYearChoices(currentYear),
+              current: profile.birthYear,
+              initial: currentYear - 25,
+              format: (year) => '$year',
+              onPicked: (year) => onChanged(profile.copyWith(birthYear: year)),
+            ),
+          ),
+          const Divider(indent: 56),
+          ValueRow(
+            key: ProfileKeys.cycleLength,
+            icon: CupertinoIcons.arrow_2_circlepath,
+            label: l10n.usualCycleLabel,
+            value: _days(l10n, profile.usualCycleLength),
+            placeholder: profile.usualCycleLength == null,
+            onTap: () => _pickNumber(
+              context,
+              title: l10n.usualCycleLabel,
+              values: [
+                for (
+                  var days = Profile.minCycleLength;
+                  days <= Profile.maxCycleLength;
+                  days++
+                )
+                  days,
+              ],
+              current: profile.usualCycleLength,
+              initial: 28,
+              format: l10n.lengthInDays,
+              onPicked: (days) =>
+                  onChanged(profile.copyWith(usualCycleLength: days)),
+            ),
+          ),
+          const Divider(indent: 56),
+          ValueRow(
+            key: ProfileKeys.periodLength,
+            icon: CupertinoIcons.drop,
+            label: l10n.usualPeriodLabel,
+            value: _days(l10n, profile.usualPeriodLength),
+            placeholder: profile.usualPeriodLength == null,
+            onTap: () => _pickNumber(
+              context,
+              title: l10n.usualPeriodLabel,
+              values: [
+                for (
+                  var days = Profile.minPeriodLength;
+                  days <= Profile.maxPeriodLength;
+                  days++
+                )
+                  days,
+              ],
+              current: profile.usualPeriodLength,
+              initial: 5,
+              format: l10n.lengthInDays,
+              onPicked: (days) =>
+                  onChanged(profile.copyWith(usualPeriodLength: days)),
+            ),
+          ),
+          const Divider(indent: 56),
+          ValueRow(
+            key: ProfileKeys.contraception,
+            icon: CupertinoIcons.shield,
+            label: l10n.contraceptionLabel,
+            value: switch (profile.contraception) {
+              final method? => methodLabel(l10n, method),
+              null => l10n.notSet,
+            },
+            placeholder: profile.contraception == null,
+            onTap: () => Navigator.of(context).push(
+              CupertinoPageRoute<void>(
+                builder: (_) => _ContraceptionPicker(
+                  backLabel: backLabel,
+                  current: profile.contraception,
+                  onPicked: (method) =>
+                      onChanged(profile.copyWith(contraception: method)),
+                ),
+              ),
+            ),
+          ),
+          const Divider(indent: 56),
+          ValueRow(
+            key: ProfileKeys.conditions,
+            icon: CupertinoIcons.heart_circle,
+            label: l10n.conditionsLabel,
+            value: conditionsSummary(l10n, profile.conditions),
+            placeholder: profile.conditions.isEmpty,
+            onTap: () => Navigator.of(context).push(
+              CupertinoPageRoute<void>(
+                builder: (_) => _ConditionsPicker(
+                  backLabel: backLabel,
+                  initial: profile.conditions,
+                  onChanged: (conditions) =>
+                      onChanged(profile.copyWith(conditions: conditions)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -329,9 +362,11 @@ class _Header extends StatelessWidget {
 
 /// The offer to switch to the contraception mode. docs/cycle-logic.md §10:
 /// offered, never done for her.
-class _ContraceptionOffer extends StatelessWidget {
-  const _ContraceptionOffer({required this.onAccept});
+class ContraceptionOffer extends StatelessWidget {
+  /// Creates the offer.
+  const ContraceptionOffer({required this.onAccept, super.key});
 
+  /// Switches to the contraception mode.
   final VoidCallback onAccept;
 
   @override
@@ -489,9 +524,14 @@ Future<void> _pickNumber(
 
 /// The contraception list, pushed like a Settings sub-page.
 class _ContraceptionPicker extends StatelessWidget {
-  const _ContraceptionPicker({required this.current, required this.onPicked});
+  const _ContraceptionPicker({
+    required this.current,
+    required this.onPicked,
+    required this.backLabel,
+  });
 
   final ContraceptionMethod? current;
+  final String backLabel;
   final ValueChanged<ContraceptionMethod?> onPicked;
 
   @override
@@ -505,7 +545,7 @@ class _ContraceptionPicker extends StatelessWidget {
 
     return GroupedPage(
       title: l10n.contraceptionLabel,
-      backLabel: l10n.profileTitle,
+      backLabel: backLabel,
       trailing: current == null
           ? null
           : CupertinoButton(
@@ -530,9 +570,14 @@ class _ContraceptionPicker extends StatelessWidget {
 /// The diagnosed-conditions list. Any number may be checked; each tap is
 /// saved at once, as a Settings list is.
 class _ConditionsPicker extends StatefulWidget {
-  const _ConditionsPicker({required this.initial, required this.onChanged});
+  const _ConditionsPicker({
+    required this.initial,
+    required this.onChanged,
+    required this.backLabel,
+  });
 
   final Set<KnownCondition> initial;
+  final String backLabel;
   final ValueChanged<Set<KnownCondition>> onChanged;
 
   @override
@@ -548,7 +593,7 @@ class _ConditionsPickerState extends State<_ConditionsPicker> {
 
     return GroupedPage(
       title: l10n.conditionsLabel,
-      backLabel: l10n.profileTitle,
+      backLabel: widget.backLabel,
       children: [
         MultiCheckList(
           options: KnownCondition.values,

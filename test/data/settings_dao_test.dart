@@ -152,6 +152,22 @@ void main() {
     });
   });
 
+  group('onboarding', () {
+    test('is not done on a fresh install', () async {
+      expect(await database.settingsDao.onboardingDone(), isFalse);
+    });
+
+    test('stays done once saved', () async {
+      await database.settingsDao.saveOnboardingDone();
+      expect(await database.settingsDao.onboardingDone(), isTrue);
+    });
+
+    test('an unreadable value reads as not done', () async {
+      await storeRaw(SettingKeys.onboardingDone, 'maybe');
+      expect(await database.settingsDao.onboardingDone(), isFalse);
+    });
+  });
+
   group('reminders', () {
     test('are off until turned on, at 9:00, two days ahead', () async {
       expect(

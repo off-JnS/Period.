@@ -948,5 +948,89 @@
   "calendarFilterClear": "Clear filter",
   "@calendarFilterClear": {
     "description": "Calendar: accessible name of the \u00d7 on the active-filter tag."
+  },
+  "onboardingSkip": "Skip",
+  "@onboardingSkip": {
+    "description": "Onboarding: top-right button that ends the introduction."
+  },
+  "onboardingContinue": "Continue",
+  "@onboardingContinue": {
+    "description": "Onboarding: main button between pages."
+  },
+  "onboardingStart": "Get started",
+  "@onboardingStart": {
+    "description": "Onboarding: main button on the welcome page."
+  },
+  "onboardingFinish": "Start tracking",
+  "@onboardingFinish": {
+    "description": "Onboarding: main button on the last page."
+  },
+  "onboardingProgress": "Step {step} of {count}",
+  "@onboardingProgress": {
+    "description": "Onboarding: accessible name of the progress dots.",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onboardingWelcomeTitle": "Welcome to Period.",
+  "@onboardingWelcomeTitle": {
+    "description": "Onboarding: welcome page title."
+  },
+  "onboardingWelcomeBody": "A calm place for your cycle. Three things to know before you start.",
+  "@onboardingWelcomeBody": {
+    "description": "Onboarding: line under the welcome title."
+  },
+  "onboardingPromiseDeviceTitle": "Stays on your phone",
+  "@onboardingPromiseDeviceTitle": {
+    "description": "Onboarding: first promise title."
+  },
+  "onboardingPromiseDeviceBody": "Everything you enter is encrypted and kept only on this device. Nothing is ever sent anywhere.",
+  "@onboardingPromiseDeviceBody": {
+    "description": "Onboarding: first promise."
+  },
+  "onboardingPromiseAccountTitle": "No account, no sign-in",
+  "@onboardingPromiseAccountTitle": {
+    "description": "Onboarding: second promise title."
+  },
+  "onboardingPromiseAccountBody": "No email, no password. Open the app and start.",
+  "@onboardingPromiseAccountBody": {
+    "description": "Onboarding: second promise."
+  },
+  "onboardingPromiseEstimateTitle": "Estimates, never certainties",
+  "@onboardingPromiseEstimateTitle": {
+    "description": "Onboarding: third promise title."
+  },
+  "onboardingPromiseEstimateBody": "Predictions are windows based on your own entries. They are not suitable for contraception.",
+  "@onboardingPromiseEstimateBody": {
+    "description": "Onboarding: third promise. Must keep the contraception caveat (CLAUDE.md section 8)."
+  },
+  "onboardingAboutTitle": "About you",
+  "@onboardingAboutTitle": {
+    "description": "Onboarding: profile page title, also the back label of its pickers."
+  },
+  "onboardingAboutBody": "All optional, and you can change it any time in Profile.",
+  "@onboardingAboutBody": {
+    "description": "Onboarding: line under the profile page title."
+  },
+  "onboardingLastPeriodTitle": "When did your last period start?",
+  "@onboardingLastPeriodTitle": {
+    "description": "Onboarding: last page title."
+  },
+  "onboardingLastPeriodBody": "This becomes your first entry. Not sure? Skip it and log your next period when it comes.",
+  "@onboardingLastPeriodBody": {
+    "description": "Onboarding: line under the last page title."
+  },
+  "onboardingLastPeriodLabel": "First day",
+  "@onboardingLastPeriodLabel": {
+    "description": "Onboarding: the row that opens the date wheel."
+  },
+  "onboardingSaveFailed": "Your entry could not be saved. Please try again.",
+  "@onboardingSaveFailed": {
+    "description": "Onboarding: shown when finishing could not be stored."
   }
 }

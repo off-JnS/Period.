@@ -187,13 +187,20 @@ discharge, sex, pill, body signals, note), and the sheet itself is calmer:
 fewer boxes, less text, the common things first. Defaults follow the profile
 — the pill section only with a pill, body signals off until she wants them.
 
-### 13. Onboarding ⏳
+### 13. Onboarding 🔨 — built, awaiting review
 
-**What:** on first launch, a few short pages: what the app is and its privacy
-promise, the profile questions, what to track, and optionally the first day of
-her last period (a real entry, not a setting). Every page skippable. Never
-shown again once finished or skipped, and not at all on an install that
-already has data.
+**What:** on first launch, three short pages: what the app is and its privacy
+promise (on the device only, no account, estimates never certainties), the
+profile questions (the same rows as Profile, with the contraception-mode
+offer), and optionally the first day of her last period (a real entry, not a
+setting). Skip on every page. Never shown again once finished or skipped, and
+not at all on an install that already has data.
+
+**Decided 2026-09-28:** there is no login page and never will be (§1); this
+is the whole of "getting started". The "what to track" page waits for
+feature 12, which it would configure. Stored as `onboarding_done` in the
+settings table — **no migration**. For testing, a debug build shows it on
+every launch with `--dart-define=PERIOD_ONBOARDING=true` (ignored in release).
 
 ### 14. Icons and motion ⏳
 
