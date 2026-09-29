@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/day_entry.dart';
@@ -6,6 +8,27 @@ import 'package:period/presentation/log/log_entry_screen.dart';
 import '../support/dates.dart';
 import '../support/models.dart';
 import '../support/widgets.dart';
+
+/// An option on the sheet by its name.
+Finder option(String label) => find.widgetWithText(EntryOption, label);
+
+/// Whether the tile around [finder] says it is chosen.
+bool isSelected(WidgetTester tester, Finder finder) =>
+    tester.getSemantics(finder).flagsCollection.isSelected == Tristate.isTrue;
+
+/// Scrolls to a folded section and opens it.
+Future<void> openFold(WidgetTester tester, String heading) async {
+  await tester.scrollUntilVisible(
+    find.text(heading),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  // To the top, so what opens underneath is on screen too.
+  await Scrollable.ensureVisible(tester.element(find.text(heading)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(heading));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   final day = aDate(2024, 5, 17);
@@ -85,10 +108,92 @@ void main() {
       // other is an observation that there was no bleeding. A fresh day must
       // not claim the second.
       await pumpAndClose(tester, act: (tester) async {});
-      final notRecorded = tester.widget<ChoiceChip>(
-        find.widgetWithText(ChoiceChip, 'Not recorded'),
+      for (final flow in ['None', 'Light', 'Medium', 'Heavy']) {
+        expect(isSelected(tester, find.text(flow)), isFalse);
+      }
+    });
+  });
+
+  group('choosing', () {
+    DayEntry entryOf(LogEntryResult? result) =>
+        (result! as LogEntrySaved).draft.entry;
+
+    testWidgets('a day of the week is one tap away', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await tester.tap(find.text('16'));
+          await tester.pumpAndSettle();
+          expect(find.text('Thursday, May 16'), findsOneWidget);
+          await tester.tap(find.text('Save'));
+        },
       );
-      expect(notRecorded.selected, isTrue);
+      expect(entryOf(result).date, aDate(2024, 5, 16));
+    });
+
+    testWidgets('days still to come cannot be chosen', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await tester.tap(find.text('18'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(entryOf(result).date, day);
+    });
+
+    testWidgets('the arrows move a week at a time, never past today', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await tester.tap(find.bySemanticsLabel('Previous week'));
+          await tester.pumpAndSettle();
+          expect(find.text('Friday, May 10'), findsOneWidget);
+          await tester.tap(find.bySemanticsLabel('Next week'));
+          await tester.pumpAndSettle();
+          expect(find.text('Today, May 17'), findsOneWidget);
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(entryOf(result).date, day);
+    });
+
+    testWidgets('tapping the chosen flow again clears it', (tester) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          await tester.tap(find.text('Light'));
+          await tester.pumpAndSettle();
+          expect(isSelected(tester, find.text('Light')), isTrue);
+          await tester.tap(find.text('Light'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(entryOf(result).flow, isNull);
+    });
+
+    testWidgets('a folded section shows what is chosen in it', (tester) async {
+      await pumpAndClose(
+        tester,
+        entry: aDayEntry(
+          date: day,
+          symptoms: {aSymptom(key: 'discharge.sticky')},
+        ),
+        act: (tester) async {
+          await tester.scrollUntilVisible(
+            find.text('Sticky'),
+            200,
+            scrollable: find.byType(Scrollable).first,
+          );
+          // Named beside the heading, with its options still folded away.
+          expect(option('Creamy'), findsNothing);
+          expect(find.text('Not recorded'), findsNWidgets(2));
+        },
+      );
     });
   });
 
@@ -97,9 +202,9 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Medium'));
+          await tester.tap(find.text('Medium'));
           await tester.pumpAndSettle();
-          await tester.tap(find.widgetWithText(FilterChip, 'Cramps'));
+          await tester.tap(option('Cramps'));
           await tester.pumpAndSettle();
           // The note is the last section and sits below the fold.
           await tester.scrollUntilVisible(
@@ -221,18 +326,8 @@ void main() {
         act: (tester) async {},
       );
 
-      expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Heavy'))
-            .selected,
-        isTrue,
-      );
-      expect(
-        tester
-            .widget<FilterChip>(find.widgetWithText(FilterChip, 'Headache'))
-            .selected,
-        isTrue,
-      );
+      expect(isSelected(tester, find.text('Heavy')), isTrue);
+      expect(tester.widget<EntryOption>(option('Headache')).selected, isTrue);
       await tester.scrollUntilVisible(
         find.text('a note'),
         200,
@@ -352,9 +447,9 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.widgetWithText(FilterChip, 'Calm'));
-          await tester.tap(find.widgetWithText(FilterChip, 'Calm'));
-          await tester.tap(find.widgetWithText(FilterChip, 'Sensitive'));
+          await scrollTo(tester, option('Sensitive'));
+          await tester.tap(option('Calm'));
+          await tester.tap(option('Sensitive'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -366,10 +461,10 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Creamy'));
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Sticky'));
+          await openFold(tester, 'Discharge');
+          await tester.tap(option('Sticky'));
           await tester.pumpAndSettle();
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Creamy'));
+          await tester.tap(option('Creamy'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -385,8 +480,8 @@ void main() {
           symptoms: {aSymptom(key: 'sex.protected')},
         ),
         act: (tester) async {
-          await scrollTo(tester, find.widgetWithText(ChoiceChip, 'Protected'));
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Protected'));
+          await openFold(tester, 'Sex');
+          await tester.tap(option('Protected'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -407,11 +502,8 @@ void main() {
           },
         ),
         act: (tester) async {
-          await scrollTo(
-            tester,
-            find.widgetWithText(ChoiceChip, 'Unprotected'),
-          );
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Unprotected'));
+          await openFold(tester, 'Sex');
+          await tester.tap(option('Unprotected'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -422,7 +514,10 @@ void main() {
     testWidgets('sex says it is never combined with an estimate', (
       tester,
     ) async {
-      await pumpAndClose(tester, act: (tester) async {});
+      await pumpAndClose(
+        tester,
+        act: (tester) async => openFold(tester, 'Sex'),
+      );
       await scrollTo(tester, find.textContaining('never combined'));
       expect(find.textContaining('never combined with any estimate'), findsOne);
     });
@@ -456,7 +551,7 @@ void main() {
           symptoms: {aSymptom(key: 'pill.taken')},
         ),
         act: (tester) async {
-          await tester.tap(find.widgetWithText(ChoiceChip, 'Light'));
+          await tester.tap(find.text('Light'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
         },
@@ -485,7 +580,7 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.text('Basal temperature'));
+          await openFold(tester, 'Body signals');
           await tester.enterText(temperatureField(), '36,45');
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
@@ -503,7 +598,7 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.text('Basal temperature'));
+          await openFold(tester, 'Body signals');
           await tester.enterText(temperatureField(), '3,65');
           await tester.pumpAndSettle();
           await tester.tap(find.text('Save'));
@@ -530,7 +625,9 @@ void main() {
         locale: const Locale('de'),
         entry: aDayEntry(date: day).copyWith(temperatureCentiCelsius: 3645),
         act: (tester) async {
-          await scrollTo(tester, find.text('Basaltemperatur'));
+          // Shown beside the folded section's name, and in the field.
+          await scrollTo(tester, find.text('36,45 °C'));
+          await openFold(tester, 'Körpersignale');
           expect(find.text('36,45'), findsOneWidget);
         },
       );
@@ -540,8 +637,8 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.text('Pregnancy test'));
-          final chip = find.widgetWithText(ChoiceChip, 'Positive').first;
+          await openFold(tester, 'Body signals');
+          final chip = option('Positive').first;
           // scrollUntilVisible stops once any part shows; bring it fully in.
           await tester.ensureVisible(chip);
           await tester.pumpAndSettle();
@@ -562,9 +659,9 @@ void main() {
       final result = await pumpAndClose(
         tester,
         act: (tester) async {
-          await scrollTo(tester, find.text('Pregnancy test'));
-          final positive = find.widgetWithText(ChoiceChip, 'Positive').last;
-          final negative = find.widgetWithText(ChoiceChip, 'Negative').last;
+          await openFold(tester, 'Body signals');
+          final positive = option('Positive').last;
+          final negative = option('Negative').last;
           await tester.ensureVisible(positive);
           await tester.pumpAndSettle();
           await tester.tap(negative);
@@ -584,6 +681,7 @@ void main() {
       await pumpAndClose(
         tester,
         act: (tester) async {
+          await openFold(tester, 'Body signals');
           await scrollTo(tester, find.textContaining('never uses these'));
           expect(find.textContaining('never uses these'), findsOneWidget);
         },

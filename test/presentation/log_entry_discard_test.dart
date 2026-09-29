@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/models/day_entry.dart';
@@ -56,7 +58,7 @@ void main() {
 
   testWidgets('Cancel after a change asks first', (tester) async {
     await openSheet(tester);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+    await tester.tap(find.text('Heavy'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -69,7 +71,7 @@ void main() {
     tester,
   ) async {
     await openSheet(tester);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+    await tester.tap(find.text('Heavy'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -78,16 +80,15 @@ void main() {
 
     expect(sheetOpen(), isTrue);
     expect(
-      tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Heavy'))
-          .selected,
+      tester.getSemantics(find.text('Heavy')).flagsCollection.isSelected ==
+          Tristate.isTrue,
       isTrue,
     );
   });
 
   testWidgets('Discard closes and reports nothing', (tester) async {
     final results = await openSheet(tester);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+    await tester.tap(find.text('Heavy'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -103,9 +104,9 @@ void main() {
       tester,
       entry: aDayEntry(date: day, flow: FlowIntensity.light),
     );
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+    await tester.tap(find.text('Heavy'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Light'));
+    await tester.tap(find.text('Light'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -131,7 +132,7 @@ void main() {
 
   testWidgets('Save is never held up by the prompt', (tester) async {
     final results = await openSheet(tester);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+    await tester.tap(find.text('Heavy'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
@@ -154,15 +155,14 @@ void main() {
 
     testWidgets('does nothing once something was changed', (tester) async {
       await openSheet(tester);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+      await tester.tap(find.text('Heavy'));
       await tester.pumpAndSettle();
 
       await swipeDown(tester);
       expect(sheetOpen(), isTrue);
       expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Heavy'))
-            .selected,
+        tester.getSemantics(find.text('Heavy')).flagsCollection.isSelected ==
+            Tristate.isTrue,
         isTrue,
       );
     });

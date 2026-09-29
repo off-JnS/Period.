@@ -137,9 +137,9 @@ void main() {
 
       await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+      await tester.tap(find.text('Heavy'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilterChip, 'Headache'));
+      await tester.tap(find.widgetWithText(EntryOption, 'Headache'));
       await tester.pumpAndSettle();
       // The note is the last section and sits below the fold.
       await tester.scrollUntilVisible(
@@ -208,7 +208,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Heavy'));
+      await tester.tap(find.text('Heavy'));
       await tester.pumpAndSettle();
       // The sheet's Cancel, which is what backing out is on iOS. Something
       // was changed, so it asks first.
@@ -337,12 +337,16 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.widgetWithText(ChoiceChip, 'Protected'),
+        find.text('Sex'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.widgetWithText(FilterChip, 'Happy'));
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Protected'));
+      await tester.tap(find.widgetWithText(EntryOption, 'Happy'));
+      await Scrollable.ensureVisible(tester.element(find.text('Sex')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sex'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(EntryOption, 'Protected'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Save'));
       await tester.pumpAndSettle();

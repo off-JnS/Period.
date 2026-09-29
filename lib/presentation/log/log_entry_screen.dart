@@ -8,11 +8,24 @@ import '../../domain/models/symptom.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../theme.dart';
+import 'entry_icons.dart';
 import 'entry_labels.dart';
 import 'temperature.dart';
 
 /// Identifies the note field, the sheet's last text field, for tests.
 const noteFieldKey = ValueKey('noteField');
+
+/// The folded sections at the bottom of the log sheet.
+enum EntryFold {
+  /// Discharge.
+  discharge,
+
+  /// Sex.
+  sex,
+
+  /// Temperature and tests.
+  bodySignals,
+}
 
 /// What the user recorded on one day, on its way back to the caller.
 ///
@@ -116,6 +129,9 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
 
   /// Set when Save was tapped with a temperature that could not be accepted.
   bool _temperatureInvalid = false;
+
+  /// The folded sections she has opened.
+  final Set<EntryFold> _open = {};
 
   late final TextEditingController _note = TextEditingController(
     text: widget.entry?.note ?? '',
@@ -286,65 +302,31 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
         // Scrollable for the same reason the Today screen is: at 200% text size
         // and in German this is considerably taller than a phone screen.
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 48),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
           children: [
-            _DaySection(date: _date, onChangeDay: _pickDay),
-            const SizedBox(height: 28),
+            // Which day, as a week to tap through: most entries are for
+            // today or a day or two back, one tap away here.
+            _Group(
+              heading: l10n.entryDateHeading,
+              padding: const EdgeInsets.fromLTRB(6, 6, 6, 12),
+              child: _DayStrip(
+                date: _date,
+                today: widget.today,
+                onSelect: (day) => setState(() => _date = day),
+                onOpenWheel: _pickDay,
+              ),
+            ),
+            const SizedBox(height: 24),
             _PeriodSection(
+              flow: _flow,
+              onFlowChanged: (value) => setState(() => _flow = value),
               isPeriodStart: _isPeriodStart,
-              onChanged: (value) {
+              onPeriodStartChanged: (value) {
                 setState(() => _isPeriodStart = value);
               },
             ),
-            const SizedBox(height: 28),
-            _FlowSection(
-              flow: _flow,
-              onChanged: (value) {
-                setState(() => _flow = value);
-              },
-            ),
-            const SizedBox(height: 28),
-            _ChipsSection(
-              heading: l10n.symptomsHeading,
-              keys: offeredSymptomKeys,
-              selectedKeys: _symptomKeys,
-              onToggle: (key, selected) {
-                _toggle(key, selected: selected);
-              },
-            ),
-            const SizedBox(height: 28),
-            _ChipsSection(
-              heading: l10n.moodHeading,
-              keys: offeredMoodKeys,
-              selectedKeys: _symptomKeys,
-              onToggle: (key, selected) {
-                _toggle(key, selected: selected);
-              },
-            ),
-            const SizedBox(height: 28),
-            _ChipsSection(
-              heading: l10n.dischargeHeading,
-              keys: offeredDischargeKeys,
-              selectedKeys: _symptomKeys,
-              singleChoice: true,
-              footer: l10n.singleChoiceHint,
-              onToggle: (key, selected) {
-                _toggle(key, selected: selected);
-              },
-            ),
-            const SizedBox(height: 28),
-            _ChipsSection(
-              heading: l10n.sexHeading,
-              keys: offeredSexKeys,
-              selectedKeys: _symptomKeys,
-              singleChoice: true,
-              footer: '${l10n.sexFooter} ${l10n.singleChoiceHint}',
-              onToggle: (key, selected) {
-                _toggle(key, selected: selected);
-              },
-            ),
             if (widget.offerPill) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               _Group(
                 heading: l10n.pillHeading,
                 padding: EdgeInsets.zero,
@@ -358,16 +340,82 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 28),
-            _BodySignalsSection(
-              temperature: _temperature,
-              invalid: _temperatureInvalid,
+            const SizedBox(height: 24),
+            _OptionsSection(
+              heading: l10n.symptomsHeading,
+              keys: offeredSymptomKeys,
               selectedKeys: _symptomKeys,
-              onToggle: (key, selected) {
-                _toggle(key, selected: selected);
-              },
+              onToggle: (key, selected) => _toggle(key, selected: selected),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
+            _OptionsSection(
+              heading: l10n.moodHeading,
+              keys: offeredMoodKeys,
+              selectedKeys: _symptomKeys,
+              onToggle: (key, selected) => _toggle(key, selected: selected),
+            ),
+            const SizedBox(height: 24),
+            // Asked for less often, so folded away with what she chose shown
+            // beside each name; one tap opens it.
+            GroupHeader(l10n.entryMoreHeading),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _Fold(
+                    heading: l10n.dischargeHeading,
+                    summary: _chosen(offeredDischargeKeys),
+                    open: _open.contains(EntryFold.discharge),
+                    onToggle: () => _flip(EntryFold.discharge),
+                    child: _Options(
+                      keys: offeredDischargeKeys,
+                      selectedKeys: _symptomKeys,
+                      onToggle: (key, selected) {
+                        _toggle(key, selected: selected);
+                      },
+                      footer: l10n.singleChoiceHint,
+                    ),
+                  ),
+                  const Divider(indent: 16),
+                  _Fold(
+                    heading: l10n.sexHeading,
+                    summary: _chosen(offeredSexKeys),
+                    open: _open.contains(EntryFold.sex),
+                    onToggle: () => _flip(EntryFold.sex),
+                    child: _Options(
+                      keys: offeredSexKeys,
+                      selectedKeys: _symptomKeys,
+                      onToggle: (key, selected) {
+                        _toggle(key, selected: selected);
+                      },
+                      footer: '${l10n.sexFooter} ${l10n.singleChoiceHint}',
+                    ),
+                  ),
+                  const Divider(indent: 16),
+                  _Fold(
+                    heading: l10n.bodySignalsHeading,
+                    summary: [
+                      if (_temperature.text.trim() case final t
+                          when t.isNotEmpty)
+                        '$t °C',
+                      ?_chosen(offeredOvulationTestKeys),
+                      ?_chosen(offeredPregnancyTestKeys),
+                    ].join(' · '),
+                    open: _open.contains(EntryFold.bodySignals),
+                    onToggle: () => _flip(EntryFold.bodySignals),
+                    child: _BodySignals(
+                      temperature: _temperature,
+                      invalid: _temperatureInvalid,
+                      selectedKeys: _symptomKeys,
+                      onToggle: (key, selected) {
+                        _toggle(key, selected: selected);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             _NoteSection(controller: _note),
             if (_hasSomethingStored) ...[
               const SizedBox(height: 28),
@@ -395,6 +443,20 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
         ),
       ),
     );
+  }
+
+  void _flip(EntryFold fold) => setState(
+    () => _open.contains(fold) ? _open.remove(fold) : _open.add(fold),
+  );
+
+  /// The names of whatever is chosen among [keys], or null for nothing.
+  String? _chosen(List<String> keys) {
+    final l10n = AppLocalizations.of(context);
+    final names = [
+      for (final key in keys)
+        if (_symptomKeys.contains(key)) ?symptomLabel(l10n, key),
+    ];
+    return names.isEmpty ? null : names.join(', ');
   }
 
   Future<void> _pickDay() async {
@@ -487,8 +549,11 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
         temperature = null;
       case InvalidTemperature():
         // Refused, not stored and not silently dropped: she typed something,
-        // so she is told why it cannot be kept.
-        setState(() => _temperatureInvalid = true);
+        // so she is told why it cannot be kept, with its section opened.
+        setState(() {
+          _temperatureInvalid = true;
+          _open.add(EntryFold.bodySignals);
+        });
         return;
     }
     final note = _note.text.trim();
@@ -511,11 +576,21 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
   }
 }
 
-class _DaySection extends StatelessWidget {
-  const _DaySection({required this.date, required this.onChangeDay});
+/// The week around the day being logged, one tap per day, with arrows for
+/// the weeks before and the full date above, which opens a wheel for a day
+/// further back. Days still to come are shown but cannot be chosen.
+class _DayStrip extends StatelessWidget {
+  const _DayStrip({
+    required this.date,
+    required this.today,
+    required this.onSelect,
+    required this.onOpenWheel,
+  });
 
   final CycleDate date;
-  final VoidCallback onChangeDay;
+  final CycleDate today;
+  final ValueChanged<CycleDate> onSelect;
+  final VoidCallback onOpenWheel;
 
   @override
   Widget build(BuildContext context) {
@@ -523,36 +598,169 @@ class _DaySection extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final formatted = DateFormat.yMMMd(locale)
-        .format(DateTime(date.year, date.month, date.day));
+    final firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
 
-    // A label and a tinted date pill, as the date row in Calendar or Reminders.
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 7, 12, 7),
-        child: Row(
+    // CycleDate counts Monday as 1 and Sunday as 7; the locale counts
+    // Sunday as 0.
+    final start = date.subtractDays((date.weekday % 7 - firstDay) % 7);
+    final days = [for (var i = 0; i < 7; i++) start.addDays(i)];
+    final nextWeek = start.addDays(7);
+    final canGoOn = !nextWeek.isAfter(today);
+
+    return Column(
+      children: [
+        Row(
           children: [
-            Expanded(
-              child: Text(
-                l10n.entryDateHeading,
-                style: theme.textTheme.bodyLarge,
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(44, 44),
+              onPressed: () => onSelect(date.subtractDays(7)),
+              child: Icon(
+                CupertinoIcons.chevron_left,
+                size: 20,
+                semanticLabel: l10n.entryPreviousWeek,
               ),
             ),
-            Semantics(
-              button: true,
-              hint: l10n.changeDay,
-              child: CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                // 44pt tall: Apple's minimum touch target.
-                minimumSize: const Size(44, 44),
-                color: scheme.groupedBackground,
-                borderRadius: BorderRadius.circular(8),
-                onPressed: onChangeDay,
-                child: Text(
-                  formatted,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: scheme.primary,
+            Expanded(
+              child: Semantics(
+                button: true,
+                hint: l10n.changeDay,
+                child: CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 44),
+                  onPressed: onOpenWheel,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          date == today
+                              ? '${l10n.todayTitle}, '
+                                    '${DateFormat.MMMMd(locale).format(_toDateTime(date))}'
+                              : DateFormat.MMMMEEEEd(locale)
+                                    .format(_toDateTime(date)),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        CupertinoIcons.chevron_down,
+                        size: 14,
+                        color: scheme.primary,
+                      ),
+                    ],
                   ),
+                ),
+              ),
+            ),
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(44, 44),
+              onPressed: canGoOn
+                  ? () => onSelect(
+                      date.addDays(7).isAfter(today) ? today : date.addDays(7),
+                    )
+                  : null,
+              child: Icon(
+                CupertinoIcons.chevron_right,
+                size: 20,
+                semanticLabel: l10n.entryNextWeek,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            for (final day in days)
+              Expanded(
+                child: _StripDay(
+                  day: day,
+                  selected: day == date,
+                  isToday: day == today,
+                  onTap: day.isAfter(today) ? null : () => onSelect(day),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StripDay extends StatelessWidget {
+  const _StripDay({
+    required this.day,
+    required this.selected,
+    required this.isToday,
+    required this.onTap,
+  });
+
+  final CycleDate day;
+  final bool selected;
+  final bool isToday;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final still = MediaQuery.of(context).disableAnimations;
+    final future = onTap == null;
+    final number = selected
+        ? scheme.onPrimary
+        : isToday
+        ? scheme.primary
+        : future
+        ? scheme.onSurface.withValues(alpha: 0.3)
+        : scheme.onSurface;
+
+    return Semantics(
+      button: !future,
+      selected: selected,
+      label: DateFormat.yMMMMEEEEd(locale).format(_toDateTime(day)),
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          children: [
+            Text(
+              DateFormat.E(locale).format(_toDateTime(day)).characters.first,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            AnimatedContainer(
+              duration: still
+                  ? Duration.zero
+                  : const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? scheme.primary : Colors.transparent,
+                border: isToday && !selected
+                    ? Border.all(color: scheme.primary, width: 1.5)
+                    : null,
+              ),
+              child: Text(
+                '${day.day}',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: number,
+                  fontWeight: selected || isToday
+                      ? FontWeight.w700
+                      : FontWeight.w500,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
@@ -563,123 +771,408 @@ class _DaySection extends StatelessWidget {
   }
 }
 
+/// How much she bled, as four tiles with one to three drops, and whether a
+/// period started: the two things asked most, together in one card.
+///
+/// Tapping the chosen tile again clears it, back to "not recorded", which is
+/// a different fact from None: she looked and there was no bleeding.
 class _PeriodSection extends StatelessWidget {
-  const _PeriodSection({required this.isPeriodStart, required this.onChanged});
-
-  final bool isPeriodStart;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    return _Group(
-      heading: l10n.periodHeading,
-      footer: l10n.periodStartExplanation,
-      padding: EdgeInsets.zero,
-      child: SwitchListTile.adaptive(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        value: isPeriodStart,
-        onChanged: onChanged,
-        title: Text(l10n.periodStartedThisDay),
-      ),
-    );
-  }
-}
-
-class _FlowSection extends StatelessWidget {
-  const _FlowSection({required this.flow, required this.onChanged});
+  const _PeriodSection({
+    required this.flow,
+    required this.onFlowChanged,
+    required this.isPeriodStart,
+    required this.onPeriodStartChanged,
+  });
 
   final FlowIntensity? flow;
-  final ValueChanged<FlowIntensity?> onChanged;
+  final ValueChanged<FlowIntensity?> onFlowChanged;
+  final bool isPeriodStart;
+  final ValueChanged<bool> onPeriodStartChanged;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
 
-    // "Not recorded" is an option rather than the absence of one, so a user who
-    // tapped a value by mistake has a way back to having said nothing. It is a
-    // different fact from `none`, which means she looked and there was no
-    // bleeding.
-    return _Group(
-      heading: l10n.flowHeading,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          ChoiceChip(
-            label: Text(l10n.flowNotRecorded),
-            selected: flow == null,
-            onSelected: (_) => onChanged(null),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GroupHeader(l10n.periodHeading),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(l10n.flowHeading, style: theme.textTheme.bodyLarge),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.singleChoiceHint,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                child: Row(
+                  children: [
+                    for (final (index, value) in FlowIntensity.values.indexed)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: index == 0 ? 0 : 8),
+                          child: _FlowTile(
+                            value: value,
+                            selected: flow == value,
+                            onTap: () =>
+                                onFlowChanged(flow == value ? null : value),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(indent: 16),
+              SwitchListTile.adaptive(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                value: isPeriodStart,
+                onChanged: onPeriodStartChanged,
+                title: Text(l10n.periodStartedThisDay),
+              ),
+            ],
           ),
-          for (final value in FlowIntensity.values)
-            ChoiceChip(
-              label: Text(flowLabel(l10n, value)),
-              selected: flow == value,
-              onSelected: (_) => onChanged(value),
-            ),
-        ],
+        ),
+        GroupFooter(l10n.periodStartExplanation),
+      ],
+    );
+  }
+}
+
+class _FlowTile extends StatelessWidget {
+  const _FlowTile({
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final FlowIntensity value;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final still = MediaQuery.of(context).disableAnimations;
+    final colour = selected ? scheme.onPrimary : scheme.primary;
+    final drops = switch (value) {
+      FlowIntensity.none => 0,
+      FlowIntensity.light => 1,
+      FlowIntensity.medium => 2,
+      FlowIntensity.heavy => 3,
+    };
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      label: flowLabel(l10n, value),
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: still ? Duration.zero : const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary : scheme.groupedBackground,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 22,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (drops == 0)
+                      Icon(CupertinoIcons.drop, size: 20, color: colour)
+                    else
+                      for (var i = 0; i < drops; i++)
+                        Icon(CupertinoIcons.drop_fill, size: 16, color: colour),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                flowLabel(l10n, value),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? scheme.onPrimary : scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-/// A group of chips for keyed things to log: symptoms, moods, discharge, sex.
-///
-/// Multi-choice groups use filter chips; single-choice groups use choice
-/// chips, where tapping the chosen one again clears it, so "not recorded" is
-/// always reachable without a separate chip.
-class _ChipsSection extends StatelessWidget {
-  const _ChipsSection({
+/// One thing to tap on or off: a rounded tile with its icon, if it has one,
+/// filled in the app's colour once chosen.
+class EntryOption extends StatelessWidget {
+  /// Creates the option.
+  const EntryOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    super.key,
+  });
+
+  /// Its name.
+  final String label;
+
+  /// An icon before the name.
+  final IconData? icon;
+
+  /// Whether it is chosen.
+  final bool selected;
+
+  /// Called on a tap, to choose it or let it go.
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final still = MediaQuery.of(context).disableAnimations;
+    final colour = selected ? scheme.onPrimary : scheme.onSurface;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: still ? Duration.zero : const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: EdgeInsets.fromLTRB(icon == null ? 14 : 11, 8, 14, 8),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary : scheme.groupedBackground,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon case final icon?) ...[
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? scheme.onPrimary : scheme.primary,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colour,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Options for [keys], laid out to wrap, with an optional line under them.
+class _Options extends StatelessWidget {
+  const _Options({
+    required this.keys,
+    required this.selectedKeys,
+    required this.onToggle,
+    this.footer,
+  });
+
+  final List<String> keys;
+  final Set<String> selectedKeys;
+  final void Function(String key, bool selected) onToggle;
+  final String? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final key in keys)
+              if (symptomLabel(l10n, key) case final label?)
+                EntryOption(
+                  label: label,
+                  icon: entryIcon(key),
+                  selected: selectedKeys.contains(key),
+                  onTap: () => onToggle(key, !selectedKeys.contains(key)),
+                ),
+          ],
+        ),
+        if (footer case final text?)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A heading, and a card of options for symptoms or moods.
+class _OptionsSection extends StatelessWidget {
+  const _OptionsSection({
     required this.heading,
     required this.keys,
     required this.selectedKeys,
     required this.onToggle,
-    this.singleChoice = false,
-    this.footer,
   });
 
   final String heading;
   final List<String> keys;
   final Set<String> selectedKeys;
   final void Function(String key, bool selected) onToggle;
-  final bool singleChoice;
-  final String? footer;
+
+  @override
+  Widget build(BuildContext context) => _Group(
+    heading: heading,
+    padding: const EdgeInsets.all(12),
+    child: _Options(keys: keys, selectedKeys: selectedKeys, onToggle: onToggle),
+  );
+}
+
+/// A row that opens to show [child]: its name, what is chosen in it, and a
+/// chevron that turns as it opens.
+class _Fold extends StatelessWidget {
+  const _Fold({
+    required this.heading,
+    required this.summary,
+    required this.open,
+    required this.onToggle,
+    required this.child,
+  });
+
+  final String heading;
+  final String? summary;
+  final bool open;
+  final VoidCallback onToggle;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final still = MediaQuery.of(context).disableAnimations;
+    const duration = Duration(milliseconds: 240);
+    final shown = summary?.isNotEmpty ?? false;
 
-    return _Group(
-      heading: heading,
-      footer: footer,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final key in keys)
-            if (symptomLabel(l10n, key) case final label?)
-              singleChoice
-                  ? ChoiceChip(
-                      label: Text(label),
-                      selected: selectedKeys.contains(key),
-                      onSelected: (selected) => onToggle(key, selected),
-                    )
-                  : FilterChip(
-                      label: Text(label),
-                      selected: selectedKeys.contains(key),
-                      onSelected: (selected) => onToggle(key, selected),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          expanded: open,
+          child: InkWell(
+            onTap: onToggle,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 50),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
+                child: Row(
+                  children: [
+                    Text(heading, style: theme.textTheme.bodyLarge),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        shown ? summary! : l10n.entryNothingChosen,
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: shown
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-        ],
-      ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: open ? 0.25 : 0,
+                      duration: still ? Duration.zero : duration,
+                      curve: Curves.easeOutCubic,
+                      child: Icon(
+                        CupertinoIcons.chevron_right,
+                        size: 16,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: still ? Duration.zero : duration,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: open
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                  child: child,
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
     );
   }
 }
 
-/// Basal temperature and the ovulation test: recorded only
-/// (docs/cycle-logic.md §9), which the footer says outright.
-class _BodySignalsSection extends StatelessWidget {
-  const _BodySignalsSection({
+/// Basal temperature and the ovulation and pregnancy tests: recorded only
+/// (docs/cycle-logic.md §9), which the line under them says outright.
+class _BodySignals extends StatelessWidget {
+  const _BodySignals({
     required this.temperature,
     required this.invalid,
     required this.selectedKeys,
@@ -695,85 +1188,78 @@ class _BodySignalsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
 
-    return _Group(
-      heading: l10n.bodySignalsHeading,
-      footer: l10n.bodySignalsFooter,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
                 child: Text(
                   l10n.temperatureLabel,
-                  style: theme.textTheme.bodyLarge,
-                ),
-              ),
-              SizedBox(
-                width: 120,
-                child: TextField(
-                  controller: temperature,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textAlign: TextAlign.end,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                  decoration: InputDecoration(
-                    hintText: formatTemperatureNumber(3650, locale),
-                    suffixText: '°C',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (invalid)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                l10n.temperatureInvalid,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
+                  style: theme.textTheme.bodyMedium,
                 ),
               ),
             ),
-          const Divider(height: 24),
-          Text(l10n.ovulationTestLabel, style: theme.textTheme.bodyLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final key in offeredOvulationTestKeys)
-                if (symptomLabel(l10n, key) case final label?)
-                  ChoiceChip(
-                    label: Text(label),
-                    selected: selectedKeys.contains(key),
-                    onSelected: (selected) => onToggle(key, selected),
-                  ),
-            ],
+            SizedBox(
+              width: 120,
+              child: TextField(
+                controller: temperature,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+                decoration: InputDecoration(
+                  hintText: formatTemperatureNumber(3650, locale),
+                  suffixText: '°C',
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (invalid)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              l10n.temperatureInvalid,
+              style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+            ),
           ),
-          const Divider(height: 24),
-          Text(l10n.pregnancyTestLabel, style: theme.textTheme.bodyLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final key in offeredPregnancyTestKeys)
-                if (symptomLabel(l10n, key) case final label?)
-                  ChoiceChip(
-                    label: Text(label),
-                    selected: selectedKeys.contains(key),
-                    onSelected: (selected) => onToggle(key, selected),
-                  ),
-            ],
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            l10n.ovulationTestLabel,
+            style: theme.textTheme.bodyMedium,
           ),
-        ],
-      ),
+        ),
+        _Options(
+          keys: offeredOvulationTestKeys,
+          selectedKeys: selectedKeys,
+          onToggle: onToggle,
+        ),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            l10n.pregnancyTestLabel,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+        _Options(
+          keys: offeredPregnancyTestKeys,
+          selectedKeys: selectedKeys,
+          onToggle: onToggle,
+          footer: '${l10n.bodySignalsFooter} ${l10n.singleChoiceHint}',
+        ),
+      ],
     );
   }
 }

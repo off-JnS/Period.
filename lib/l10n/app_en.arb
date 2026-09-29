@@ -1045,5 +1045,21 @@
         "type": "String"
       }
     }
+  },
+  "entryPreviousWeek": "Previous week",
+  "@entryPreviousWeek": {
+    "description": "Log sheet: accessible name of the arrow that moves the day strip back a week."
+  },
+  "entryNextWeek": "Next week",
+  "@entryNextWeek": {
+    "description": "Log sheet: accessible name of the arrow that moves the day strip on a week."
+  },
+  "entryMoreHeading": "More",
+  "@entryMoreHeading": {
+    "description": "Log sheet: heading above the folded sections (discharge, sex, body signals)."
+  },
+  "entryNothingChosen": "Not recorded",
+  "@entryNothingChosen": {
+    "description": "Log sheet: shown beside a folded section's name when nothing in it is filled in."
   }
 }
