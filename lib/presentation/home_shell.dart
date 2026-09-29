@@ -234,6 +234,7 @@ class _HomeShellState extends State<HomeShell> {
             onEraseEverything: widget.onEraseEverything,
             offerWidget: widget.widgetSync != null,
             backLabel: backLabel,
+            clock: widget.clock,
           ),
         ),
       ),

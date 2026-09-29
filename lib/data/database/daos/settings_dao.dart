@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../domain/models/app_preferences.dart';
+import '../../../domain/models/cycle_date.dart';
 import '../../../domain/models/cycle_mode.dart';
 import '../../../domain/models/profile.dart';
 import '../../../domain/models/reminder_settings.dart';
@@ -41,6 +42,51 @@ abstract final class SettingKeys {
 
   /// The reminder time as `HH:MM`, 24-hour.
   static const reminderTime = 'reminder_time';
+
+  /// `true` when she wants a pill reminder.
+  static const reminderPill = 'reminder_pill';
+
+  /// The pill reminder time as `HH:MM`, 24-hour.
+  static const reminderPillTime = 'reminder_pill_time';
+
+  /// Her [PillPack], by enum name.
+  static const reminderPillPack = 'reminder_pill_pack';
+
+  /// The first day of a pill pack, `YYYY-MM-DD`; empty for none.
+  static const reminderPillPackStart = 'reminder_pill_pack_start';
+
+  /// `true` when she wants ring reminders.
+  static const reminderRing = 'reminder_ring';
+
+  /// The day the current ring went in, `YYYY-MM-DD`; empty for none.
+  static const reminderRingInserted = 'reminder_ring_inserted';
+
+  /// `true` when she wants patch reminders.
+  static const reminderPatch = 'reminder_patch';
+
+  /// The day the current patch pack began, `YYYY-MM-DD`; empty for none.
+  static const reminderPatchStarted = 'reminder_patch_started';
+
+  /// `true` when she wants injection reminders.
+  static const reminderInjection = 'reminder_injection';
+
+  /// The day of her last injection, `YYYY-MM-DD`; empty for none.
+  static const reminderInjectionLast = 'reminder_injection_last';
+
+  /// Weeks between injections, as a decimal integer.
+  static const reminderInjectionWeeks = 'reminder_injection_weeks';
+
+  /// `true` when she wants IUD or implant reminders.
+  static const reminderDevice = 'reminder_device';
+
+  /// The day it should be replaced by, `YYYY-MM-DD`; empty for none.
+  static const reminderDeviceReplaceBy = 'reminder_device_replace_by';
+
+  /// Weeks ahead to be reminded, as a decimal integer.
+  static const reminderDeviceWeeks = 'reminder_device_weeks';
+
+  /// The time for the ring, patch, injection and device reminders, `HH:MM`.
+  static const reminderMethodTime = 'reminder_method_time';
 
   /// `true` when the home-screen widget may show details.
   static const widgetDetailed = 'widget_detailed';
@@ -142,38 +188,127 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
     final values = await _values();
     const defaults = ReminderSettings();
 
-    final days = int.tryParse(values[SettingKeys.reminderDaysBefore] ?? '');
-    final time = RegExp(r'^(\d{2}):(\d{2})$')
-        .firstMatch(values[SettingKeys.reminderTime] ?? '');
-    final hour = time == null ? null : int.parse(time.group(1)!);
-    final minute = time == null ? null : int.parse(time.group(2)!);
-    final timeValid =
-        hour != null && minute != null && hour < 24 && minute < 60;
+    int? number(String key, int min, int max) {
+      final value = int.tryParse(values[key] ?? '');
+      return value != null && value >= min && value <= max ? value : null;
+    }
+
+    (int, int)? time(String key) {
+      final match = RegExp(r'^(\d{2}):(\d{2})$').firstMatch(values[key] ?? '');
+      if (match == null) return null;
+      final hour = int.parse(match.group(1)!);
+      final minute = int.parse(match.group(2)!);
+      return hour < 24 && minute < 60 ? (hour, minute) : null;
+    }
+
+    CycleDate? day(String key) {
+      final value = values[key];
+      if (value == null || value.isEmpty) return null;
+      try {
+        return CycleDate.parseIso8601(value);
+      } on FormatException {
+        return null;
+      }
+    }
+
+    final cycleTime = time(SettingKeys.reminderTime);
+    final pillTime = time(SettingKeys.reminderPillTime);
+    final methodTime = time(SettingKeys.reminderMethodTime);
+    final deviceWeeks = int.tryParse(
+      values[SettingKeys.reminderDeviceWeeks] ?? '',
+    );
 
     return ReminderSettings(
       periodComing: values[SettingKeys.reminderPeriod] == 'true',
       daysBefore:
-          days != null &&
-              days >= ReminderSettings.minDaysBefore &&
-              days <= ReminderSettings.maxDaysBefore
-          ? days
-          : defaults.daysBefore,
+          number(
+            SettingKeys.reminderDaysBefore,
+            ReminderSettings.minDaysBefore,
+            ReminderSettings.maxDaysBefore,
+          ) ??
+          defaults.daysBefore,
       dailyLog: values[SettingKeys.reminderDaily] == 'true',
-      hour: timeValid ? hour : defaults.hour,
-      minute: timeValid ? minute : defaults.minute,
+      hour: cycleTime?.$1 ?? defaults.hour,
+      minute: cycleTime?.$2 ?? defaults.minute,
+      pill: values[SettingKeys.reminderPill] == 'true',
+      pillHour: pillTime?.$1 ?? defaults.pillHour,
+      pillMinute: pillTime?.$2 ?? defaults.pillMinute,
+      pillPack:
+          PillPack.values.asNameMap()[values[SettingKeys.reminderPillPack]] ??
+          defaults.pillPack,
+      pillPackStart: day(SettingKeys.reminderPillPackStart),
+      ring: values[SettingKeys.reminderRing] == 'true',
+      ringInserted: day(SettingKeys.reminderRingInserted),
+      patch: values[SettingKeys.reminderPatch] == 'true',
+      patchStarted: day(SettingKeys.reminderPatchStarted),
+      injection: values[SettingKeys.reminderInjection] == 'true',
+      injectionLast: day(SettingKeys.reminderInjectionLast),
+      injectionWeeks:
+          number(
+            SettingKeys.reminderInjectionWeeks,
+            ReminderSettings.minInjectionWeeks,
+            ReminderSettings.maxInjectionWeeks,
+          ) ??
+          defaults.injectionWeeks,
+      device: values[SettingKeys.reminderDevice] == 'true',
+      deviceReplaceBy: day(SettingKeys.reminderDeviceReplaceBy),
+      deviceWeeksBefore:
+          ReminderSettings.deviceWeeksOptions.contains(deviceWeeks)
+          ? deviceWeeks!
+          : defaults.deviceWeeksBefore,
+      methodHour: methodTime?.$1 ?? defaults.methodHour,
+      methodMinute: methodTime?.$2 ?? defaults.methodMinute,
     );
   }
 
   /// Stores [settings], replacing whatever was there.
   Future<void> saveReminderSettings(ReminderSettings settings) async {
     String two(int n) => n.toString().padLeft(2, '0');
+    String time(int hour, int minute) => '${two(hour)}:${two(minute)}';
+    String day(CycleDate? date) => date?.toIso8601() ?? '';
     await transaction(() async {
       await _put(SettingKeys.reminderPeriod, '${settings.periodComing}');
       await _put(SettingKeys.reminderDaysBefore, '${settings.daysBefore}');
       await _put(SettingKeys.reminderDaily, '${settings.dailyLog}');
       await _put(
         SettingKeys.reminderTime,
-        '${two(settings.hour)}:${two(settings.minute)}',
+        time(settings.hour, settings.minute),
+      );
+      await _put(SettingKeys.reminderPill, '${settings.pill}');
+      await _put(
+        SettingKeys.reminderPillTime,
+        time(settings.pillHour, settings.pillMinute),
+      );
+      await _put(SettingKeys.reminderPillPack, settings.pillPack.name);
+      await _put(
+        SettingKeys.reminderPillPackStart,
+        day(settings.pillPackStart),
+      );
+      await _put(SettingKeys.reminderRing, '${settings.ring}');
+      await _put(SettingKeys.reminderRingInserted, day(settings.ringInserted));
+      await _put(SettingKeys.reminderPatch, '${settings.patch}');
+      await _put(SettingKeys.reminderPatchStarted, day(settings.patchStarted));
+      await _put(SettingKeys.reminderInjection, '${settings.injection}');
+      await _put(
+        SettingKeys.reminderInjectionLast,
+        day(settings.injectionLast),
+      );
+      await _put(
+        SettingKeys.reminderInjectionWeeks,
+        '${settings.injectionWeeks}',
+      );
+      await _put(SettingKeys.reminderDevice, '${settings.device}');
+      await _put(
+        SettingKeys.reminderDeviceReplaceBy,
+        day(settings.deviceReplaceBy),
+      );
+      await _put(
+        SettingKeys.reminderDeviceWeeks,
+        '${settings.deviceWeeksBefore}',
+      );
+      await _put(
+        SettingKeys.reminderMethodTime,
+        time(settings.methodHour, settings.methodMinute),
       );
     });
   }

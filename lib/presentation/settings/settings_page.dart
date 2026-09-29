@@ -4,12 +4,16 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/database/daos/settings_dao.dart';
+import '../../data/system_clock.dart';
+import '../../domain/models/clock.dart';
+import '../../domain/models/profile.dart';
 import '../../domain/models/app_preferences.dart';
 import '../../domain/models/reminder_settings.dart';
 import '../../l10n/app_localizations.dart';
 import '../grouped_page.dart';
 import '../lock/app_lock.dart';
 import '../reminders/reminder_sync.dart';
+import 'reminders_screen.dart';
 import 'settings_screen.dart';
 
 /// Loads the stored settings, hands them to [SettingsScreen], and saves every
@@ -28,8 +32,12 @@ class SettingsPage extends StatefulWidget {
     this.onEraseEverything,
     this.offerWidget = false,
     this.backLabel,
+    this.clock = const SystemClock(),
     super.key,
   });
+
+  /// Supplies today, for the reminders' dates.
+  final Clock clock;
 
   /// The title of the screen Settings was opened from, for its back button.
   final String? backLabel;
@@ -70,6 +78,47 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _lockUnavailable = false;
 
   ReminderSettings _reminders = const ReminderSettings();
+
+  /// Her contraception, for the reminders page.
+  ContraceptionMethod? _method;
+
+  /// Rebuilds the reminders page, pushed on top, when its settings change.
+  final _remindersChanged = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _remindersChanged.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openReminders() async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final profile = await widget.settingsDao.profile(
+        currentYear: widget.clock.today().year,
+      );
+      _method = profile.contraception;
+    } on Object {
+      _method = null;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => ValueListenableBuilder<int>(
+          valueListenable: _remindersChanged,
+          builder: (_, _, _) => RemindersScreen(
+            reminders: _reminders,
+            method: _method,
+            today: widget.clock.today(),
+            blocked: _remindersBlocked,
+            onChanged: _changeReminders,
+            backLabel: l10n.settingsTitle,
+          ),
+        ),
+      ),
+    );
+  }
+
   bool _widgetDetailed = false;
 
   Future<void> _changeWidgetDetailed(bool detailed) async {
@@ -137,6 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (!mounted) return;
       if (!granted) {
         setState(() => _remindersBlocked = true);
+        _remindersChanged.value++;
         return;
       }
     }
@@ -145,12 +195,14 @@ class _SettingsPageState extends State<SettingsPage> {
       _reminders = next;
       _remindersBlocked = false;
     });
+    _remindersChanged.value++;
     try {
       await widget.settingsDao.saveReminderSettings(next);
       widget.onScheduleAffected?.call();
     } on Object {
       if (!mounted) return;
       setState(() => _reminders = previous);
+      _remindersChanged.value++;
     }
   }
 
@@ -245,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
       onLockChanged: lock == null || lock.authenticating ? null : _changeLock,
       lockUnavailable: _lockUnavailable,
       reminders: widget.reminderSync == null ? null : _reminders,
-      onRemindersChanged: _changeReminders,
+      onOpenReminders: _openReminders,
       remindersBlocked: _remindersBlocked,
       widgetDetailed: widget.offerWidget ? _widgetDetailed : null,
       onWidgetDetailedChanged: _changeWidgetDetailed,

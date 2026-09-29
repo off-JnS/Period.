@@ -286,7 +286,7 @@ Stated explicitly so they are inherited rather than rediscovered:
 
 ## 8. Reminders
 
-Two optional reminders, both off by default. Neither is cycle science; they are
+Optional reminders, all off by default. None is cycle science; they are
 written here because the first one depends on the prediction, and §11 wants
 anything that depends on it defined in one place.
 
@@ -307,9 +307,45 @@ estimated window** (§3), at the time she chose. `daysBefore` is 1–5, default 
 days and rescheduled whenever the app is opened, so it keeps going as long as
 the app is used.
 
+**Contraception reminders** (added 2026-09-30). Not cycle science either:
+they follow the schedule *she* enters, never one the app works out, and never
+say whether she is protected. Each is off by default, belongs to one kind of
+method, and is planned **only while that method is the one in her profile**
+(§10), so changing method silences the old reminder instead of leaving it
+firing. Dates she enters are calendar days (§3); every reminder is planned
+from them on read (§4). A reminder day already past is skipped, as above.
+
+- **Pill** (combined or progestin-only). Every day at her pill time, for the
+  next 30 days. She picks the pack: taken every day with no break (the
+  default, and the only safe reading when she has not said), 21 days then a
+  7-day break, or 24 days then a 4-day break. With a break she gives the
+  first day of a pack; days are counted from it in 28-day packs, and break
+  days get no reminder. These three layouts are the common ones on pack
+  leaflets; the app does not know her brand, which is why she chooses.
+- **Vaginal ring.** From the day she put the current ring in: take it out on
+  day 22 (after three weeks), put a new one in on day 29 (after a week's
+  break), repeating every 28 days, planned 120 days ahead.
+- **Patch.** From the day she put on the first patch of a pack: change it on
+  days 8 and 15, take it off on day 22, a new pack on day 29, repeating every
+  28 days, planned 120 days ahead.
+- **Injection.** From the day of her last injection and the interval she was
+  given (4–14 weeks, default 12): one reminder a week before the next is due,
+  one on the day. Only the next injection; she enters the new date once she
+  has had it.
+- **IUD or implant** (hormonal or copper IUD, implant). The date it should be
+  replaced by, as she was told, and how long before to be reminded (1, 2, 4
+  or 8 weeks, default 4): one reminder then, one on the day.
+
+Pill reminders arrive at their own time (default 21:00); the others at one
+shared time (default 09:00). iOS keeps at most 64 pending notifications, so
+at most 60 are scheduled: the contraception and period reminders first, then
+the daily log reminder for as many of its 30 days as still fit.
+
 **Wording.** Every notification reads only *Reminder* / *Erinnerung*. No
 cycle, period, date or day number appears on the lock screen (CLAUDE.md §9),
-and the two kinds are deliberately indistinguishable there.
+and the kinds are deliberately indistinguishable there, contraception
+included: a lock screen reading "take your pill" says what she uses. Inside
+the app, the reminders page lists what each upcoming one is for.
 
 ---
 

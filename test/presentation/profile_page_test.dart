@@ -159,6 +159,26 @@ void main() {
       expect(await stored(), const Profile());
     });
 
+    testWidgets('methods are listed as hormonal and non-hormonal', (
+      tester,
+    ) async {
+      await pumpPage(tester);
+      await tester.tap(find.byKey(ProfileKeys.contraception));
+      await tester.pumpAndSettle();
+
+      double top(String text) => tester.getTopLeft(find.text(text)).dy;
+      final hormonal = top('Hormonal');
+      final nonHormonal = top('Non-hormonal');
+      expect(hormonal, lessThan(nonHormonal));
+      for (final method in ['Combined pill', 'Hormonal IUD', 'Implant']) {
+        expect(top(method), inExclusiveRange(hormonal, nonHormonal));
+      }
+      // Copper does not act through hormones, whatever it shares with the
+      // hormonal IUD.
+      expect(top('Copper IUD'), greaterThan(nonHormonal));
+      expect(top('Condoms'), greaterThan(nonHormonal));
+    });
+
     testWidgets('a contraception method is saved, and a hormonal one offers '
         'the contraception mode without switching', (tester) async {
       await pumpPage(tester);
@@ -187,7 +207,8 @@ void main() {
         find.textContaining('Switch to the contraception mode?'),
         findsNothing,
       );
-      expect(affected, 1);
+      // Once for the method, whose reminders follow it, once for the mode.
+      expect(affected, 2);
     });
 
     testWidgets('conditions are saved as they are ticked', (tester) async {

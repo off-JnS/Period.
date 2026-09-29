@@ -65,7 +65,7 @@ void main() {
           hour: 20,
           minute: 30,
         ),
-        onRemindersChanged: (_) {},
+        onOpenReminders: () {},
         onEraseEverything: () {},
         widgetDetailed: false,
         onWidgetDetailedChanged: (_) {},

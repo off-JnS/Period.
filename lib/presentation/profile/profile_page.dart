@@ -74,6 +74,10 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _profile = next);
     try {
       await widget.settingsDao.saveProfile(next);
+      // Contraception reminders follow the method (docs/cycle-logic.md §8).
+      if (next.contraception != previous?.contraception) {
+        widget.onScheduleAffected?.call();
+      }
     } on Object {
       // Put the screen back to what is actually stored rather than leave it
       // showing an answer that was never saved.

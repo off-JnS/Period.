@@ -1,6 +1,7 @@
 import 'package:period/data/database/daos/settings_dao.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/models/app_preferences.dart';
+import 'package:period/domain/models/cycle_date.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/profile.dart';
 import 'package:period/domain/models/reminder_settings.dart';
@@ -212,6 +213,65 @@ void main() {
         final read = await database.settingsDao.reminderSettings();
         expect((read.hour, read.minute), (9, 0), reason: raw);
       }
+    });
+  });
+
+  group('contraception reminders', () {
+    Future<void> putRaw(String key, String value) => database
+        .into(database.appSettings)
+        .insertOnConflictUpdate(
+          AppSettingsCompanion.insert(settingKey: key, settingValue: value),
+        );
+
+    test('round-trip, every field', () async {
+      final chosen = ReminderSettings(
+        pill: true,
+        pillHour: 22,
+        pillMinute: 45,
+        pillPack: PillPack.days24,
+        pillPackStart: CycleDate(2024, 5, 3),
+        ring: true,
+        ringInserted: CycleDate(2024, 5, 10),
+        patch: true,
+        patchStarted: CycleDate(2024, 4, 30),
+        injection: true,
+        injectionLast: CycleDate(2024, 3, 1),
+        injectionWeeks: 13,
+        device: true,
+        deviceReplaceBy: CycleDate(2030, 1, 31),
+        deviceWeeksBefore: 8,
+        methodHour: 7,
+        methodMinute: 30,
+      );
+      await database.settingsDao.saveReminderSettings(chosen);
+      expect(await database.settingsDao.reminderSettings(), chosen);
+    });
+
+    test('a date can be cleared again', () async {
+      await database.settingsDao.saveReminderSettings(
+        ReminderSettings(ringInserted: CycleDate(2024, 5, 10)),
+      );
+      await database.settingsDao.saveReminderSettings(const ReminderSettings());
+      expect(
+        (await database.settingsDao.reminderSettings()).ringInserted,
+        isNull,
+      );
+    });
+
+    test('values this build cannot read fall back to the defaults', () async {
+      await putRaw(SettingKeys.reminderPillPack, 'days99');
+      await putRaw(SettingKeys.reminderRingInserted, '2023-02-29');
+      await putRaw(SettingKeys.reminderPatchStarted, 'yesterday');
+      await putRaw(SettingKeys.reminderInjectionWeeks, '40');
+      await putRaw(SettingKeys.reminderDeviceWeeks, '3');
+      await putRaw(SettingKeys.reminderPillTime, '24:00');
+      final read = await database.settingsDao.reminderSettings();
+      expect(read.pillPack, PillPack.everyDay);
+      expect(read.ringInserted, isNull);
+      expect(read.patchStarted, isNull);
+      expect(read.injectionWeeks, ReminderSettings.defaultInjectionWeeks);
+      expect(read.deviceWeeksBefore, ReminderSettings.defaultDeviceWeeksBefore);
+      expect((read.pillHour, read.pillMinute), (21, 0));
     });
   });
 

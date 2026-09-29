@@ -1073,5 +1073,200 @@
   "calendarOpenMonth": "Opens this month",
   "@calendarOpenMonth": {
     "description": "Calendar year view: VoiceOver hint on each small month."
+  },
+  "methodsHormonal": "Hormonal",
+  "@methodsHormonal": {
+    "description": "Profile: heading over the hormonal contraception methods."
+  },
+  "methodsHormonalFooter": "These act through hormones, so bleeding follows the method rather than a natural cycle.",
+  "@methodsHormonalFooter": {
+    "description": "Profile: under the hormonal methods."
+  },
+  "methodsNonHormonal": "Non-hormonal",
+  "@methodsNonHormonal": {
+    "description": "Profile: heading over the contraception methods without hormones."
+  },
+  "methodsNonHormonalFooter": "Your natural cycle carries on with these.",
+  "@methodsNonHormonalFooter": {
+    "description": "Profile: under the non-hormonal methods."
+  },
+  "remindersOn": "On",
+  "@remindersOn": {
+    "description": "Settings: the Reminders row's value when any reminder is on."
+  },
+  "remindersOff": "Off",
+  "@remindersOff": {
+    "description": "Settings: the Reminders row's value when all are off."
+  },
+  "remindersCycleHeading": "Your cycle",
+  "@remindersCycleHeading": {
+    "description": "Reminders page: heading over the period and daily-log reminders."
+  },
+  "remindersNoMethod": "Choose your contraception in Profile to be reminded about it here.",
+  "@remindersNoMethod": {
+    "description": "Reminders page: when no contraception method is set."
+  },
+  "remindersNothingForMethod": "There is nothing to be reminded of for {method}.",
+  "@remindersNothingForMethod": {
+    "description": "Reminders page: for a method with no reminder, such as condoms.",
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderPill": "Pill",
+  "@reminderPill": {
+    "description": "Reminders page: switch for the daily pill reminder."
+  },
+  "reminderPillPack": "Pack",
+  "@reminderPillPack": {
+    "description": "Reminders page: label above the pill pack layouts."
+  },
+  "pillPackEveryDay": "Every day",
+  "@pillPackEveryDay": {
+    "description": "Pill pack with no break."
+  },
+  "pillPack21": "21 + 7 break",
+  "@pillPack21": {
+    "description": "Pill pack: 21 days of pills then 7 without."
+  },
+  "pillPack24": "24 + 4 break",
+  "@pillPack24": {
+    "description": "Pill pack: 24 days of pills then 4 without."
+  },
+  "reminderPillPackStart": "First day of this pack",
+  "@reminderPillPackStart": {
+    "description": "Reminders page: date row for a pill pack with a break."
+  },
+  "reminderPillFooter": "Break days get no reminder. Follow your pack's leaflet: the app does not know your brand.",
+  "@reminderPillFooter": {
+    "description": "Reminders page: under the pill reminder."
+  },
+  "reminderRing": "Ring",
+  "@reminderRing": {
+    "description": "Reminders page: switch for ring reminders."
+  },
+  "reminderRingInserted": "Current ring in since",
+  "@reminderRingInserted": {
+    "description": "Reminders page: date the current ring went in."
+  },
+  "reminderRingFooter": "Out after three weeks, a new one after a week's break.",
+  "@reminderRingFooter": {
+    "description": "Reminders page: under the ring reminder."
+  },
+  "reminderPatch": "Patch",
+  "@reminderPatch": {
+    "description": "Reminders page: switch for patch reminders."
+  },
+  "reminderPatchStarted": "First patch of this pack",
+  "@reminderPatchStarted": {
+    "description": "Reminders page: date the current patch pack began."
+  },
+  "reminderPatchFooter": "A new patch each week for three weeks, then a week without.",
+  "@reminderPatchFooter": {
+    "description": "Reminders page: under the patch reminder."
+  },
+  "reminderInjection": "Injection",
+  "@reminderInjection": {
+    "description": "Reminders page: switch for injection reminders."
+  },
+  "reminderInjectionLast": "Last injection",
+  "@reminderInjectionLast": {
+    "description": "Reminders page: date of the last injection."
+  },
+  "reminderInjectionEvery": "Every",
+  "@reminderInjectionEvery": {
+    "description": "Reminders page: label before the injection interval."
+  },
+  "reminderWeeks": "{weeks, plural, =1{1 week} other{{weeks} weeks}}",
+  "@reminderWeeks": {
+    "description": "A number of weeks.",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderInjectionFooter": "A week before the next one is due, and on the day. Enter the new date once you have had it.",
+  "@reminderInjectionFooter": {
+    "description": "Reminders page: under the injection reminder."
+  },
+  "reminderDevice": "Replacement",
+  "@reminderDevice": {
+    "description": "Reminders page: switch for the IUD or implant replacement reminder."
+  },
+  "reminderDeviceReplaceBy": "Replace by",
+  "@reminderDeviceReplaceBy": {
+    "description": "Reminders page: the date an IUD or implant should be replaced by."
+  },
+  "reminderDeviceWeeksBefore": "Remind me ahead",
+  "@reminderDeviceWeeksBefore": {
+    "description": "Reminders page: label above the choice of weeks."
+  },
+  "reminderWeeksShort": "{weeks} wk",
+  "@reminderWeeksShort": {
+    "description": "Short form of a number of weeks, in a segmented control.",
+    "placeholders": {
+      "weeks": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderDeviceFooter": "Once ahead of time, and again on the day. Use the date you were given.",
+  "@reminderDeviceFooter": {
+    "description": "Reminders page: under the replacement reminder."
+  },
+  "reminderNotSet": "Not set",
+  "@reminderNotSet": {
+    "description": "Reminders page: a date not entered yet."
+  },
+  "remindersComingUp": "Coming up",
+  "@remindersComingUp": {
+    "description": "Reminders page: heading over the list of upcoming contraception reminders."
+  },
+  "remindersComingUpFooter": "On the lock screen each one only says “Reminder”, so nobody else can tell what it is for.",
+  "@remindersComingUpFooter": {
+    "description": "Reminders page: under the upcoming list."
+  },
+  "reminderKindPill": "Take your pill",
+  "@reminderKindPill": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindRingOut": "Take out the ring",
+  "@reminderKindRingOut": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindRingIn": "Put in a new ring",
+  "@reminderKindRingIn": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindPatchChange": "Change the patch",
+  "@reminderKindPatchChange": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindPatchOff": "Take off the patch",
+  "@reminderKindPatchOff": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindPatchOn": "Put on a new patch",
+  "@reminderKindPatchOn": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindInjectionSoon": "Injection due in a week",
+  "@reminderKindInjectionSoon": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindInjectionDue": "Injection due",
+  "@reminderKindInjectionDue": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindDeviceSoon": "Replacement coming up",
+  "@reminderKindDeviceSoon": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
+  },
+  "reminderKindDeviceDue": "Replacement due",
+  "@reminderKindDeviceDue": {
+    "description": "Reminders page: what an upcoming reminder is for (shown in the app only)."
   }
 }

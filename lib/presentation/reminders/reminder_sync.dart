@@ -55,12 +55,15 @@ class ReminderSync {
 
     var planned = const <PlannedReminder>[];
     if (reminders.anyEnabled) {
+      final today = clock.today();
       final starts = await logDao.allPeriodStarts();
       final cycle = await settingsDao.cycleSettings();
+      final profile = await settingsDao.profile(currentYear: today.year);
       planned = planReminders(
         settings: reminders,
         prediction: predictNextPeriod(periodStarts: starts, settings: cycle),
-        today: clock.today(),
+        today: today,
+        method: profile.contraception,
       );
     }
 

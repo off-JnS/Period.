@@ -555,8 +555,48 @@ class _ContraceptionPicker extends StatelessWidget {
               child: Text(l10n.clearAnswer),
             ),
       children: [
+        // Hormonal methods apart from the rest, since that is the line the
+        // app draws (docs/cycle-logic.md §10): only a hormonal method offers
+        // the contraception mode.
         CheckList(
-          options: ContraceptionMethod.values,
+          options: const [ContraceptionMethod.none],
+          selected: current,
+          label: (method) => methodLabel(l10n, method),
+          icon: methodIcon,
+          onSelected: pick,
+        ),
+        const SizedBox(height: 24),
+        GroupHeader(l10n.methodsHormonal),
+        CheckList(
+          options: [
+            for (final method in ContraceptionMethod.values)
+              if (method.hormonal) method,
+          ],
+          selected: current,
+          label: (method) => methodLabel(l10n, method),
+          icon: methodIcon,
+          onSelected: pick,
+        ),
+        GroupFooter(l10n.methodsHormonalFooter),
+        const SizedBox(height: 28),
+        GroupHeader(l10n.methodsNonHormonal),
+        CheckList(
+          options: [
+            for (final method in ContraceptionMethod.values)
+              if (!method.hormonal &&
+                  method != ContraceptionMethod.none &&
+                  method != ContraceptionMethod.other)
+                method,
+          ],
+          selected: current,
+          label: (method) => methodLabel(l10n, method),
+          icon: methodIcon,
+          onSelected: pick,
+        ),
+        GroupFooter(l10n.methodsNonHormonalFooter),
+        const SizedBox(height: 28),
+        CheckList(
+          options: const [ContraceptionMethod.other],
           selected: current,
           label: (method) => methodLabel(l10n, method),
           icon: methodIcon,

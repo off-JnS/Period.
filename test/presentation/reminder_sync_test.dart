@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
 import 'package:period/domain/logic/reminders.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/profile.dart';
 import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/reminders/reminder_sync.dart';
 
@@ -42,6 +43,27 @@ void main() {
       await database.logDao.addPeriodStart(start);
     }
   }
+
+  test('contraception reminders follow the method in her profile', () async {
+    await database.settingsDao.saveReminderSettings(
+      ReminderSettings(ring: true, ringInserted: today, pill: true),
+    );
+    await database.settingsDao.saveProfile(
+      const Profile(contraception: ContraceptionMethod.ring),
+    );
+    await run();
+    expect(scheduler.current!.map((r) => r.kind).toSet(), {
+      ReminderKind.ringOut,
+      ReminderKind.ringIn,
+    });
+
+    // A new method silences the old one's reminders at the next sync.
+    await database.settingsDao.saveProfile(
+      const Profile(contraception: ContraceptionMethod.combinedPill),
+    );
+    await run();
+    expect(scheduler.current!.map((r) => r.kind).toSet(), {ReminderKind.pill});
+  });
 
   test('with every reminder off, clears the schedule', () async {
     await run();

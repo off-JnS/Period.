@@ -6,6 +6,9 @@ import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/lock/app_lock.dart';
 import 'package:period/presentation/reminders/reminder_sync.dart';
 import 'package:period/presentation/settings/settings_page.dart';
+import 'package:period/presentation/settings/settings_screen.dart';
+import 'package:period/presentation/settings/reminders_screen.dart';
+import 'package:period/domain/models/profile.dart';
 
 import '../support/fake_authenticator.dart';
 import '../support/fake_reminder_scheduler.dart';
@@ -174,11 +177,17 @@ void main() {
           onScheduleAffected: () => affected++,
         ),
       );
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      // Their own page, opened from a row.
       await tester.scrollUntilVisible(
-        find.text('Daily reminder to log'),
+        find.byKey(SettingsKeys.reminders),
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.tap(find.byKey(SettingsKeys.reminders));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
     }
 
     testWidgets('the first reminder turned on asks permission, then saves', (
@@ -217,6 +226,30 @@ void main() {
       await tester.tap(find.text('Before my period'));
       await tester.pumpAndSettle();
       expect(scheduler.permissionRequests, 0);
+    });
+
+    testWidgets('her method from Profile brings its reminder, saved', (
+      tester,
+    ) async {
+      await database.settingsDao.saveProfile(
+        const Profile(contraception: ContraceptionMethod.progestinPill),
+      );
+      await pumpWithReminders(tester);
+      expect(find.text('Contraception: Progestin-only pill'), findsOneWidget);
+
+      await tester.tap(find.byKey(RemindersKeys.methodSwitch));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+
+      expect(scheduler.permissionRequests, 1);
+      expect((await database.settingsDao.reminderSettings()).pill, isTrue);
+      expect(find.text('Take your pill'), findsWidgets);
+      expect(affected, 1);
+
+      // Back in Settings, the row says reminders are on.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('On'), findsOneWidget);
     });
   });
 
