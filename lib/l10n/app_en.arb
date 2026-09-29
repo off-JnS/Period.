@@ -953,13 +953,9 @@
   "@onboardingSkip": {
     "description": "Onboarding: top-right button that ends the introduction."
   },
-  "onboardingContinue": "Continue",
-  "@onboardingContinue": {
-    "description": "Onboarding: main button between pages."
-  },
-  "onboardingStart": "Get started",
-  "@onboardingStart": {
-    "description": "Onboarding: main button on the welcome page."
+  "onboardingSwipeHint": "Swipe to continue",
+  "@onboardingSwipeHint": {
+    "description": "Onboarding: line at the bottom of the first two pages, which turn by swipe rather than a button."
   },
   "onboardingFinish": "Start tracking",
   "@onboardingFinish": {

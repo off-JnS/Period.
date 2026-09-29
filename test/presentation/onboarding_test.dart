@@ -42,8 +42,14 @@ void main() {
     surface: surface,
   );
 
+  /// Swipes on to the next page, or on the last one taps Start tracking.
   Future<void> next(WidgetTester tester) async {
-    await tester.tap(find.byKey(OnboardingKeys.next));
+    final button = find.byKey(OnboardingKeys.next);
+    if (button.evaluate().isEmpty) {
+      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+    } else {
+      await tester.tap(button);
+    }
     await tester.pumpAndSettle();
   }
 
@@ -61,7 +67,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.bySemanticsLabel('Step 1 of 3'), findsOneWidget);
-    expect(find.text('Get started'), findsOneWidget);
+    // No button until the last page: the first two turn by swipe.
+    expect(find.text('Swipe to continue'), findsOneWidget);
+    expect(find.byKey(OnboardingKeys.next), findsNothing);
   });
 
   testWidgets('the last page reassures until a day is picked', (tester) async {
@@ -96,10 +104,7 @@ void main() {
     await tester.tap(find.byKey(OnboardingKeys.lastPeriod));
     await tester.pumpAndSettle();
     // The wheel starts on today, and cannot go past it.
-    await tester.drag(
-      find.byKey(OnboardingKeys.dateWheel),
-      const Offset(0, 0),
-    );
+    await tester.drag(find.byKey(OnboardingKeys.dateWheel), const Offset(0, 0));
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
     expect(find.text('September 28'), findsOneWidget);
@@ -139,9 +144,7 @@ void main() {
     expect(finished, 1);
   });
 
-  testWidgets('skip on the last page drops a date she picked', (
-    tester,
-  ) async {
+  testWidgets('skip on the last page drops a date she picked', (tester) async {
     await pumpFlow(tester);
     await next(tester);
     await next(tester);
@@ -166,28 +169,29 @@ void main() {
     expect(find.bySemanticsLabel('Step 1 of 3'), findsOneWidget);
   });
 
-  testWidgets('a hormonal method offers the contraception mode, never sets it', (
-    tester,
-  ) async {
-    await database.settingsDao.saveProfile(
-      const Profile(contraception: ContraceptionMethod.combinedPill),
-    );
-    await pumpFlow(tester);
-    await next(tester);
+  testWidgets(
+    'a hormonal method offers the contraception mode, never sets it',
+    (tester) async {
+      await database.settingsDao.saveProfile(
+        const Profile(contraception: ContraceptionMethod.combinedPill),
+      );
+      await pumpFlow(tester);
+      await next(tester);
 
-    expect(find.text('Switch'), findsOneWidget);
-    expect(
-      (await database.settingsDao.cycleSettings()).mode,
-      CycleMode.natural,
-    );
+      expect(find.text('Switch'), findsOneWidget);
+      expect(
+        (await database.settingsDao.cycleSettings()).mode,
+        CycleMode.natural,
+      );
 
-    await tester.tap(find.text('Switch'));
-    await tester.pumpAndSettle();
-    expect(
-      (await database.settingsDao.cycleSettings()).mode,
-      CycleMode.hormonalContraception,
-    );
-  });
+      await tester.tap(find.text('Switch'));
+      await tester.pumpAndSettle();
+      expect(
+        (await database.settingsDao.cycleSettings()).mode,
+        CycleMode.hormonalContraception,
+      );
+    },
+  );
 
   testWidgets('opens on answers already stored', (tester) async {
     await database.settingsDao.saveProfile(const Profile(birthYear: 1998));
@@ -218,7 +222,7 @@ void main() {
   testWidgets('German', (tester) async {
     await pumpFlow(tester, locale: const Locale('de'));
     expect(find.text('Willkommen bei Period.'), findsOneWidget);
-    expect(find.text('Los geht’s'), findsOneWidget);
+    expect(find.text('Zum Fortfahren wischen'), findsOneWidget);
   });
 
   testWidgets('every page fits at the largest text size', (tester) async {

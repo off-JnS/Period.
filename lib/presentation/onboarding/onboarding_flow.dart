@@ -28,7 +28,8 @@ const onboardingAlwaysRequested =
 /// Keys for the introduction's controls, so tests can reach them without
 /// matching text.
 abstract final class OnboardingKeys {
-  /// The main button at the bottom: Get started, Continue, Start tracking.
+  /// Start tracking, at the bottom of the last page. The pages before it
+  /// turn by swipe.
   static const next = ValueKey('onboarding.next');
 
   /// Skip, top right.
@@ -241,52 +242,126 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ],
               ),
             ),
+            // The first two pages turn by swipe alone; the last one ends
+            // with a button, since finishing saves what she gave.
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: FilledButton(
-                key: OnboardingKeys.next,
-                onPressed: _finishing ? null : _next,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
+              child: SizedBox(
+                height: 52,
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 240),
+                  duration: const Duration(milliseconds: 280),
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
-                  child: Row(
-                    key: ValueKey(_page),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          switch (_page) {
-                            0 => l10n.onboardingStart,
-                            _ when last => l10n.onboardingFinish,
-                            _ => l10n.onboardingContinue,
-                          },
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
+                  child: last
+                      ? FilledButton(
+                          key: OnboardingKeys.next,
+                          onPressed: _finishing ? null : _next,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        last
-                            ? CupertinoIcons.checkmark_alt
-                            : CupertinoIcons.arrow_right,
-                        size: 18,
-                      ),
-                    ],
-                  ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  l10n.onboardingFinish,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(
+                                CupertinoIcons.checkmark_alt,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        )
+                      : _SwipeHint(key: const ValueKey('hint')),
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "Swipe to continue" with a chevron that drifts gently to the side twice,
+/// to show which way, then rests. Still under Reduce Motion.
+class _SwipeHint extends StatefulWidget {
+  const _SwipeHint({super.key});
+
+  @override
+  State<_SwipeHint> createState() => _SwipeHintState();
+}
+
+class _SwipeHintState extends State<_SwipeHint>
+    with SingleTickerProviderStateMixin {
+  late final _drift = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _drift.stop();
+    } else if (!_drift.isAnimating && _drift.value == 0) {
+      _drift.repeat(count: 2);
+    }
+  }
+
+  @override
+  void dispose() {
+    _drift.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colour = theme.colorScheme.onSurfaceVariant;
+    // A pause, then out and back over the second half of each beat.
+    final nudge = CurvedAnimation(
+      parent: _drift,
+      curve: const Interval(0.5, 1, curve: Curves.easeInOutSine),
+    );
+
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              l10n.onboardingSwipeHint,
+              style: theme.textTheme.bodyLarge?.copyWith(color: colour),
+            ),
+          ),
+          const SizedBox(width: 6),
+          AnimatedBuilder(
+            animation: nudge,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(5 * (1 - (2 * nudge.value - 1).abs()), 0),
+              child: child,
+            ),
+            child: ExcludeSemantics(
+              child: Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: colour,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
