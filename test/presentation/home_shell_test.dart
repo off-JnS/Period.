@@ -194,7 +194,7 @@ void main() {
       await pumpWithReminders(tester);
       final before = scheduler.schedules.length;
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.tap(find.text('Add entry'));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();

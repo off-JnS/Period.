@@ -576,10 +576,11 @@ class _LogEntryScreenState extends State<LogEntryScreen> {
   }
 }
 
-/// The week around the day being logged, one tap per day, with arrows for
-/// the weeks before and the full date above, which opens a wheel for a day
-/// further back. Days still to come are shown but cannot be chosen.
-class _DayStrip extends StatelessWidget {
+/// The week around the day being logged, one tap per day. Swiping sideways,
+/// or the arrows, turns to the week before or after and keeps the weekday, as
+/// the week strip in iOS Calendar does; the full date above opens a wheel for
+/// a day further back. Days still to come are shown but cannot be chosen.
+class _DayStrip extends StatefulWidget {
   const _DayStrip({
     required this.date,
     required this.today,
@@ -592,20 +593,77 @@ class _DayStrip extends StatelessWidget {
   final ValueChanged<CycleDate> onSelect;
   final VoidCallback onOpenWheel;
 
+  /// How far back the strip reaches, the same five years the wheel offers.
+  static const weeksBack = 5 * 53;
+
+  @override
+  State<_DayStrip> createState() => _DayStripState();
+}
+
+class _DayStripState extends State<_DayStrip> {
+  PageController? _pages;
+  late int _firstDay;
+
+  /// The first day of the week holding [day], in the locale's week.
+  CycleDate _weekOf(CycleDate day) =>
+      day.subtractDays((day.weekday % 7 - _firstDay) % 7);
+
+  /// The page for the week holding [day]; the last page is this week.
+  int _pageOf(CycleDate day) =>
+      _DayStrip.weeksBack - _weekOf(day).daysUntil(_weekOf(widget.today)) ~/ 7;
+
+  CycleDate _weekAt(int page) =>
+      _weekOf(widget.today).subtractDays(7 * (_DayStrip.weeksBack - page));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // CycleDate counts Monday as 1 and Sunday as 7; the locale counts
+    // Sunday as 0.
+    _firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
+    _pages ??= PageController(initialPage: _pageOf(widget.date));
+  }
+
+  @override
+  void didUpdateWidget(_DayStrip old) {
+    super.didUpdateWidget(old);
+    // Chosen on the wheel or with an arrow: bring its week into view.
+    final pages = _pages!;
+    final target = _pageOf(widget.date);
+    if (!pages.hasClients || pages.page?.round() == target) return;
+    if (MediaQuery.of(context).disableAnimations ||
+        (target - pages.page!).abs() > 1.5) {
+      pages.jumpToPage(target);
+    } else {
+      pages.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pages?.dispose();
+    super.dispose();
+  }
+
+  /// The same weekday [weeks] weeks away, never past today.
+  CycleDate _shift(int weeks) {
+    final day = widget.date.addDays(7 * weeks);
+    return day.isAfter(widget.today) ? widget.today : day;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
-
-    // CycleDate counts Monday as 1 and Sunday as 7; the locale counts
-    // Sunday as 0.
-    final start = date.subtractDays((date.weekday % 7 - firstDay) % 7);
-    final days = [for (var i = 0; i < 7; i++) start.addDays(i)];
-    final nextWeek = start.addDays(7);
-    final canGoOn = !nextWeek.isAfter(today);
+    final date = widget.date;
+    final today = widget.today;
+    final page = _pageOf(date);
 
     return Column(
       children: [
@@ -614,7 +672,7 @@ class _DayStrip extends StatelessWidget {
             CupertinoButton(
               padding: EdgeInsets.zero,
               minimumSize: const Size(44, 44),
-              onPressed: () => onSelect(date.subtractDays(7)),
+              onPressed: page > 0 ? () => widget.onSelect(_shift(-1)) : null,
               child: Icon(
                 CupertinoIcons.chevron_left,
                 size: 20,
@@ -628,7 +686,7 @@ class _DayStrip extends StatelessWidget {
                 child: CupertinoButton(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(44, 44),
-                  onPressed: onOpenWheel,
+                  onPressed: widget.onOpenWheel,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -660,10 +718,8 @@ class _DayStrip extends StatelessWidget {
             CupertinoButton(
               padding: EdgeInsets.zero,
               minimumSize: const Size(44, 44),
-              onPressed: canGoOn
-                  ? () => onSelect(
-                      date.addDays(7).isAfter(today) ? today : date.addDays(7),
-                    )
+              onPressed: page < _DayStrip.weeksBack
+                  ? () => widget.onSelect(_shift(1))
                   : null,
               child: Icon(
                 CupertinoIcons.chevron_right,
@@ -674,18 +730,38 @@ class _DayStrip extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            for (final day in days)
-              Expanded(
-                child: _StripDay(
-                  day: day,
-                  selected: day == date,
-                  isToday: day == today,
-                  onTap: day.isAfter(today) ? null : () => onSelect(day),
-                ),
-              ),
-          ],
+        // Tall enough for the weekday letter and the day's circle, and for
+        // both grown with the text size.
+        SizedBox(
+          height: 44 + 26 * MediaQuery.textScalerOf(context).scale(1),
+          child: PageView.builder(
+            controller: _pages,
+            itemCount: _DayStrip.weeksBack + 1,
+            onPageChanged: (index) {
+              // Swiped to another week: the same weekday there.
+              final weeks = index - _pageOf(date);
+              if (weeks != 0) widget.onSelect(_shift(weeks));
+            },
+            itemBuilder: (context, index) {
+              final start = _weekAt(index);
+              return Row(
+                children: [
+                  for (var i = 0; i < 7; i++)
+                    if (start.addDays(i) case final day)
+                      Expanded(
+                        child: _StripDay(
+                          day: day,
+                          selected: day == date,
+                          isToday: day == today,
+                          onTap: day.isAfter(today)
+                              ? null
+                              : () => widget.onSelect(day),
+                        ),
+                      ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );

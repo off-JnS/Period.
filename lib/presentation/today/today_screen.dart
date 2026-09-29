@@ -155,15 +155,7 @@ class _TodayScreenState extends State<TodayScreen> {
           // not readable, and section 9's refusal to let shape or colour carry
           // meaning on its own applies to an action as much as to a calendar
           // cell. The screen's one prominent button, as the HIG asks.
-          enter(
-            FilledButton.icon(
-              onPressed: () {
-                onAdd();
-              },
-              icon: const Icon(CupertinoIcons.add),
-              label: Text(l10n.addEntry),
-            ),
-          ),
+          enter(Center(child: _AddEntryButton(onPressed: onAdd))),
         ],
         const SizedBox(height: 28),
         enter(
@@ -189,6 +181,104 @@ class _TodayScreenState extends State<TodayScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The screen's one prominent action: a capsule sized to its words rather
+/// than a bar across the page, sitting under the ring with a soft glow in
+/// the app's colour. It settles down a little while pressed.
+class _AddEntryButton extends StatefulWidget {
+  const _AddEntryButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_AddEntryButton> createState() => _AddEntryButtonState();
+}
+
+class _AddEntryButtonState extends State<_AddEntryButton> {
+  bool _down = false;
+
+  void _press(bool down) {
+    if (_down != down) setState(() => _down = down);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final still = MediaQuery.of(context).disableAnimations;
+    const duration = Duration(milliseconds: 140);
+
+    return Semantics(
+      button: true,
+      label: l10n.addEntry,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTapDown: (_) => _press(true),
+        onTapUp: (_) => _press(false),
+        onTapCancel: () => _press(false),
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _down && !still ? 0.96 : 1,
+          duration: duration,
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: still ? Duration.zero : duration,
+            constraints: const BoxConstraints(minHeight: 52),
+            padding: const EdgeInsets.fromLTRB(8, 8, 24, 8),
+            decoration: ShapeDecoration(
+              shape: const StadiumBorder(),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(scheme.primary, Colors.white, 0.12)!,
+                  scheme.primary,
+                ],
+              ),
+              shadows: [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: _down ? 0.14 : 0.24),
+                  blurRadius: _down ? 12 : 22,
+                  spreadRadius: -6,
+                  offset: Offset(0, _down ? 4 : 10),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.onPrimary.withValues(alpha: 0.18),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.plus,
+                    size: 20,
+                    color: scheme.onPrimary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    l10n.addEntry,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: scheme.onPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

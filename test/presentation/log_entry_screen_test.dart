@@ -161,6 +161,33 @@ void main() {
       expect(entryOf(result).date, day);
     });
 
+    testWidgets('swiping the strip turns the week, keeping the weekday', (
+      tester,
+    ) async {
+      final result = await pumpAndClose(
+        tester,
+        act: (tester) async {
+          final strip = find.byType(PageView);
+          await tester.fling(strip, const Offset(300, 0), 1000);
+          await tester.pumpAndSettle();
+          expect(find.text('Friday, May 10'), findsOneWidget);
+          await tester.fling(strip, const Offset(300, 0), 1000);
+          await tester.pumpAndSettle();
+          expect(find.text('Friday, May 3'), findsOneWidget);
+          // Back towards today; there is no week after this one.
+          await tester.fling(strip, const Offset(-300, 0), 1000);
+          await tester.pumpAndSettle();
+          await tester.fling(strip, const Offset(-300, 0), 1000);
+          await tester.pumpAndSettle();
+          await tester.fling(strip, const Offset(-300, 0), 1000);
+          await tester.pumpAndSettle();
+          expect(find.text('Today, May 17'), findsOneWidget);
+          await tester.tap(find.text('Save'));
+        },
+      );
+      expect(entryOf(result).date, day);
+    });
+
     testWidgets('tapping the chosen flow again clears it', (tester) async {
       final result = await pumpAndClose(
         tester,

@@ -49,7 +49,7 @@ void main() {
 
     testWidgets('offers a labelled way to add an entry', (tester) async {
       await pumpPage(tester);
-      expect(find.widgetWithText(FilledButton, 'Add entry'), findsOne);
+      expect(find.text('Add entry'), findsOne);
     });
   });
 
@@ -119,7 +119,7 @@ void main() {
       await pumpPage(tester);
       expect(find.text('No cycle yet'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.tap(find.text('Add entry'));
       await tester.pumpAndSettle();
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
@@ -135,7 +135,7 @@ void main() {
     testWidgets('writes flow, symptoms and a note', (tester) async {
       await pumpPage(tester);
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.tap(find.text('Add entry'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Heavy'));
       await tester.pumpAndSettle();
@@ -206,7 +206,7 @@ void main() {
     testWidgets('backing out without saving changes nothing', (tester) async {
       await pumpPage(tester);
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.tap(find.text('Add entry'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Heavy'));
       await tester.pumpAndSettle();
@@ -334,7 +334,7 @@ void main() {
   group('logging the newer kinds', () {
     testWidgets('mood and sex are stored and summarised', (tester) async {
       await pumpPage(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+      await tester.tap(find.text('Add entry'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Sex'),
@@ -370,7 +370,7 @@ void main() {
       Future<bool> offered() async {
         await tester.pumpWidget(const SizedBox());
         await pumpPage(tester);
-        await tester.tap(find.widgetWithText(FilledButton, 'Add entry'));
+        await tester.tap(find.text('Add entry'));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
           find.text('Note'),
