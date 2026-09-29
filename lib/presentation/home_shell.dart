@@ -245,8 +245,8 @@ class _HomeShellState extends State<HomeShell> {
 typedef _DockItem = ({IconData icon, IconData activeIcon, String label});
 
 /// A floating, frosted bar of icons, as the dock on the iOS home screen:
-/// no words under them, a soft light behind the one on show, and a small dot
-/// beneath it. Each still has its name for VoiceOver.
+/// no words under them and a soft light behind the one on show. Each still
+/// has its name for VoiceOver.
 class _Dock extends StatelessWidget {
   const _Dock({
     required this.selected,
@@ -386,38 +386,21 @@ class _DockButton extends StatelessWidget {
         onTap: onTap,
         child: SizedBox(
           width: width,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedScale(
-                scale: selected ? 1.08 : 1,
+          child: Center(
+            child: AnimatedScale(
+              scale: selected ? 1.08 : 1,
+              duration: still ? Duration.zero : duration,
+              curve: Curves.easeOutCubic,
+              child: AnimatedSwitcher(
                 duration: still ? Duration.zero : duration,
-                curve: Curves.easeOutCubic,
-                child: AnimatedSwitcher(
-                  duration: still ? Duration.zero : duration,
-                  child: Icon(
-                    selected ? item.activeIcon : item.icon,
-                    key: ValueKey(selected),
-                    size: 26,
-                    color: colour,
-                  ),
+                child: Icon(
+                  selected ? item.activeIcon : item.icon,
+                  key: ValueKey(selected),
+                  size: 26,
+                  color: colour,
                 ),
               ),
-              const SizedBox(height: 4),
-              // The running-app dot of the dock.
-              AnimatedOpacity(
-                opacity: selected ? 1 : 0,
-                duration: still ? Duration.zero : duration,
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: scheme.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

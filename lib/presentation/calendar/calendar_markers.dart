@@ -18,23 +18,25 @@ class MarkerColors {
     required this.fertile,
   });
 
-  /// The colours for [scheme].
-  factory MarkerColors.of(ColorScheme scheme) => MarkerColors(
-    period: scheme.primary,
-    // Every band is a shade of the app's own rose; the shapes tell them
-    // apart (filled, dashed, plain), the shade only agrees with them.
-    estimateLine: scheme.primary.withValues(alpha: 0.75),
-    // Solid, pre-blended onto the card: a see-through wash would darken
-    // where neighbouring days overlap.
-    estimateWash: Color.alphaBlend(
-      scheme.primary.withValues(alpha: 0.10),
-      scheme.groupedCard,
-    ),
-    fertile: Color.alphaBlend(
-      scheme.primary.withValues(alpha: 0.20),
-      scheme.groupedCard,
-    ),
-  );
+  /// The colours for [scheme], drawn on [background] (a card unless said
+  /// otherwise).
+  factory MarkerColors.of(ColorScheme scheme, {Color? background}) =>
+      MarkerColors(
+        period: scheme.primary,
+        // Every band is a shade of the app's own rose; the shapes tell them
+        // apart (filled, dashed, plain), the shade only agrees with them.
+        estimateLine: scheme.primary.withValues(alpha: 0.75),
+        // Solid, pre-blended onto what is behind: a see-through wash would
+        // darken where neighbouring days overlap.
+        estimateWash: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.10),
+          background ?? scheme.groupedCard,
+        ),
+        fertile: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.20),
+          background ?? scheme.groupedCard,
+        ),
+      );
 
   final Color period;
   final Color estimateLine;

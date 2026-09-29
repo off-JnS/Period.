@@ -194,15 +194,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
         };
 
+    // The same tinted page as every other screen, rather than a white one.
     return Scaffold(
-      backgroundColor: scheme.groupedCard,
+      backgroundColor: scheme.groupedBackground,
       body: Column(
         children: [
           // A fixed bar rather than a collapsing one: the scroll runs both
           // ways from the middle, so a large title in it would sit above the
           // earliest month instead of at the top of the screen.
           Material(
-            color: scheme.groupedCard,
+            color: scheme.groupedBackground,
             child: SafeArea(
               bottom: false,
               child: Column(
@@ -693,7 +694,10 @@ class _DayCell extends StatelessWidget {
                   joinsLeft: left,
                   joinsRight: right,
                   fadesOut: fadesOut,
-                  colors: MarkerColors.of(scheme),
+                  colors: MarkerColors.of(
+                    scheme,
+                    background: scheme.groupedBackground,
+                  ),
                   scale: scale,
                 ),
                 child: Stack(
