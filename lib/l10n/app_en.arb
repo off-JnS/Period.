@@ -1061,5 +1061,17 @@
   "entryNothingChosen": "Not recorded",
   "@entryNothingChosen": {
     "description": "Log sheet: shown beside a folded section's name when nothing in it is filled in."
+  },
+  "calendarYearView": "Year view",
+  "@calendarYearView": {
+    "description": "Calendar: accessible name of the button that zooms out to whole years."
+  },
+  "calendarMonthView": "Month view",
+  "@calendarMonthView": {
+    "description": "Calendar: accessible name of the button that zooms back in to months."
+  },
+  "calendarOpenMonth": "Opens this month",
+  "@calendarOpenMonth": {
+    "description": "Calendar year view: VoiceOver hint on each small month."
   }
 }

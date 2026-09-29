@@ -13,6 +13,7 @@ import '../../l10n/app_localizations.dart';
 import '../theme.dart';
 import 'calendar_markers.dart';
 import 'month_grid.dart';
+import 'year_view.dart';
 
 /// Everything the calendar needs, already computed.
 ///
@@ -131,6 +132,98 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// What the calendar is narrowed to, or null for everything.
   CalendarFilter? _filter;
 
+  /// The month the scroll is anchored on, counted as year * 12 + month - 1;
+  /// null for the current one. Opening a month from the year view anchors
+  /// on it, so it lands at the top without measuring the months between.
+  int? _anchor;
+
+  /// Whether whole years are shown rather than months, and which year first.
+  bool _yearView = false;
+  int _year = 0;
+
+  /// Fingers on the screen, for a pinch between the two views.
+  final Map<int, Offset> _pointers = {};
+  double? _pinchStart;
+
+  int get _current => widget.data.today.year * 12 + widget.data.today.month - 1;
+
+  /// Roughly the month at the top of the screen, from the scroll offset and
+  /// each month's height: its rows of days and its name above them.
+  int _monthOnScreen() {
+    var month = _anchor ?? _current;
+    if (!_controller.hasClients) return month;
+    final firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    double height(int absolute) {
+      final rows = monthGrid(
+        year: absolute ~/ 12,
+        month: absolute % 12 + 1,
+        firstDayOfWeekIndex: firstDay,
+      ).weeks.length;
+      return 24 + 34 * scale + rows * 58 * scale;
+    }
+
+    // A little way down, so a month mostly scrolled past does not count.
+    var offset = _controller.offset + 60;
+    if (offset >= 0) {
+      while (offset > height(month)) {
+        offset -= height(month);
+        month++;
+      }
+    } else {
+      while (offset < 0) {
+        month--;
+        offset += height(month);
+      }
+    }
+    return month;
+  }
+
+  void _zoomOut() {
+    if (_yearView) return;
+    final month = _monthOnScreen();
+    setState(() {
+      // Kept, so zooming back in returns to the same month.
+      _anchor = month;
+      _year = month ~/ 12;
+      _yearView = true;
+    });
+  }
+
+  void _openMonth(int year, int month) => setState(() {
+    _anchor = year * 12 + month - 1;
+    _yearView = false;
+  });
+
+  void _zoomIn() {
+    if (!_yearView) return;
+    setState(() => _yearView = false);
+  }
+
+  void _pointerMoved(PointerEvent event) {
+    _pointers[event.pointer] = event.position;
+    if (_pointers.length != 2) {
+      _pinchStart = null;
+      return;
+    }
+    final [a, b] = _pointers.values.toList();
+    final distance = (a - b).distance;
+    final start = _pinchStart ??= distance;
+    if (start < 1) return;
+    if (distance / start < 0.7) {
+      _pinchStart = null;
+      _zoomOut();
+    } else if (distance / start > 1.4) {
+      _pinchStart = null;
+      _zoomIn();
+    }
+  }
+
+  void _pointerGone(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    _pinchStart = null;
+  }
+
   void _setFilter(CalendarFilter? filter) {
     if (filter == _filter) return;
     setState(() => _filter = filter);
@@ -145,6 +238,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   /// Back to the current month: a glide when it is near, a jump when it is
   /// years away, where a glide would only be a blur.
   void _scrollToToday() {
+    if (_yearView || (_anchor != null && _anchor != _current)) {
+      setState(() {
+        _anchor = null;
+        _yearView = false;
+      });
+      return;
+    }
     if (!_controller.hasClients) return;
     if (_controller.offset.abs() > 4000) {
       _controller.jumpTo(0);
@@ -164,7 +264,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final scheme = theme.colorScheme;
     final materialL10n = MaterialLocalizations.of(context);
     final today = widget.data.today;
-    final current = today.year * 12 + today.month - 1;
+    final current = _anchor ?? today.year * 12 + today.month - 1;
+    final still = MediaQuery.of(context).disableAnimations;
 
     Widget month(int absolute) => _MonthSection(
       key: ValueKey(absolute),
@@ -215,10 +316,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         Expanded(
                           child: Semantics(
                             header: true,
-                            child: Text(
-                              l10n.calendarTitle,
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
+                            // Shrinks rather than breaking the word when
+                            // large text leaves the buttons little room.
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                l10n.calendarTitle,
+                                maxLines: 1,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
@@ -235,81 +343,102 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           ),
                         ),
-                        // A pull-down under the button, as iOS menus open.
-                        MenuAnchor(
-                          alignmentOffset: const Offset(-150, 0),
-                          style: MenuStyle(
-                            backgroundColor: WidgetStatePropertyAll(
-                              scheme.groupedCard,
-                            ),
-                            shape: WidgetStatePropertyAll(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            side: const WidgetStatePropertyAll(BorderSide.none),
-                            elevation: const WidgetStatePropertyAll(8),
-                            shadowColor: WidgetStatePropertyAll(
-                              Colors.black.withValues(alpha: 0.25),
-                            ),
-                          ),
-                          menuChildren: [
-                            for (final option in [
-                              null,
-                              ...CalendarFilter.values,
-                            ])
-                              MenuItemButton(
-                                onPressed: () => _setFilter(option),
-                                leadingIcon: SizedBox(
-                                  width: 20,
-                                  child: Center(
-                                    child: option == null
-                                        ? Icon(
-                                            CupertinoIcons.calendar,
-                                            size: 18,
-                                            color: scheme.primary,
-                                          )
-                                        : filterIcon(option),
-                                  ),
-                                ),
-                                trailingIcon: option == _filter
-                                    ? Icon(
-                                        CupertinoIcons.checkmark_alt,
-                                        size: 18,
-                                        color: scheme.primary,
-                                      )
-                                    : const SizedBox(width: 18),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: Text(
-                                    option == null
-                                        ? l10n.calendarFilterAll
-                                        : filterLabel(option),
-                                  ),
-                                ),
-                              ),
-                          ],
-                          builder: (context, controller, _) => Semantics(
-                            button: true,
-                            label: l10n.calendarFilterButton,
-                            excludeSemantics: true,
-                            child: CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(44, 44),
-                              onPressed: () => controller.isOpen
-                                  ? controller.close()
-                                  : controller.open(),
-                              child: Icon(
-                                _filter == null
-                                    ? CupertinoIcons
-                                          .line_horizontal_3_decrease_circle
-                                    : CupertinoIcons
-                                          .line_horizontal_3_decrease_circle_fill,
-                                color: scheme.primary,
-                              ),
+                        Semantics(
+                          button: true,
+                          label: _yearView
+                              ? l10n.calendarMonthView
+                              : l10n.calendarYearView,
+                          excludeSemantics: true,
+                          child: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(44, 44),
+                            onPressed: _yearView ? _zoomIn : _zoomOut,
+                            child: Icon(
+                              _yearView
+                                  ? CupertinoIcons.calendar
+                                  : CupertinoIcons.square_grid_2x2,
+                              color: scheme.primary,
                             ),
                           ),
                         ),
+                        // A pull-down under the button, as iOS menus open.
+                        if (!_yearView)
+                          MenuAnchor(
+                            alignmentOffset: const Offset(-150, 0),
+                            style: MenuStyle(
+                              backgroundColor: WidgetStatePropertyAll(
+                                scheme.groupedCard,
+                              ),
+                              shape: WidgetStatePropertyAll(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              side: const WidgetStatePropertyAll(
+                                BorderSide.none,
+                              ),
+                              elevation: const WidgetStatePropertyAll(8),
+                              shadowColor: WidgetStatePropertyAll(
+                                Colors.black.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            menuChildren: [
+                              for (final option in [
+                                null,
+                                ...CalendarFilter.values,
+                              ])
+                                MenuItemButton(
+                                  onPressed: () => _setFilter(option),
+                                  leadingIcon: SizedBox(
+                                    width: 20,
+                                    child: Center(
+                                      child: option == null
+                                          ? Icon(
+                                              CupertinoIcons.calendar,
+                                              size: 18,
+                                              color: scheme.primary,
+                                            )
+                                          : filterIcon(option),
+                                    ),
+                                  ),
+                                  trailingIcon: option == _filter
+                                      ? Icon(
+                                          CupertinoIcons.checkmark_alt,
+                                          size: 18,
+                                          color: scheme.primary,
+                                        )
+                                      : const SizedBox(width: 18),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: Text(
+                                      option == null
+                                          ? l10n.calendarFilterAll
+                                          : filterLabel(option),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            builder: (context, controller, _) => Semantics(
+                              button: true,
+                              label: l10n.calendarFilterButton,
+                              excludeSemantics: true,
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(44, 44),
+                                onPressed: () => controller.isOpen
+                                    ? controller.close()
+                                    : controller.open(),
+                                child: Icon(
+                                  _filter == null
+                                      ? CupertinoIcons
+                                            .line_horizontal_3_decrease_circle
+                                      : CupertinoIcons
+                                            .line_horizontal_3_decrease_circle_fill,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
                         Semantics(
                           button: true,
                           label: l10n.calendarLegendButton,
@@ -336,7 +465,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
                     child: switch (_filter) {
-                      final filter? => Padding(
+                      final filter? when !_yearView => Padding(
                         padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
@@ -384,16 +513,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                         ),
                       ),
-                      null => const SizedBox(width: double.infinity),
+                      _ => const SizedBox(width: double.infinity),
                     },
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                    child: _WeekdayHeader(
-                      firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
-                      narrowWeekdays: materialL10n.narrowWeekdays,
+                  if (!_yearView)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: _WeekdayHeader(
+                        firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
+                        narrowWeekdays: materialL10n.narrowWeekdays,
+                      ),
                     ),
-                  ),
                   Divider(
                     height: 0.5,
                     thickness: 0.5,
@@ -404,28 +534,73 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
           Expanded(
-            child: CustomScrollView(
-              controller: _controller,
-              center: _centreKey,
-              slivers: [
-                // Grows upwards from the current month, into the past.
-                SliverList.builder(
-                  itemCount: current - _firstYear * 12,
-                  itemBuilder: (context, index) => month(current - 1 - index),
-                ),
-                // The current month and everything after it.
-                SliverPadding(
-                  key: _centreKey,
-                  // Clear of the dock, which floats over the end.
-                  padding: EdgeInsets.only(
-                    bottom: 24 + MediaQuery.paddingOf(context).bottom,
+            // A pinch in zooms out to years, a pinch out back in to months.
+            // Listened to rather than recognised, so it never takes a scroll
+            // away from the list underneath.
+            child: Listener(
+              onPointerDown: _pointerMoved,
+              onPointerMove: _pointerMoved,
+              onPointerUp: _pointerGone,
+              onPointerCancel: _pointerGone,
+              child: AnimatedSwitcher(
+                duration: still
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                // Months shrink away into the year, the year grows back
+                // into months: a zoom, kept small.
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween(
+                      begin: child.key == const ValueKey('year') ? 1.06 : 0.94,
+                      end: 1.0,
+                    ).animate(animation),
+                    child: child,
                   ),
-                  sliver: SliverList.builder(
-                    itemCount: (_lastYear + 1) * 12 - current,
-                    itemBuilder: (context, index) => month(current + index),
-                  ),
                 ),
-              ],
+                child: _yearView
+                    ? CalendarYearView(
+                        key: const ValueKey('year'),
+                        data: widget.data,
+                        year: _year,
+                        firstYear: _firstYear,
+                        lastYear: _lastYear,
+                        onSelectMonth: _openMonth,
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('months'),
+                        child: CustomScrollView(
+                          // A new anchor starts a new scroll, at that month.
+                          key: ValueKey(current),
+                          controller: _controller,
+                          center: _centreKey,
+                          slivers: [
+                            // Grows upwards from the current month, into the past.
+                            SliverList.builder(
+                              itemCount: current - _firstYear * 12,
+                              itemBuilder: (context, index) =>
+                                  month(current - 1 - index),
+                            ),
+                            // The current month and everything after it.
+                            SliverPadding(
+                              key: _centreKey,
+                              // Clear of the dock, which floats over the end.
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    24 + MediaQuery.paddingOf(context).bottom,
+                              ),
+                              sliver: SliverList.builder(
+                                itemCount: (_lastYear + 1) * 12 - current,
+                                itemBuilder: (context, index) =>
+                                    month(current + index),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
             ),
           ),
         ],

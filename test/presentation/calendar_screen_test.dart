@@ -385,4 +385,76 @@ void main() {
       handle.dispose();
     });
   });
+
+  group('the year view', () {
+    Future<void> zoomOut(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Year view'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('zooms out to twelve months of the year', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+
+      expect(find.text('2024'), findsOneWidget);
+      expect(find.bySemanticsLabel('January 2024'), findsOneWidget);
+      expect(find.bySemanticsLabel('December 2024'), findsOneWidget);
+      // The months' own marks are not repeated day by day.
+      expect(day(r'^May 17, 2024'), findsNothing);
+    });
+
+    testWidgets('a month opens at the top of the month view', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+      await tester.tap(find.bySemanticsLabel('February 2024'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Year view'), findsOneWidget);
+      expect(day(r'^February 1, 2024'), findsOneWidget);
+      expect(day(r'^May 17, 2024'), findsNothing);
+    });
+
+    testWidgets('Today comes back from anywhere', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+      await tester.tap(find.bySemanticsLabel('February 2024'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Today'));
+      await tester.pumpAndSettle();
+
+      expect(day(r'^May 17, 2024'), findsOneWidget);
+    });
+
+    testWidgets('a pinch zooms out, and back in to the same month', (
+      tester,
+    ) async {
+      await pump(tester, data());
+      final centre = tester.getCenter(find.byType(CustomScrollView));
+
+      final a = await tester.startGesture(centre - const Offset(0, 120));
+      final b = await tester.startGesture(centre + const Offset(0, 120));
+      await a.moveTo(centre - const Offset(0, 40));
+      await b.moveTo(centre + const Offset(0, 40));
+      await a.up();
+      await b.up();
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Month view'), findsOneWidget);
+
+      final c = await tester.startGesture(centre - const Offset(0, 40));
+      final d = await tester.startGesture(centre + const Offset(0, 40));
+      await c.moveTo(centre - const Offset(0, 140));
+      await d.moveTo(centre + const Offset(0, 140));
+      await c.up();
+      await d.up();
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Year view'), findsOneWidget);
+      expect(day(r'^May 17, 2024'), findsOneWidget);
+    });
+
+    testWidgets('fits at the largest text size', (tester) async {
+      await pump(tester, data(), textScale: 2);
+      await zoomOut(tester);
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

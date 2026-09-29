@@ -299,5 +299,8 @@
   "entryPreviousWeek": "Vorherige Woche",
   "entryNextWeek": "Nächste Woche",
   "entryMoreHeading": "Mehr",
-  "entryNothingChosen": "Nicht erfasst"
+  "entryNothingChosen": "Nicht erfasst",
+  "calendarYearView": "Jahresansicht",
+  "calendarMonthView": "Monatsansicht",
+  "calendarOpenMonth": "Öffnet diesen Monat"
 }
