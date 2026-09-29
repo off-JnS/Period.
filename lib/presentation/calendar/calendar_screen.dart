@@ -704,17 +704,18 @@ class _DayCell extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     // The number sits a little above centre, leaving room
-                    // beneath it, inside the band, for the day's mark.
+                    // beneath it, inside the band, for the day's mark. The
+                    // discs behind it stay small enough to clear that mark.
                     Align(
-                      alignment: const Alignment(0, -0.2),
+                      alignment: const Alignment(0, -0.22),
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
                           // A day that matches the filter gets a soft disc.
                           if (filter != null && matches && !isToday)
                             Container(
-                              width: 34 * scale,
-                              height: 34 * scale,
+                              width: 30 * scale,
+                              height: 30 * scale,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: scheme.primary.withValues(alpha: 0.16),
@@ -724,8 +725,8 @@ class _DayCell extends StatelessWidget {
                           // inverted on a period band so it still stands out.
                           if (isToday)
                             Container(
-                              width: 32 * scale,
-                              height: 32 * scale,
+                              width: 29 * scale,
+                              height: 29 * scale,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: onBand
@@ -759,7 +760,7 @@ class _DayCell extends StatelessWidget {
                     // a logged day too, and one mark reads cleaner than two.
                     if (hadSex || hadTest || isLogged)
                       Align(
-                        alignment: const Alignment(0, 0.6),
+                        alignment: const Alignment(0, 0.68),
                         child: hadSex || hadTest
                             // Icons for the two things worth spotting at a
                             // glance, side by side on a day with both; the

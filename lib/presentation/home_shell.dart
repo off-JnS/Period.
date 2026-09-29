@@ -258,8 +258,8 @@ class _Dock extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final List<_DockItem> items;
 
-  static const _itemWidth = 64.0;
-  static const _height = 64.0;
+  static const _itemWidth = 78.0;
+  static const _height = 54.0;
 
   @override
   Widget build(BuildContext context) {
@@ -267,7 +267,7 @@ class _Dock extends StatelessWidget {
     final light = scheme.brightness == Brightness.light;
     final still = MediaQuery.of(context).disableAnimations;
     const duration = Duration(milliseconds: 320);
-    final radius = BorderRadius.circular(26);
+    final radius = BorderRadius.circular(24);
 
     return SafeArea(
       top: false,
@@ -305,10 +305,10 @@ class _Dock extends StatelessWidget {
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(5),
                     child: SizedBox(
                       width: _itemWidth * items.length,
-                      height: _height - 12,
+                      height: _height - 10,
                       child: Stack(
                         children: [
                           // The light behind the screen on show, sliding
@@ -323,7 +323,7 @@ class _Dock extends StatelessWidget {
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: scheme.primary.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                               ),
                             ),
                           ),
