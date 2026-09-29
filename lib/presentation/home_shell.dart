@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -16,19 +18,29 @@ import 'settings/settings_page.dart';
 import 'theme.dart';
 import 'today/today_page.dart';
 
-/// The four top-level screens behind an iOS tab bar.
+/// Keys for the dock's buttons, so tests can reach them without matching
+/// text (the dock shows none).
+abstract final class HomeShellKeys {
+  /// The dock button for each screen, left to right.
+  static const dock = [
+    ValueKey('dock.today'),
+    ValueKey('dock.calendar'),
+    ValueKey('dock.analysis'),
+    ValueKey('dock.profile'),
+  ];
+}
+
+/// The four top-level screens, swiped between sideways and reached from a
+/// floating dock at the bottom.
 ///
-/// Settings is not a tab: it opens from the gear on Profile, inside that
-/// tab's own navigator, so the tab bar stays in place as in any iOS app.
+/// Settings is not a screen of its own here: it opens from the gear on
+/// Profile, inside that screen's own navigator, so the dock stays in place.
 ///
-/// The HIG puts top-level navigation in a tab bar at the bottom rather than in
-/// buttons on the home screen, and it keeps each destination one tap away from
-/// every other.
-///
-/// Only the selected tab is built. Each tab reads the database when it appears,
-/// so a day logged from the calendar is already on Today when the user switches
-/// back, with no cross-tab refresh wiring to get wrong. Every figure is derived
-/// on read anyway (section 4), so rebuilding costs a query, not correctness.
+/// Only the screen on show (and one being swiped in) is built. Each reads the
+/// database when it appears, so a day logged from the calendar is already on
+/// Today when the user comes back, with no cross-screen refresh wiring to get
+/// wrong. Every figure is derived on read anyway (section 4), so rebuilding
+/// costs a query, not correctness.
 class HomeShell extends StatefulWidget {
   /// Creates the shell.
   const HomeShell({
@@ -74,6 +86,11 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _tab = 0;
+  final _pages = PageController();
+
+  /// Set while a tap on the dock carries the pages over, so the screens
+  /// passed on the way do not light up in the dock one after another.
+  bool _jumping = false;
   late final AppLifecycleListener _lifecycle;
 
   /// Lets the navigation bars on Profile and Settings animate into each
@@ -100,6 +117,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _lifecycle.dispose();
     _profileHeroes.dispose();
+    _pages.dispose();
     super.dispose();
   }
 
@@ -119,85 +137,289 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Future<void> _select(int index) async {
+    if (index == _tab) return;
+    setState(() => _tab = index);
+    if (MediaQuery.of(context).disableAnimations ||
+        (index - (_pages.page ?? _tab)).abs() > 1.5) {
+      // A long way over would sweep through every screen in between.
+      _pages.jumpToPage(index);
+      return;
+    }
+    _jumping = true;
+    await _pages.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeInOutCubic,
+    );
+    _jumping = false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: switch (_tab) {
-        0 => TodayPage(
-          logDao: widget.logDao,
+      // The screens run on under the dock, which blurs what passes behind
+      // it; each screen already pads its end by the bottom inset.
+      extendBody: true,
+      body: PageView.builder(
+        controller: _pages,
+        itemCount: 4,
+        onPageChanged: (index) {
+          if (!_jumping && index != _tab) setState(() => _tab = index);
+        },
+        itemBuilder: (context, index) => _screen(index),
+      ),
+      bottomNavigationBar: _Dock(
+        selected: _tab,
+        onSelect: _select,
+        items: [
+          (
+            icon: Icons.circle_outlined,
+            activeIcon: Icons.trip_origin_rounded,
+            label: l10n.todayTitle,
+          ),
+          (
+            icon: Icons.calendar_month_outlined,
+            activeIcon: Icons.calendar_month_rounded,
+            label: l10n.calendarTitle,
+          ),
+          (
+            icon: Icons.insert_chart_outlined_rounded,
+            activeIcon: Icons.insert_chart_rounded,
+            label: l10n.analysisTitle,
+          ),
+          (
+            icon: CupertinoIcons.person_crop_circle,
+            activeIcon: CupertinoIcons.person_crop_circle_fill,
+            label: l10n.profileTitle,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _screen(int index) => switch (index) {
+    0 => TodayPage(
+      logDao: widget.logDao,
+      settingsDao: widget.settingsDao,
+      clock: widget.clock,
+      onEntriesChanged: _syncOutsideTheApp,
+    ),
+    1 => CalendarPage(
+      logDao: widget.logDao,
+      settingsDao: widget.settingsDao,
+      clock: widget.clock,
+      onEntriesChanged: _syncOutsideTheApp,
+    ),
+    2 => AnalysisPage(
+      logDao: widget.logDao,
+      settingsDao: widget.settingsDao,
+      clock: widget.clock,
+    ),
+    _ => Navigator(
+      observers: [_profileHeroes],
+      onGenerateRoute: (_) => CupertinoPageRoute<void>(
+        builder: (_) => ProfilePage(
           settingsDao: widget.settingsDao,
           clock: widget.clock,
-          onEntriesChanged: _syncOutsideTheApp,
+          onScheduleAffected: _syncOutsideTheApp,
+          settingsPage: (backLabel) => SettingsPage(
+            settingsDao: widget.settingsDao,
+            onPreferencesChanged: widget.onPreferencesChanged,
+            appLock: widget.appLock,
+            reminderSync: widget.reminderSync,
+            onScheduleAffected: _syncOutsideTheApp,
+            onEraseEverything: widget.onEraseEverything,
+            offerWidget: widget.widgetSync != null,
+            backLabel: backLabel,
+          ),
         ),
-        1 => CalendarPage(
-          logDao: widget.logDao,
-          settingsDao: widget.settingsDao,
-          clock: widget.clock,
-          onEntriesChanged: _syncOutsideTheApp,
-        ),
-        2 => AnalysisPage(
-          logDao: widget.logDao,
-          settingsDao: widget.settingsDao,
-          clock: widget.clock,
-        ),
-        _ => Navigator(
-          observers: [_profileHeroes],
-          onGenerateRoute: (_) => CupertinoPageRoute<void>(
-            builder: (_) => ProfilePage(
-              settingsDao: widget.settingsDao,
-              clock: widget.clock,
-              onScheduleAffected: _syncOutsideTheApp,
-              settingsPage: (backLabel) => SettingsPage(
-                settingsDao: widget.settingsDao,
-                onPreferencesChanged: widget.onPreferencesChanged,
-                appLock: widget.appLock,
-                reminderSync: widget.reminderSync,
-                onScheduleAffected: _syncOutsideTheApp,
-                onEraseEverything: widget.onEraseEverything,
-                offerWidget: widget.widgetSync != null,
-                backLabel: backLabel,
+      ),
+    ),
+  };
+}
+
+/// One button in the dock.
+typedef _DockItem = ({IconData icon, IconData activeIcon, String label});
+
+/// A floating, frosted bar of icons, as the dock on the iOS home screen:
+/// no words under them, a soft light behind the one on show, and a small dot
+/// beneath it. Each still has its name for VoiceOver.
+class _Dock extends StatelessWidget {
+  const _Dock({
+    required this.selected,
+    required this.onSelect,
+    required this.items,
+  });
+
+  final int selected;
+  final ValueChanged<int> onSelect;
+  final List<_DockItem> items;
+
+  static const _itemWidth = 64.0;
+  static const _height = 64.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final light = scheme.brightness == Brightness.light;
+    final still = MediaQuery.of(context).disableAnimations;
+    const duration = Duration(milliseconds: 320);
+    final radius = BorderRadius.circular(26);
+
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        child: Center(
+          heightFactor: 1,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: light ? 0.08 : 0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: radius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: scheme.groupedCard.withValues(
+                      alpha: light ? 0.72 : 0.62,
+                    ),
+                    borderRadius: radius,
+                    border: Border.all(
+                      color: (light ? Colors.white : Colors.white24).withValues(
+                        alpha: light ? 0.6 : 0.12,
+                      ),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: SizedBox(
+                      width: _itemWidth * items.length,
+                      height: _height - 12,
+                      child: Stack(
+                        children: [
+                          // The light behind the screen on show, sliding
+                          // from one icon to the next.
+                          AnimatedPositioned(
+                            duration: still ? Duration.zero : duration,
+                            curve: Curves.easeOutCubic,
+                            left: _itemWidth * selected,
+                            top: 0,
+                            bottom: 0,
+                            width: _itemWidth,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              for (final (index, item) in items.indexed)
+                                _DockButton(
+                                  key: HomeShellKeys.dock[index],
+                                  item: item,
+                                  selected: index == selected,
+                                  width: _itemWidth,
+                                  onTap: () => onSelect(index),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ),
-      },
-      bottomNavigationBar: CupertinoTabBar(
-        currentIndex: _tab,
-        activeColor: scheme.primary,
-        inactiveColor: scheme.onSurfaceVariant.withValues(alpha: 0.8),
-        backgroundColor: scheme.groupedCard.withValues(alpha: 0.92),
-        border: Border(
-          top: BorderSide(color: scheme.outlineVariant, width: 0.5),
+      ),
+    );
+  }
+}
+
+class _DockButton extends StatelessWidget {
+  const _DockButton({
+    required this.item,
+    required this.selected,
+    required this.width,
+    required this.onTap,
+    super.key,
+  });
+
+  final _DockItem item;
+  final bool selected;
+  final double width;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final still = MediaQuery.of(context).disableAnimations;
+    const duration = Duration(milliseconds: 240);
+    final colour = selected
+        ? scheme.primary
+        : scheme.onSurfaceVariant.withValues(alpha: 0.85);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: item.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: width,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1.08 : 1,
+                duration: still ? Duration.zero : duration,
+                curve: Curves.easeOutCubic,
+                child: AnimatedSwitcher(
+                  duration: still ? Duration.zero : duration,
+                  child: Icon(
+                    selected ? item.activeIcon : item.icon,
+                    key: ValueKey(selected),
+                    size: 26,
+                    color: colour,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              // The running-app dot of the dock.
+              AnimatedOpacity(
+                opacity: selected ? 1 : 0,
+                duration: still ? Duration.zero : duration,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        onTap: (index) {
-          if (index == _tab) return;
-          setState(() => _tab = index);
-        },
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.circle_outlined),
-            activeIcon: const Icon(Icons.trip_origin_rounded),
-            label: l10n.todayTitle,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.calendar_month_outlined),
-            activeIcon: const Icon(Icons.calendar_month_rounded),
-            label: l10n.calendarTitle,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.insert_chart_outlined_rounded),
-            activeIcon: const Icon(Icons.insert_chart_rounded),
-            label: l10n.analysisTitle,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(CupertinoIcons.person_crop_circle),
-            activeIcon: const Icon(CupertinoIcons.person_crop_circle_fill),
-            label: l10n.profileTitle,
-          ),
-        ],
       ),
     );
   }

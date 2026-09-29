@@ -150,8 +150,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     } else {
       _pages.animateToPage(
         page,
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOutCubic,
       );
     }
   }
@@ -209,9 +209,12 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             Expanded(
               child: PageView(
                 controller: _pages,
-                // Buttons only: a sideways swipe on a page of wheels and
-                // rows would too easily turn it by accident.
-                physics: const NeverScrollableScrollPhysics(),
+                // Swiped through like any iOS introduction; the button below
+                // does the same for anyone who cannot or would rather not.
+                // The wheels open in a popup, so a swipe never fights them.
+                onPageChanged: (page) {
+                  if (page != _page) setState(() => _page = page);
+                },
                 children: [
                   for (final (index, page) in [
                     const _WelcomePage(),
@@ -228,7 +231,13 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                       onChanged: (date) => setState(() => _lastPeriod = date),
                     ),
                   ].indexed)
-                    _Parallax(controller: _pages, index: index, child: page),
+                    _KeepAlive(
+                      child: _Parallax(
+                        controller: _pages,
+                        index: index,
+                        child: page,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -244,17 +253,9 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                   ),
                 ),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, animation) => FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween(
-                        begin: const Offset(0, 0.4),
-                        end: Offset.zero,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  ),
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
                   child: Row(
                     key: ValueKey(_page),
                     mainAxisSize: MainAxisSize.min,
@@ -397,16 +398,39 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// Fades and lifts [child] into place, [order] beats after the page appears.
-/// Still at once under Reduce Motion.
+/// Keeps a page alive once built, so its entrance plays once rather than
+/// again every time it is swiped back into view.
+class _KeepAlive extends StatefulWidget {
+  const _KeepAlive({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+/// Fades [child] in and lets it drift a few points into place, [order] beats
+/// after the page appears. Still at once under Reduce Motion.
 class _Appear extends StatelessWidget {
   const _Appear({required this.order, required this.child});
 
   final int order;
   final Widget child;
 
-  static const _step = 70;
-  static const _length = 420;
+  static const _step = 60;
+  static const _length = 560;
 
   @override
   Widget build(BuildContext context) {
@@ -415,7 +439,7 @@ class _Appear extends StatelessWidget {
     final curve = Interval(
       order * _step / total,
       1,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
     );
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -425,7 +449,7 @@ class _Appear extends StatelessWidget {
         return Opacity(
           opacity: t,
           child: Transform.translate(
-            offset: Offset(0, 16 * (1 - t)),
+            offset: Offset(0, 6 * (1 - t)),
             child: child,
           ),
         );
@@ -435,9 +459,8 @@ class _Appear extends StatelessWidget {
   }
 }
 
-/// Fades and slightly shrinks a page as it slides out, and brings the next
-/// one in the same way, so a turn reads as moving forward rather than a
-/// flat slide.
+/// Lets a page fade a little as it slides out, and the next one in the same
+/// way, so a turn feels soft rather than a hard-edged slide.
 class _Parallax extends StatelessWidget {
   const _Parallax({
     required this.controller,
@@ -460,57 +483,28 @@ class _Parallax extends StatelessWidget {
             ? controller.page ?? controller.initialPage.toDouble()
             : controller.initialPage.toDouble();
         final distance = (page - index).abs().clamp(0.0, 1.0);
-        return Opacity(
-          opacity: 1 - distance * 0.7,
-          child: Transform.scale(scale: 1 - distance * 0.06, child: child),
-        );
+        return Opacity(opacity: 1 - distance * 0.35, child: child);
       },
     );
   }
 }
 
-/// The large tinted circle at the top of each page. It pops in, then sends
-/// out two soft rings and settles: enough to draw the eye, then still.
-class _Badge extends StatefulWidget {
+/// The large tinted circle at the top of each page. It fades in and settles
+/// from a touch smaller, then stays still.
+class _Badge extends StatelessWidget {
   const _Badge(this.icon, {this.size = 88});
 
   final IconData icon;
   final double size;
 
   @override
-  State<_Badge> createState() => _BadgeState();
-}
-
-class _BadgeState extends State<_Badge> with SingleTickerProviderStateMixin {
-  late final _rings = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!MediaQuery.of(context).disableAnimations && !_rings.isAnimating) {
-      Future<void>.delayed(const Duration(milliseconds: 250), () {
-        if (mounted) _rings.forward(from: 0);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _rings.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final size = widget.size;
-    final icon = widget.icon;
     final circle = Container(
       width: size,
       height: size,
+      // Air above and below, so the heading does not crowd it.
+      margin: EdgeInsets.symmetric(vertical: size * 0.18),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -527,48 +521,16 @@ class _BadgeState extends State<_Badge> with SingleTickerProviderStateMixin {
     if (MediaQuery.of(context).disableAnimations) {
       return ExcludeSemantics(child: circle);
     }
-    // Room around the circle for the rings, so they never shift the layout.
-    final outer = size * 1.5;
     return ExcludeSemantics(
-      child: SizedBox(
-        width: outer,
-        height: outer,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            for (final delay in const [0.0, 0.35])
-              AnimatedBuilder(
-                animation: _rings,
-                builder: (context, _) {
-                  final t = ((_rings.value - delay) / (1 - delay)).clamp(
-                    0.0,
-                    1.0,
-                  );
-                  if (t == 0 || t == 1) return const SizedBox.shrink();
-                  final eased = Curves.easeOutCubic.transform(t);
-                  return Container(
-                    width: size + (outer - size) * eased,
-                    height: size + (outer - size) * eased,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: scheme.primary.withValues(alpha: 0.35 * (1 - t)),
-                        width: 2,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.6, end: 1),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOutBack,
-              builder: (context, scale, child) =>
-                  Transform.scale(scale: scale, child: child),
-              child: circle,
-            ),
-          ],
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutQuart,
+        builder: (context, t, child) => Opacity(
+          opacity: t,
+          child: Transform.scale(scale: 0.94 + 0.06 * t, child: child),
         ),
+        child: circle,
       ),
     );
   }

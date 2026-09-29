@@ -415,7 +415,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 // The current month and everything after it.
                 SliverPadding(
                   key: _centreKey,
-                  padding: const EdgeInsets.only(bottom: 24),
+                  // Clear of the dock, which floats over the end.
+                  padding: EdgeInsets.only(
+                    bottom: 24 + MediaQuery.paddingOf(context).bottom,
+                  ),
                   sliver: SliverList.builder(
                     itemCount: (_lastYear + 1) * 12 - current,
                     itemBuilder: (context, index) => month(current + index),

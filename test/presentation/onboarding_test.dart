@@ -197,6 +197,24 @@ void main() {
     expect(find.text('1998'), findsOneWidget);
   });
 
+  testWidgets('turns its pages with a swipe, both ways', (tester) async {
+    await pumpFlow(tester);
+    final pages = find.byType(PageView);
+
+    await tester.fling(pages, const Offset(-300, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.text('Step 2 of 3'), findsOneWidget);
+
+    await tester.fling(pages, const Offset(-300, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.text('Step 3 of 3'), findsOneWidget);
+
+    await tester.fling(pages, const Offset(300, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.text('Step 2 of 3'), findsOneWidget);
+    expect(finished, 0);
+  });
+
   testWidgets('German', (tester) async {
     await pumpFlow(tester, locale: const Locale('de'));
     expect(find.text('Willkommen bei Period.'), findsOneWidget);

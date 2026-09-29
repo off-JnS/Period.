@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
@@ -34,26 +35,43 @@ void main() {
     ),
   );
 
-  Finder tab(String label) => find.descendant(
-    of: find.byType(CupertinoTabBar),
-    matching: find.text(label),
-  );
+  const names = ['Today', 'Calendar', 'Your cycles', 'Profile'];
+  Finder tab(String label) =>
+      find.byKey(HomeShellKeys.dock[names.indexOf(label)]);
 
   testWidgets('opens on Today', (tester) async {
     await pumpShell(tester);
     expect(find.byType(TodayScreen), findsOneWidget);
   });
 
-  testWidgets('labels every tab in words, not only with an icon', (
-    tester,
-  ) async {
+  testWidgets('shows icons only, each named for VoiceOver', (tester) async {
     await pumpShell(tester);
-    expect(tab('Today'), findsOneWidget);
-    expect(tab('Calendar'), findsOneWidget);
-    expect(tab('Your cycles'), findsOneWidget);
-    expect(tab('Profile'), findsOneWidget);
-    // Settings opens from Profile rather than taking a tab.
-    expect(tab('Settings'), findsNothing);
+    for (final (index, name) in names.indexed) {
+      final button = find.byKey(HomeShellKeys.dock[index]);
+      expect(tester.getSemantics(button).label, name);
+      expect(
+        find.descendant(of: button, matching: find.byType(Text)),
+        findsNothing,
+      );
+    }
+    // Settings opens from Profile rather than taking a place in the dock.
+    expect(HomeShellKeys.dock, hasLength(4));
+  });
+
+  testWidgets('swipes sideways between the screens', (tester) async {
+    await pumpShell(tester);
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(CalendarScreen), findsOneWidget);
+    expect(
+      tester.getSemantics(tab('Calendar')).flagsCollection.isSelected,
+      Tristate.isTrue,
+    );
+
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(TodayScreen), findsOneWidget);
   });
 
   testWidgets('switches between the three screens', (tester) async {
@@ -118,7 +136,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SettingsPage), findsOneWidget);
-    expect(find.byType(CupertinoTabBar), findsOneWidget);
+    expect(tab('Today'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
