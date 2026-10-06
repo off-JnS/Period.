@@ -1,12 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
+import 'package:period/domain/logic/pregnancy_week.dart';
 import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
-import '../support/views.dart';
 import '../support/dates.dart';
+import '../support/models.dart';
 import '../support/widgets.dart';
 
 void main() {
@@ -20,7 +22,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
+          data: TodayViewData(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -30,13 +32,14 @@ void main() {
 
       // Section 8: a prediction is a window. The en dash is the range.
       expect(find.textContaining('–'), findsWidgets);
-      expect(find.text('Day 22'), findsOneWidget);
+      expect(find.text('22'), findsOneWidget);
+      expect(find.text('Cycle day'), findsOneWidget);
     });
 
     testWidgets('always carries the qualifying wording', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: aTodayView(prediction: predicted, cycleDay: 22)),
+        TodayScreen(data: TodayViewData(prediction: predicted, cycleDay: 22)),
       );
       expect(find.text('Estimated, based on your entries'), findsOneWidget);
     });
@@ -48,8 +51,8 @@ void main() {
     testWidgets('not enough cycles asks for what it needs', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(
-          data: aTodayView(prediction: NotEnoughCycles(have: 1, need: 2)),
+        const TodayScreen(
+          data: TodayViewData(prediction: NotEnoughCycles(have: 1, need: 2)),
         ),
       );
       expect(find.textContaining('one more period'), findsOneWidget);
@@ -60,7 +63,9 @@ void main() {
     ) async {
       await pumpApp(
         tester,
-        TodayScreen(data: aTodayView(prediction: CyclesTooVariable(9))),
+        const TodayScreen(
+          data: TodayViewData(prediction: CyclesTooVariable(9)),
+        ),
       );
       expect(find.textContaining('vary too much'), findsOneWidget);
     });
@@ -76,7 +81,7 @@ void main() {
         await pumpApp(
           tester,
           TodayScreen(
-            data: aTodayView(prediction: PredictionsDisabled(entry.key)),
+            data: TodayViewData(prediction: PredictionsDisabled(entry.key)),
           ),
         );
         expect(
@@ -97,7 +102,7 @@ void main() {
     testWidgets('is absent unless one was estimated', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: aTodayView(prediction: predicted)),
+        TodayScreen(data: TodayViewData(prediction: predicted)),
       );
       expect(find.text('Estimated fertile window'), findsNothing);
     });
@@ -108,7 +113,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(prediction: predicted, fertileWindow: fertile),
+          data: TodayViewData(prediction: predicted, fertileWindow: fertile),
         ),
       );
       expect(
@@ -122,37 +127,64 @@ void main() {
     testWidgets('is absent by default', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: aTodayView(prediction: predicted)),
+        TodayScreen(data: TodayViewData(prediction: predicted)),
       );
       expect(find.textContaining('worth mentioning'), findsNothing);
     });
 
-    testWidgets('suggests a conversation without naming anything', (
+    Future<void> pumpHint(WidgetTester tester) => pumpApp(
+      tester,
+      TodayScreen(
+        data: TodayViewData(prediction: predicted, showDoctorHint: true),
+      ),
+    );
+
+    Finder mark() => find.bySemanticsLabel('Cycles varied more than usual');
+
+    testWidgets('is a small mark in the estimate card, not a card', (
       tester,
     ) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: aTodayView(prediction: predicted, showDoctorHint: true),
+      await pumpHint(tester);
+      expect(mark(), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.exclamationmark), findsOneWidget);
+      // Inside the Next period card, taking no block of its own.
+      expect(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Next period'),
+            matching: find.byType(Card),
+          ),
+          matching: find.byIcon(CupertinoIcons.exclamationmark),
         ),
+        findsOneWidget,
       );
+      expect(find.textContaining('worth mentioning'), findsNothing);
+    });
+
+    testWidgets('tapping it gives the full wording, naming nothing', (
+      tester,
+    ) async {
+      await pumpHint(tester);
+      await tester.tap(mark());
+      await tester.pumpAndSettle();
       final hint = tester.widget<Text>(find.textContaining('worth mentioning'));
       expect(hint.data, contains('might be worth mentioning to a doctor'));
       // Section 8: never a finding, never a condition.
       expect(hint.data, isNot(contains('abnormal')));
       expect(hint.data, isNot(contains('irregular')));
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      // Done only closes it; the mark stays.
+      expect(mark(), findsOneWidget);
     });
 
-    testWidgets('can be dismissed', (tester) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: aTodayView(prediction: predicted, showDoctorHint: true),
-        ),
-      );
+    testWidgets('can be dismissed from the dialog', (tester) async {
+      await pumpHint(tester);
+      await tester.tap(mark());
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Dismiss'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('worth mentioning'), findsNothing);
+      expect(mark(), findsNothing);
     });
   });
 
@@ -161,8 +193,8 @@ void main() {
       // An arc conveys nothing to a screen reader.
       await pumpApp(
         tester,
-        TodayScreen(
-          data: aTodayView(
+        const TodayScreen(
+          data: TodayViewData(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: NotEnoughCycles(have: 0, need: 2),
@@ -176,7 +208,7 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
+          data: TodayViewData(
             cycleDay: 22,
             typicalCycleLength: 28,
             prediction: predicted,
@@ -198,115 +230,203 @@ void main() {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
+          data: const TodayViewData(
             prediction: PredictionsDisabled(CycleMode.perimenopause),
           ),
         ),
         locale: const Locale('de'),
       );
       expect(tester.takeException(), isNull);
-      // Was find.text('Heute') -- the app bar's old title, used as a stand-in
-      // for "German rendered". The bar carries the date now, so this asserts
-      // the same thing against something German that is still on the screen:
-      // a weekday and a month name no English build would produce.
-      expect(find.text('Freitag, 17. Mai'), findsOneWidget);
+      // The large title and its collapsed twin are both in the tree.
+      expect(find.text('Heute'), findsWidgets);
     });
 
     testWidgets('renders in dark mode', (tester) async {
       await pumpApp(
         tester,
-        TodayScreen(data: aTodayView(prediction: predicted, cycleDay: 22)),
+        TodayScreen(data: TodayViewData(prediction: predicted, cycleDay: 22)),
         brightness: Brightness.dark,
       );
       expect(tester.takeException(), isNull);
     });
   });
 
-  group('running late', () {
-    // Section 9: no information by colour alone. The ring draws the overrun in
-    // a second colour, so being late has to be said in words as well -- and
-    // this is the state a user is most likely to have opened the app for.
-    testWidgets('is said in words, not only drawn', (tester) async {
+  group('what was logged today', () {
+    testWidgets('lists each kind on its own line', (tester) async {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
-            cycleDay: 34,
-            typicalCycleLength: 28,
-            prediction: predicted,
+          data: TodayViewData(
+            prediction: const NotEnoughCycles(have: 0, need: 2),
+            todayEntry: aDayEntry(
+              date: aDate(2024, 5, 17),
+              symptoms: {
+                aSymptom(key: 'cramps'),
+                aSymptom(key: 'mood.sad'),
+                aSymptom(key: 'mood.calm'),
+                aSymptom(key: 'discharge.creamy'),
+                aSymptom(key: 'sex.protected'),
+                aSymptom(key: 'pill.taken'),
+              },
+            ),
           ),
         ),
       );
-      expect(find.text('6 days later than your usual 28'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Pill taken'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Cramps'), findsOneWidget);
+      // In the order offered, not alphabetical.
+      expect(find.text('Mood: Calm, Sad'), findsOneWidget);
+      expect(find.text('Discharge: Creamy'), findsOneWidget);
+      expect(find.text('Sex: Protected'), findsOneWidget);
+      expect(find.text('Pill taken'), findsOneWidget);
     });
 
-    testWidgets('one day late reads as a day, not 1 days', (tester) async {
+    testWidgets('lists the temperature and ovulation test', (tester) async {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
-            cycleDay: 29,
-            typicalCycleLength: 28,
-            prediction: predicted,
+          data: TodayViewData(
+            prediction: const NotEnoughCycles(have: 0, need: 2),
+            todayEntry: aDayEntry(
+              date: aDate(2024, 5, 17),
+              symptoms: {aSymptom(key: 'ovulationTest.positive')},
+            ).copyWith(temperatureCentiCelsius: 3668),
           ),
         ),
       );
-      expect(find.text('1 day later than your usual 28'), findsOneWidget);
-    });
-
-    testWidgets('says nothing on the usual length itself', (tester) async {
-      await pumpApp(
-        tester,
-        TodayScreen(
-          data: aTodayView(
-            cycleDay: 28,
-            typicalCycleLength: 28,
-            prediction: predicted,
-          ),
-        ),
+      await tester.scrollUntilVisible(
+        find.text('Ovulation test: Positive'),
+        200,
+        scrollable: find.byType(Scrollable).first,
       );
-      expect(find.textContaining('later than'), findsNothing);
+      expect(find.text('Temperature: 36.68 °C'), findsOneWidget);
+      expect(find.text('Ovulation test: Positive'), findsOneWidget);
     });
+  });
 
-    testWidgets('says nothing without a length to compare against', (
+  group('in pregnancy mode', () {
+    Future<void> pumpWith(WidgetTester tester, PregnancyCount count) => pumpApp(
+      tester,
+      TodayScreen(
+        data: TodayViewData(
+          cycleDay: 88,
+          prediction: const PredictionsDisabled(CycleMode.pregnancy),
+          pregnancy: count,
+        ),
+      ),
+    );
+
+    testWidgets('shows weeks plus days in place of the cycle day', (
       tester,
     ) async {
-      // A user with one cycle has no typical length. Comparing against 28 would
-      // be the industry's mistake, and saying she is late would be inventing it.
-      await pumpApp(
+      await pumpWith(
         tester,
-        TodayScreen(data: aTodayView(cycleDay: 40, prediction: predicted)),
+        const PregnancyCounting(PregnancyWeek(weeks: 12, days: 3)),
       );
-      expect(find.textContaining('later than'), findsNothing);
+      expect(find.text('12+3'), findsOneWidget);
+      expect(find.text('weeks + days'), findsOneWidget);
+      expect(find.text('88'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Pregnancy: 12 weeks and 3 days'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('first day of your last period'), findsOne);
     });
 
-    testWidgets('is phrased as an observation, never a warning', (
+    testWidgets('never shows a due date', (tester) async {
+      await pumpWith(
+        tester,
+        const PregnancyCounting(PregnancyWeek(weeks: 38, days: 0)),
+      );
+      expect(find.textContaining('due'), findsNothing);
+      expect(find.textContaining('Due'), findsNothing);
+    });
+
+    testWidgets('asks for the last period when there is none', (tester) async {
+      await pumpWith(tester, const PregnancyNeedsLastPeriod());
+      expect(
+        find.textContaining('Log the first day of your last period'),
+        findsOne,
+      );
+    });
+
+    testWidgets('after 44 weeks asks, without assuming, about the mode', (
       tester,
     ) async {
-      // Section 8: never a finding, never a claim about her health.
+      await pumpWith(tester, const PregnancyCounterEnded());
+      expect(find.textContaining('still right for you'), findsOneWidget);
+      // Back to the plain cycle day, not a week count.
+      expect(find.text('88'), findsOneWidget);
+    });
+  });
+
+  group('the date and countdown', () {
+    Future<void> pumpOn(WidgetTester tester, PeriodPrediction prediction) =>
+        pumpApp(
+          tester,
+          TodayScreen(
+            data: TodayViewData(
+              today: aDate(2024, 4, 14),
+              countdown: countdownTo(prediction, aDate(2024, 4, 14)),
+              prediction: prediction,
+            ),
+          ),
+        );
+
+    testWidgets('shows the date and the window counted in days', (
+      tester,
+    ) async {
+      await pumpOn(tester, predicted);
+      expect(find.text('Sunday, April 14'), findsOneWidget);
+      expect(find.text('in 12–16 days'), findsOneWidget);
+      expect(find.bySemanticsLabel('Next period: in 12–16 days'), findsOne);
+    });
+
+    testWidgets('inside the window says it could start any day', (
+      tester,
+    ) async {
       await pumpApp(
         tester,
         TodayScreen(
-          data: aTodayView(
-            cycleDay: 34,
-            typicalCycleLength: 28,
+          data: TodayViewData(
+            today: aDate(2024, 4, 27),
+            countdown: countdownTo(predicted, aDate(2024, 4, 27)),
             prediction: predicted,
           ),
         ),
       );
-      final text = tester
-          .widget<Text>(find.textContaining('later than'))
-          .data!
-          .toLowerCase();
-      for (final alarming in [
-        'late!',
-        'overdue',
-        'warning',
-        'abnormal',
-        'missed',
-      ]) {
-        expect(text, isNot(contains(alarming)), reason: 'found "$alarming"');
-      }
+      expect(find.text('could start any day'), findsOneWidget);
+    });
+
+    testWidgets('has no countdown without a window', (tester) async {
+      await pumpOn(tester, const NotEnoughCycles(have: 1, need: 2));
+      expect(find.text('Sunday, April 14'), findsOneWidget);
+      expect(find.textContaining('days'), findsNothing);
+    });
+
+    testWidgets('appears at once with reduced motion', (tester) async {
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: appHarness(
+            TodayScreen(
+              data: TodayViewData(
+                today: aDate(2024, 4, 14),
+                countdown: countdownTo(predicted, aDate(2024, 4, 14)),
+                prediction: predicted,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      // No frames to wait for: nothing is still fading in.
+      expect(tester.hasRunningAnimations, isFalse);
+      expect(find.text('in 12–16 days'), findsOneWidget);
     });
   });
 }

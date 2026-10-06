@@ -1,274 +1,277 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/data/database/database.dart';
+import 'package:period/domain/models/cycle_mode.dart';
 import 'package:period/domain/models/day_entry.dart';
-import 'package:period/domain/models/reminder_schedule.dart';
 import 'package:period/presentation/calendar/calendar_page.dart';
-import 'package:period/presentation/providers.dart';
+import 'package:period/presentation/log/log_entry_screen.dart';
 
 import '../support/database.dart';
 import '../support/dates.dart';
 import '../support/fixed_clock.dart';
 import '../support/models.dart';
-import '../support/reminders.dart';
 import '../support/widgets.dart';
 
-/// The calendar against a real database.
-///
-/// This is the loop CLAUDE.md section 4 is built around and that the app could
-/// not close until now: a day in the past is tapped, corrected, and every
-/// estimate drawn from it moves. Until this screen existed the schema supported
-/// retroactive correction and the interface could not reach it.
+/// The calendar against a real database, for the same reason `TodayPage` is:
+/// what matters is that logging a day changes what the next read shows.
 void main() {
-  late AppDatabase db;
-  late FixedClock clock;
-  late FakeReminders reminders;
+  late AppDatabase database;
+  final today = aDate(2024, 5, 17);
 
-  setUp(() {
-    db = aDatabase();
-    clock = FixedClock(aDate(2024, 5, 17));
-    reminders = FakeReminders();
-  });
-  // No tearDown closing the database: pumpWithDatabase closes it in the right
-  // order relative to unmounting the widget tree.
+  setUp(() => database = aDatabase());
+  tearDown(() => database.close());
 
-  Future<void> pumpCalendar(WidgetTester tester) async {
-    await pumpWithDatabase(
+  Future<void> pumpPage(WidgetTester tester, {Locale? locale}) async {
+    await pumpApp(
       tester,
-      const CalendarPage(),
-      database: db,
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-        clockProvider.overrideWithValue(clock),
-        remindersProvider.overrideWithValue(reminders),
-      ],
+      CalendarPage(
+        logDao: database.logDao,
+        settingsDao: database.settingsDao,
+        clock: FixedClock(today),
+      ),
+      locale: locale ?? const Locale('en'),
+      surface: const Size(420, 1000),
     );
   }
 
-  /// Opens the sheet for the day named by [label] and saves it.
-  ///
-  /// [toggleStart] flips the period-start switch, so marking and unmarking are
-  /// the same call. The day is named by its spoken label, which changes as the
-  /// day changes -- a day that has become a period start says so.
-  Future<void> log(
-    WidgetTester tester,
-    String label, {
-    bool toggleStart = false,
-  }) async {
-    await tester.tap(find.bySemanticsLabel(label));
-    await settleDatabase(tester);
-    if (toggleStart) {
-      await tester.tap(find.byType(Switch));
-      await settleDatabase(tester);
+  Finder day(String pattern) => find.bySemanticsLabel(RegExp(pattern));
+
+  testWidgets('opens on the current month', (tester) async {
+    await pumpPage(tester);
+    expect(find.text('May'), findsOneWidget);
+  });
+
+  testWidgets('marks a stored period start', (tester) async {
+    final handle = tester.ensureSemantics();
+    await database.logDao.addPeriodStart(aDate(2024, 5, 3));
+    await pumpPage(tester);
+
+    expect(day(r'^May 3, 2024.*Period start'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('marks every day of a period, and says how long it was', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await database.logDao.addPeriodStart(aDate(2024, 5, 3));
+    for (var i = 0; i < 4; i++) {
+      await database.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 5, 3 + i), flow: FlowIntensity.medium),
+      );
     }
+    await pumpPage(tester);
+
+    expect(day(r'^May 5, 2024.*Period'), findsOneWidget);
+    expect(day(r'^May 7, 2024.*Period'), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('marks a stored entry', (tester) async {
+    final handle = tester.ensureSemantics();
+    await database.logDao.saveEntry(
+      aDayEntry(date: aDate(2024, 5, 9), note: 'tired'),
+    );
+    await pumpPage(tester);
+
+    expect(day(r'^May 9, 2024.*Logged'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('shows the estimated window once it can compute one', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    for (final start in regularPeriodStarts(
+      from: aDate(2024, 2, 26),
+      length: 28,
+      count: 3,
+    )) {
+      await database.logDao.addPeriodStart(start);
+    }
+    await pumpPage(tester);
+
+    // Last start 22 April plus a 28-day median lands the window in late May.
+    expect(day(r'^May \d+, 2024.*Estimated period'), findsWidgets);
+    handle.dispose();
+  });
+
+  testWidgets('shows the fertile window only when she opted in', (
+    tester,
+  ) async {
+    for (final start in regularPeriodStarts(
+      from: aDate(2024, 2, 26),
+      length: 28,
+      count: 3,
+    )) {
+      await database.logDao.addPeriodStart(start);
+    }
+    await pumpPage(tester);
+    await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+    await tester.pumpAndSettle();
+    expect(find.text('Estimated fertile window'), findsNothing);
+
+    await database.settingsDao.saveCycleSettings(
+      const CycleSettings(fertileWindowOptedIn: true),
+    );
+    await tester.pumpWidget(const SizedBox());
+    await pumpPage(tester);
+    // The caveat comes with the legend now that the window is drawn.
+    await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+    await tester.pumpAndSettle();
+    expect(find.text('Estimated fertile window'), findsOneWidget);
+    expect(
+      find.textContaining('Not suitable for preventing pregnancy'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('scrolls back to an earlier month and shows what is there', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await database.logDao.addPeriodStart(aDate(2023, 11, 11));
+    await pumpPage(tester);
+
+    await tester.scrollUntilVisible(
+      find.text('November 2023'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(day(r'^November 11, 2023.*Period start'), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('Today brings the current month back', (tester) async {
+    await pumpPage(tester);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, 3000));
+    await tester.pumpAndSettle();
+    expect(find.text('May'), findsNothing);
+
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.text('May'), findsOneWidget);
+  });
+
+  Future<void> logMay6(WidgetTester tester) async {
+    await tester.tap(day(r'^May 6, 2024'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add entry'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save'));
-    await settleDatabase(tester);
+    await tester.pumpAndSettle();
   }
 
-  testWidgets('opens on the month containing today', (tester) async {
-    await pumpCalendar(tester);
-    expect(find.text('May 2024'), findsOneWidget);
-    expect(find.bySemanticsLabel('May 17, 2024, Today'), findsOneWidget);
+  testWidgets('logging a past day from the grid persists it', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpPage(tester);
+    await logMay6(tester);
+
+    expect(await database.logDao.allPeriodStarts(), [aDate(2024, 5, 6)]);
+    handle.dispose();
   });
 
-  testWidgets(
-    'a fresh month says nothing is logged rather than looking broken',
-    (tester) async {
-      await pumpCalendar(tester);
-      expect(find.text('Nothing logged this month'), findsOneWidget);
-    },
-  );
+  testWidgets('the grid shows it immediately afterwards', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpPage(tester);
+    await logMay6(tester);
 
-  testWidgets('the sheet opens for the day that was tapped, not for today', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    await tester.tap(find.bySemanticsLabel('May 3, 2024'));
-    await settleDatabase(tester);
-
-    expect(find.text('Log Fri, May 3'), findsOneWidget);
+    expect(day(r'^May 6, 2024.*Period start'), findsOneWidget);
+    handle.dispose();
   });
 
-  testWidgets('a past day can be logged, and says so afterwards', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    await log(tester, 'May 3, 2024');
-
-    expect(find.text('Saved'), findsOneWidget);
-    expect(find.bySemanticsLabel('May 3, 2024, Logged'), findsOneWidget);
-    expect(await db.logDao.entryOn(aDate(2024, 5, 3)), isNotNull);
-  });
-
-  testWidgets('a period start recorded days late lands on the right day', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    // The case the screen exists for: she bled on the 12th and is only opening
-    // the app on the 17th.
-    await log(tester, 'May 12, 2024', toggleStart: true);
-
-    expect(await db.logDao.allPeriodStarts(), [aDate(2024, 5, 12)]);
-    expect(find.bySemanticsLabel('May 12, 2024, Period start'), findsOneWidget);
-  });
-
-  testWidgets('a start on the wrong day can be moved to the right one', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    await log(tester, 'May 12, 2024', toggleStart: true);
-    // Corrected: it was actually the 10th. The day is named by what it has
-    // become, because that is what a screen reader now reads out.
-    await log(tester, 'May 12, 2024, Period start', toggleStart: true);
-    await log(tester, 'May 10, 2024', toggleStart: true);
-
-    expect(await db.logDao.allPeriodStarts(), [aDate(2024, 5, 10)]);
-  });
-
-  testWidgets('unmarking a start offers undo, and the undo works', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    await log(tester, 'May 12, 2024', toggleStart: true);
-    await log(tester, 'May 12, 2024, Period start', toggleStart: true);
-
-    expect(await db.logDao.allPeriodStarts(), isEmpty);
-    expect(find.text('Undo'), findsOneWidget);
-
-    await tester.tap(find.text('Undo'));
-    await settleDatabase(tester);
-    expect(await db.logDao.allPeriodStarts(), [aDate(2024, 5, 12)]);
-  });
-
-  testWidgets('an ordinary save offers no undo', (tester) async {
-    await pumpCalendar(tester);
-    await log(tester, 'May 3, 2024');
-
-    expect(find.text('Saved'), findsOneWidget);
-    expect(find.text('Undo'), findsNothing);
-  });
-
-  testWidgets('days logged out of order still read back in order', (
-    tester,
-  ) async {
-    await pumpCalendar(tester);
-    await log(tester, 'May 12, 2024', toggleStart: true);
-    await log(tester, 'May 2, 2024', toggleStart: true);
-    await log(tester, 'May 7, 2024', toggleStart: true);
-
-    expect(await db.logDao.allPeriodStarts(), [
-      aDate(2024, 5, 2),
-      aDate(2024, 5, 7),
-      aDate(2024, 5, 12),
-    ]);
-  });
-
-  testWidgets('a future day cannot be logged', (tester) async {
-    await pumpCalendar(tester);
-    await tester.tap(find.bySemanticsLabel('May 20, 2024'));
-    await settleDatabase(tester);
-
-    expect(find.byType(Switch), findsNothing);
-    expect(await db.logDao.entryOn(aDate(2024, 5, 20)), isNull);
-  });
-
-  group('moving between months', () {
-    testWidgets('back and forward again returns to where it started', (
+  group('tapping a day', () {
+    testWidgets('shows what was logged, without editing anything', (
       tester,
     ) async {
-      await pumpCalendar(tester);
-      await tester.tap(find.byIcon(Icons.chevron_left));
-      await settleDatabase(tester);
-      expect(find.text('April 2024'), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.chevron_right));
-      await settleDatabase(tester);
-      expect(find.text('May 2024'), findsOneWidget);
-    });
-
-    testWidgets('a day logged in a previous month is still marked there', (
-      tester,
-    ) async {
-      await db.logDao.saveEntry(
-        aDayEntry(date: aDate(2024, 4, 9), flow: FlowIntensity.medium),
+      final handle = tester.ensureSemantics();
+      await database.logDao.addPeriodStart(aDate(2024, 5, 3));
+      await database.logDao.saveEntry(
+        aDayEntry(
+          date: aDate(2024, 5, 4),
+          flow: FlowIntensity.heavy,
+          symptoms: {aSymptom(key: 'cramps')},
+          note: 'long day',
+        ),
       );
-      await pumpCalendar(tester);
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 4, 2024'));
+      await tester.pumpAndSettle();
 
-      await tester.tap(find.byIcon(Icons.chevron_left));
-      await settleDatabase(tester);
-      expect(find.bySemanticsLabel('April 9, 2024, Logged'), findsOneWidget);
+      expect(find.text('Saturday, May 4'), findsOneWidget);
+      expect(find.text('Cycle day 2'), findsOneWidget);
+      expect(find.text('Flow: Heavy'), findsOneWidget);
+      expect(find.text('Cramps'), findsOneWidget);
+      expect(find.text('long day'), findsOneWidget);
+      expect(find.text('Edit'), findsOneWidget);
+      // Only looking: no entry sheet yet.
+      expect(find.text('Save'), findsNothing);
+      handle.dispose();
     });
 
-    testWidgets('every month back to a fresh install is reachable', (
+    testWidgets('Edit opens the day with what was logged', (tester) async {
+      final handle = tester.ensureSemantics();
+      await database.logDao.saveEntry(
+        aDayEntry(date: aDate(2024, 5, 4), note: 'long day'),
+      );
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 4, 2024'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Save'), findsOneWidget);
+      expect(
+        tester.widget<LogEntryScreen>(find.byType(LogEntryScreen)).entry?.note,
+        'long day',
+      );
+      handle.dispose();
+    });
+
+    testWidgets('a future day shows its estimate but cannot be edited', (
       tester,
     ) async {
-      await pumpCalendar(tester);
-      for (var i = 0; i < 5; i++) {
-        await tester.tap(find.byIcon(Icons.chevron_left));
-        await settleDatabase(tester);
+      final handle = tester.ensureSemantics();
+      for (final start in regularPeriodStarts(
+        from: aDate(2024, 2, 26),
+        length: 28,
+        count: 3,
+      )) {
+        await database.logDao.addPeriodStart(start);
       }
-      expect(find.text('December 2023'), findsOneWidget);
+      await pumpPage(tester);
+      await tester.tap(day(r'^May 20, 2024'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Monday, May 20'), findsOneWidget);
+      expect(find.text('Estimated period'), findsOneWidget);
+      expect(find.text('Edit'), findsNothing);
+      expect(find.text('Add entry'), findsNothing);
+      expect(find.textContaining('Cycle day'), findsNothing);
+      handle.dispose();
     });
   });
 
-  testWidgets('a corrected start moves the estimate drawn on the calendar', (
+  testWidgets('shows a heart on a day she recorded sex, not on a "no"', (
     tester,
   ) async {
-    // Two cycles of 28 days, which is enough to predict from.
-    for (final start in [aDate(2024, 3, 20), aDate(2024, 4, 17)]) {
-      await db.logDao.addPeriodStart(start);
-    }
-    await db.logDao.addPeriodStart(aDate(2024, 5, 15));
-    await pumpCalendar(tester);
-
-    // 15 May + 28 days is 12 June, so the window sits in the following month.
-    await tester.tap(find.byIcon(Icons.chevron_right));
-    await settleDatabase(tester);
-    expect(
-      find.bySemanticsLabel('June 12, 2024, Estimated period'),
-      findsOneWidget,
+    await database.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 5, 9),
+        symptoms: {aSymptom(key: 'sex.protected')},
+      ),
     );
-
-    // She corrects the last start: it was the 13th, not the 15th. Nothing
-    // derived was stored, so the estimate follows on the next build.
-    await tester.tap(find.byIcon(Icons.chevron_left));
-    await settleDatabase(tester);
-    await log(tester, 'May 15, 2024, Period start', toggleStart: true);
-    await log(tester, 'May 13, 2024', toggleStart: true);
-
-    await tester.tap(find.byIcon(Icons.chevron_right));
-    await settleDatabase(tester);
-    expect(
-      find.bySemanticsLabel('June 10, 2024, Estimated period'),
-      findsOneWidget,
+    await database.logDao.saveEntry(
+      aDayEntry(
+        date: aDate(2024, 5, 10),
+        symptoms: {aSymptom(key: 'sex.none')},
+      ),
     );
-    expect(find.bySemanticsLabel('June 12, 2024'), findsOneWidget);
-  });
-
-  group('a reminder tonight', () {
-    testWidgets('survives a correction to an earlier day', (tester) async {
-      // Correcting last Friday says nothing about whether tonight's reminder is
-      // still wanted. Dropping it would silently lose one she never asked to
-      // lose, and she would have no way to know why it stopped arriving.
-      await db.settingsDao.writeReminderSchedule(
-        const ReminderSchedule(enabled: true),
-      );
-      await pumpCalendar(tester);
-      await log(tester, 'May 3, 2024');
-
-      expect(reminders.skipped, isEmpty);
-    });
-
-    testWidgets('is dropped when today itself is logged here', (tester) async {
-      // The same screen, the same action, a different day: today's entry does
-      // make tonight's reminder unnecessary, wherever it was logged from.
-      await db.settingsDao.writeReminderSchedule(
-        const ReminderSchedule(enabled: true),
-      );
-      await pumpCalendar(tester);
-      await log(tester, 'May 17, 2024, Today');
-
-      expect(reminders.skipped, [aDate(2024, 5, 17)]);
-    });
+    await pumpPage(tester);
+    expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
   });
 }

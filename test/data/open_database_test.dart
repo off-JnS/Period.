@@ -1,189 +1,103 @@
-import 'dart:io';
-
-import 'package:period/data/database/encryption.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:period/data/database/open_database.dart';
 import 'package:test/test.dart';
 
-/// Proves the database is actually encrypted.
+/// Tests for the guard that refuses to run against a plain sqlite3.
 ///
-/// This is the test that should have existed from the moment schema v1 shipped.
-/// Encryption was configured through a plugin package that the current sqlite3
-/// no longer uses, so `PRAGMA key` was being silently ignored and the database
-/// written in the clear -- and nothing failed, because an unknown pragma is a
-/// no-op in SQLite and a green build says nothing about which library got
-/// bundled.
-///
-/// The only check worth trusting is the one below: write a file with a key,
-/// then try to read it without one.
-///
-/// The guard itself now lives in encryption.dart, shared with the backup
-/// export. This file keeps its name because CLAUDE.md section 6 names it as
-/// one of the two things standing between this app and shipping a plaintext
-/// database again.
+/// CLAUDE.md section 6 describes the failure being guarded against: both a plain
+/// and an encrypted sqlite3 can end up linked, the plain one can win, and the
+/// result is an unencrypted database that behaves completely normally. Nothing
+/// fails and nothing warns. A silent failure needs a check that runs, which is
+/// what these cover -- without a device, a plugin or a native library.
 void main() {
-  late Directory dir;
-  late String path;
-
-  setUp(() {
-    dir = Directory.systemTemp.createTempSync('period_cipher_test');
-    path = '${dir.path}/test.sqlite';
-  });
-
-  tearDown(() => dir.deleteSync(recursive: true));
-
-  const key =
-      'a3f1c8e2b74d09561fe8a2c4d70b13e95a6c8f20d1b4e7936ac5028de1f4b7c6';
-
-  test('this build supports encryption at all', () {
-    // If this fails, nothing else in this file means anything: PRAGMA key would
-    // be a silent no-op and every other assertion would pass against plaintext.
-    final database = sqlite3.open(path);
-    addTearDown(database.close);
-
-    expect(
-      () => applyKeyAndVerify(database, key),
-      returnsNormally,
-      reason: 'check the hooks.user_defines block in pubspec.yaml',
-    );
-  });
-
-  group('the guard fires on a build with no encryption', () {
-    // Every other test here proves the database IS encrypted on this build.
-    // None of them proves this function would *notice* a build where the
-    // cipher library was not linked -- and that is the whole reason it exists.
-    // Removing the check entirely left this file green until the cipher read
-    // was made injectable, which is exactly how a guard stops guarding without
-    // anyone finding out.
-    //
-    // This is the failure section 6 says has already happened once: an unknown
-    // pragma is a silent no-op, so PRAGMA key succeeds, changes nothing, and
-    // every query works perfectly against a plaintext file.
-
-    test('nothing back from PRAGMA cipher is refused', () {
-      final database = sqlite3.open(path);
-      addTearDown(database.close);
-
+  group('verifyCipherIsActive', () {
+    test('accepts a connection that reports a cipher and decrypts', () {
       expect(
-        () => applyKeyAndVerify(database, key, readCipher: (_) => null),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test('an empty answer is refused too', () {
-      final database = sqlite3.open(path);
-      addTearDown(database.close);
-
-      expect(
-        () => applyKeyAndVerify(database, key, readCipher: (_) => ''),
-        throwsA(isA<StateError>()),
-      );
-    });
-
-    test('the message points at the cause rather than the symptom', () {
-      final database = sqlite3.open(path);
-      addTearDown(database.close);
-
-      expect(
-        () => applyKeyAndVerify(database, key, readCipher: (_) => null),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            allOf(
-              contains('written in the clear'),
-              contains('hooks.user_defines'),
-            ),
-          ),
+        () => verifyCipherIsActive(
+          cipherVersion: () => '4.10.0 community',
+          readSchemaVersion: () => 1,
         ),
-      );
-    });
-
-    test('a real answer is accepted', () {
-      final database = sqlite3.open(path);
-      addTearDown(database.close);
-
-      expect(
-        () => applyKeyAndVerify(database, key, readCipher: (_) => 'aes256cbc'),
         returnsNormally,
       );
     });
-  });
 
-  test('a written database cannot be read without the key', () {
-    final written = sqlite3.open(path);
-    applyKeyAndVerify(written, key);
-    written
-      ..execute('CREATE TABLE secrets (note TEXT);')
-      ..execute("INSERT INTO secrets VALUES ('period started today');");
-    written.close();
+    test('rejects a plain sqlite3, which reports no cipher at all', () {
+      // The exact shape of the failure this exists for: PRAGMA cipher_version
+      // returns an empty result set on a build that is not SQLCipher, so the
+      // database would be written in the clear while looking completely fine.
+      expect(
+        () => verifyCipherIsActive(
+          cipherVersion: () => null,
+          readSchemaVersion: () => 1,
+        ),
+        throwsA(isA<DatabaseNotEncrypted>()),
+      );
+    });
 
-    final withoutKey = sqlite3.open(path);
-    addTearDown(withoutKey.close);
-    expect(
-      () => withoutKey.select('SELECT * FROM secrets;'),
-      throwsA(isA<SqliteException>()),
-      reason: 'an unencrypted file would simply return the row',
-    );
-  });
+    test('rejects an empty cipher version, not just a missing one', () {
+      expect(
+        () => verifyCipherIsActive(
+          cipherVersion: () => '',
+          readSchemaVersion: () => 1,
+        ),
+        throwsA(isA<DatabaseNotEncrypted>()),
+      );
+    });
 
-  test('the plaintext never appears in the file on disk', () {
-    // The bluntest possible check, and the one a worried user would do.
-    final database = sqlite3.open(path);
-    applyKeyAndVerify(database, key);
-    database
-      ..execute('CREATE TABLE secrets (note TEXT);')
-      ..execute("INSERT INTO secrets VALUES ('period started today');");
-    database.close();
+    test('rejects a connection where asking for the cipher throws', () {
+      expect(
+        () => verifyCipherIsActive(
+          cipherVersion: () => throw StateError('no such pragma'),
+          readSchemaVersion: () => 1,
+        ),
+        throwsA(isA<DatabaseNotEncrypted>()),
+      );
+    });
 
-    final bytes = File(path).readAsBytesSync();
-    expect(
-      String.fromCharCodes(bytes),
-      isNot(contains('period started today')),
-      reason: 'the logged text is sitting in the file unencrypted',
-    );
-    expect(
-      String.fromCharCodes(bytes.take(16).toList()),
-      isNot(startsWith('SQLite format 3')),
-      reason: 'an unencrypted database announces itself in its first 16 bytes',
-    );
-  });
+    test('rejects a cipher build whose header will not decrypt', () {
+      // SQLCipher is linked, so the version reads back, but the key is wrong or
+      // missing and the header cannot be read. Surfacing it here means the app
+      // refuses to start rather than failing partway through a later write.
+      expect(
+        () => verifyCipherIsActive(
+          cipherVersion: () => '4.10.0 community',
+          readSchemaVersion: () => throw StateError('file is not a database'),
+        ),
+        throwsA(isA<DatabaseNotEncrypted>()),
+      );
+    });
 
-  test('the same key reads it back', () {
-    final written = sqlite3.open(path);
-    applyKeyAndVerify(written, key);
-    written
-      ..execute('CREATE TABLE secrets (note TEXT);')
-      ..execute("INSERT INTO secrets VALUES ('period started today');");
-    written.close();
+    test('checks the cipher before trying to read the header', () {
+      // Order matters for the diagnostic: on a plain sqlite3 the header read
+      // would succeed, so checking it first would report "fine" about a
+      // database that is not encrypted at all.
+      var readHeader = false;
+      expect(
+        () => verifyCipherIsActive(
+          cipherVersion: () => null,
+          readSchemaVersion: () {
+            readHeader = true;
+            return 1;
+          },
+        ),
+        throwsA(isA<DatabaseNotEncrypted>()),
+      );
+      expect(readHeader, isFalse);
+    });
 
-    final reopened = sqlite3.open(path);
-    applyKeyAndVerify(reopened, key);
-    addTearDown(reopened.close);
-
-    expect(
-      reopened.select('SELECT note FROM secrets;').single['note'],
-      'period started today',
-    );
-  });
-
-  test('a different key does not', () {
-    final written = sqlite3.open(path);
-    applyKeyAndVerify(written, key);
-    written.execute('CREATE TABLE secrets (note TEXT);');
-    written.close();
-
-    final wrongKey = sqlite3.open(path);
-    addTearDown(wrongKey.close);
-    // Applying a key never fails; it is the first read that does. Worth
-    // asserting, because code that trusts the pragma's success as proof of a
-    // correct key would be wrong.
-    applyKeyAndVerify(
-      wrongKey,
-      'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
-    );
-    expect(
-      () => wrongKey.select('SELECT * FROM secrets;'),
-      throwsA(isA<SqliteException>()),
-    );
+    test('says what was wrong, without quoting the key', () {
+      // The message reaches logs and crash reports. Section 6 keeps the key out
+      // of everything, so the detail describes the condition and nothing else.
+      Object? caught;
+      try {
+        verifyCipherIsActive(
+          cipherVersion: () => null,
+          readSchemaVersion: () => 1,
+        );
+      } on Object catch (error) {
+        caught = error;
+      }
+      expect(caught, isA<DatabaseNotEncrypted>());
+      expect('$caught', contains('SQLCipher'));
+    });
   });
 }

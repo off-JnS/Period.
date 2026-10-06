@@ -1,0 +1,39 @@
+PODS:
+  - Flutter (1.0.0)
+  - flutter_secure_storage (6.0.0):
+    - Flutter
+  - SQLCipher (4.10.0):
+    - SQLCipher/standard (= 4.10.0)
+  - SQLCipher/common (4.10.0)
+  - SQLCipher/standard (4.10.0):
+    - SQLCipher/common
+  - sqlcipher_flutter_libs (0.0.1):
+    - Flutter
+    - SQLCipher (~> 4.10.0)
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
+  - sqlcipher_flutter_libs (from `.symlinks/plugins/sqlcipher_flutter_libs/ios`)
+
+SPEC REPOS:
+  trunk:
+    - SQLCipher
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  flutter_secure_storage:
+    :path: ".symlinks/plugins/flutter_secure_storage/ios"
+  sqlcipher_flutter_libs:
+    :path: ".symlinks/plugins/sqlcipher_flutter_libs/ios"
+
+SPEC CHECKSUMS:
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
+  flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
+  SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
+  sqlcipher_flutter_libs: ae224763b087bffb3a5955fe295a1c460d458cb1
+
+PODFILE CHECKSUM: 3ba3a73b1b12adcf321a227a745625fe0888cc82
+
+COCOAPODS: 1.17.0

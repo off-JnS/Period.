@@ -16,7 +16,7 @@ part 'database.g.dart';
 
 /// The on-device database.
 ///
-/// Schema version 2. Read section 5 before changing anything here: there is no
+/// Schema version 3. Read section 5 before changing anything here: there is no
 /// cloud backup and no recovery path, so a broken migration destroys a user's
 /// data permanently. Migrations are additive only, a shipped one is never
 /// edited, and every one needs a test that builds the previous schema, fills it
@@ -27,15 +27,19 @@ part 'database.g.dart';
 /// them on read from [PeriodStarts], because users retroactively correct start
 /// dates constantly and any stored derivative is stale from that moment on.
 @DriftDatabase(
-  tables: [PeriodStarts, DayEntries, DaySymptoms, Settings],
+  tables: [PeriodStarts, DayEntries, DaySymptoms, AppSettings],
   daos: [LogDao, SettingsDao],
 )
 class AppDatabase extends _$AppDatabase {
   /// Opens the database over [executor].
   AppDatabase(super.executor);
 
+  /// The schema this build writes. Every change bumps it, and every bump adds a
+  /// step to [migration] below; see the history there.
+  static const currentSchemaVersion = 3;
+
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -44,39 +48,28 @@ class AppDatabase extends _$AppDatabase {
     },
     onUpgrade: (migrator, from, to) async {
       // The file has already been copied to <db>.backup-v<from> by
-      // backUpBeforeMigration before this runs.
-      //
-      // Each step guards its own version and none of them is an `else`, so a
-      // database several versions behind runs every step in turn rather than
-      // only the last. Never edit a step once it has shipped: someone's phone
-      // still has the schema it was written for. Add a new one below, and the
-      // round-trip test section 5 requires along with it.
+      // openEncryptedDatabase before this runs. Steps run in order and each is
+      // guarded by the version it upgrades from, so a user several versions
+      // behind passes through every one. Never edit a step that has shipped;
+      // add the next one below it, with its round-trip test.
 
-      // v2 adds the settings table. Purely additive -- nothing that already
-      // exists is touched, so every row in every other table survives
-      // unchanged.
-      if (from < 2) await migrator.createTable(settings);
+      // 1 -> 2: settings. Purely additive -- one new, empty table. No existing
+      // table, column or row is touched, so there is nothing of hers here
+      // that this step could damage. An empty table reads back as the
+      // defaults, which is exactly what version 1 behaved as.
+      if (from < 2) {
+        await migrator.createTable(appSettings);
+      }
+
+      // 2 -> 3: basal body temperature (docs/cycle-logic.md §9). Purely
+      // additive -- one new nullable column on day_entries. Every existing
+      // row keeps every value it had and reads its temperature as null, which
+      // is the truth: none was recorded.
+      if (from < 3) {
+        await migrator.addColumn(dayEntries, dayEntries.temperatureCenti);
+      }
     },
   );
-}
-
-/// The database file name. Kept out of line so the backup paths derived from it
-/// cannot drift away from the real one.
-const databaseFileName = 'period.sqlite';
-
-/// The migration copies [backUpBeforeMigration] leaves in [documents].
-///
-/// Named by prefix rather than by version, because the point of asking is to
-/// find every one of them without knowing which versions this phone has been
-/// through.
-Iterable<File> migrationBackupsIn(Directory documents) sync* {
-  if (!documents.existsSync()) return;
-  for (final entry in documents.listSync()) {
-    final name = entry.path.split(Platform.pathSeparator).last;
-    if (entry is File && name.startsWith('$databaseFileName.backup-v')) {
-      yield entry;
-    }
-  }
 }
 
 /// Copies the database to `<db>.backup-v<version>` before a migration runs.
@@ -111,5 +104,25 @@ Future<File?> backUpBeforeMigration(
 
   final backup = File('${databaseFile.path}.backup-v$current');
   await databaseFile.copy(backup.path);
+  return backup;
+}
+
+/// Copies [databaseFile] to `<db>.backup-v<currentVersion>` when a migration
+/// from [currentVersion] to [targetVersion] is about to run.
+///
+/// The synchronous twin of [backUpBeforeMigration], for the one place that
+/// needs it: drift's connection `setup` callback, which is where the schema
+/// version can first be read from an encrypted file (the key has to be applied
+/// on that connection before the header is readable) and which cannot await.
+/// It runs before drift starts the migration transaction, so the copy is of the
+/// untouched file.
+File? backUpBeforeMigrationSync(
+  File databaseFile, {
+  required int currentVersion,
+  required int targetVersion,
+}) {
+  if (currentVersion <= 0 || currentVersion >= targetVersion) return null;
+  final backup = File('${databaseFile.path}.backup-v$currentVersion');
+  databaseFile.copySync(backup.path);
   return backup;
 }

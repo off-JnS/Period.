@@ -2,67 +2,138 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlcipher_flutter_libs/sqlcipher_flutter_libs.dart';
 
 import '../database_key_store.dart';
 import 'database.dart';
-import 'encryption.dart';
 
-/// Opens the on-device database, encrypted with SQLCipher.
+/// The database file's name inside the application support directory.
+const databaseFileName = 'period.sqlite';
+
+/// Thrown when the database cannot be opened as an encrypted one.
 ///
-/// This is where CLAUDE.md section 1's promise stops being a design intention
-/// and becomes a file on disk. Read the whole function before changing any of
-/// it; several steps look optional and are not.
+/// Deliberately fatal. Section 6 describes the failure this guards against: both
+/// a plain and an encrypted sqlite3 can end up linked, the plain one can win,
+/// and the result is an unencrypted database that behaves completely normally.
+/// Nothing fails and nothing warns -- so this makes it fail and warn.
+class DatabaseNotEncrypted implements Exception {
+  /// Creates the error.
+  const DatabaseNotEncrypted(this.detail);
+
+  /// What was observed, for the log. Never contains the key.
+  final String detail;
+
+  @override
+  String toString() => 'DatabaseNotEncrypted: $detail';
+}
+
+/// The directory the database, its journal and its backups live in.
+Future<Directory> databaseDirectory() => getApplicationSupportDirectory();
+
+/// Opens the on-device encrypted database.
 ///
-/// The encrypting build of SQLite is selected by the `hooks.user_defines` block
-/// in pubspec.yaml, not by any plugin package. sqlite3 3.x loads its native
-/// library through Dart build hooks; the older sqlcipher_flutter_libs approach
-/// does nothing there, which would leave the database in the clear.
+/// [keyStore] supplies the SQLCipher key, generating one on first launch. The
+/// key never leaves this function and is never logged; see [DatabaseKeySafety].
 ///
-/// [applyKeyAndVerify] in encryption.dart is what stops that being a silent
-/// failure, and open_database_test.dart proves it end to end by reopening a
-/// written file without the key.
-Future<OpenedDatabase> openEncryptedDatabase({
-  DatabaseKeyStore? keyStore,
+/// The file lives in the application support directory rather than the documents
+/// directory: documents is user-visible through iOS file sharing when an app
+/// enables it, and a cycle database is not a document the user is meant to hand
+/// around.
+///
+/// Throws [DatabaseNotEncrypted] when the sqlite3 that actually got linked is
+/// not SQLCipher. Failing to start is the correct outcome there -- an app that
+/// looks like it is saving to an encrypted store while writing plaintext is the
+/// worse of the two failures, and section 1 names data leakage as one of the two
+/// outcomes to treat as worst.
+Future<AppDatabase> openEncryptedDatabase({
+  required DatabaseKeyStore keyStore,
 }) async {
-  final directory = await getApplicationDocumentsDirectory();
+  // Only does anything on old Android versions, where libsqlcipher.so
+  // occasionally cannot be opened by the usual route. A no-op elsewhere.
+  await applyWorkaroundToOpenSqlCipherOnOldAndroidVersions();
+
+  final directory = await databaseDirectory();
   final file = File('${directory.path}/$databaseFileName');
+  await file.parent.create(recursive: true);
 
-  // The key is read first because the backup below needs it. Reading the
-  // schema version means reading the database, and the database is encrypted.
-  final key = await (keyStore ?? SecureDatabaseKeyStore()).readOrCreateKey();
+  final key = await keyStore.readOrCreateKey();
 
-  // Section 5: copy the file before any migration touches it. Runs here rather
-  // than inside the migration because by then a transaction is already open and
-  // the copy would capture a half-migrated database.
-  await backUpBeforeMigration(
-    file,
-    AppDatabase(NativeDatabase.memory()).schemaVersion,
-    readSchemaVersion: (file) => readSchemaVersionOf(file.path, key: key),
-  );
+  return AppDatabase(
+    NativeDatabase(
+      file,
+      setup: (rawDatabase) {
+        // The key has to be the first statement on the connection: SQLCipher
+        // reads the header with it, so anything executed before it would be
+        // attempted against an undecrypted file.
+        rawDatabase.execute(pragmaKeyStatement(key));
+        verifyCipherIsActive(
+          cipherVersion: () {
+            final rows = rawDatabase.select('PRAGMA cipher_version;');
+            if (rows.isEmpty) return null;
+            final value = rows.first.values.first;
+            return value is String ? value : value?.toString();
+          },
+          readSchemaVersion: () =>
+              rawDatabase.select('PRAGMA user_version;').first.values.first,
+        );
 
-  return OpenedDatabase(
-    database: AppDatabase(
-      NativeDatabase(
-        file,
-        setup: (database) => applyKeyAndVerify(database, key),
-      ),
+        // Section 5: copy the file before any migration touches it. This is
+        // the first point the version is readable -- the header is encrypted
+        // until the key above is applied -- and drift has not begun migrating
+        // yet. Reading the version has also rolled back any journal a crash
+        // left behind, so the copy is of a consistent file.
+        //
+        // A failed copy is allowed to throw. The app then reports that it
+        // could not open the data and leaves the file exactly as it was,
+        // which beats migrating with no way back.
+        final current = rawDatabase
+            .select('PRAGMA user_version;')
+            .first
+            .values
+            .first;
+        backUpBeforeMigrationSync(
+          file,
+          currentVersion: current is int ? current : 0,
+          targetVersion: AppDatabase.currentSchemaVersion,
+        );
+      },
     ),
-    documents: directory,
   );
 }
 
-/// An opened database and the directory it lives in.
+/// Checks that the open connection is really SQLCipher and really keyed.
 ///
-/// The directory is returned rather than asked for again, so that section 9's
-/// delete removes the migration copies from the same place section 5 wrote
-/// them, instead of from wherever a second lookup happened to point.
-class OpenedDatabase {
-  /// Creates the pair.
-  const OpenedDatabase({required this.database, required this.documents});
+/// Split out from [openEncryptedDatabase] and driven by callbacks so it can be
+/// tested without a device, a plugin or a native library. The two checks answer
+/// different questions and both are needed:
+///
+/// - `PRAGMA cipher_version` returns nothing at all on a plain sqlite3 build.
+///   That is the link-time mix-up section 6 warns about.
+/// - Reading `user_version` forces SQLCipher to decrypt the header. A wrong or
+///   missing key surfaces here rather than later, in the middle of a write.
+void verifyCipherIsActive({
+  required String? Function() cipherVersion,
+  required Object? Function() readSchemaVersion,
+}) {
+  final String? version;
+  try {
+    version = cipherVersion();
+  } on Object catch (error) {
+    throw DatabaseNotEncrypted('cipher_version could not be read: $error');
+  }
 
-  /// The opened, decrypted database.
-  final AppDatabase database;
+  if (version == null || version.isEmpty) {
+    throw const DatabaseNotEncrypted(
+      'PRAGMA cipher_version returned nothing, so the linked sqlite3 is not '
+      'SQLCipher and this database would be written in plaintext',
+    );
+  }
 
-  /// The directory holding the database file and its `.backup-v<n>` copies.
-  final Directory documents;
+  try {
+    readSchemaVersion();
+  } on Object catch (error) {
+    throw DatabaseNotEncrypted(
+      'the database header could not be decrypted with the stored key: $error',
+    );
+  }
 }

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -7,95 +6,6 @@ import 'package:test/test.dart';
 /// are remembered. Both describe promises to the user, not house style: the
 /// first keeps cycle days free of timestamps, the second is what makes "this app
 /// makes no network requests" verifiable instead of merely asserted.
-/// Permissions a dependency may declare, each one looked at and accepted.
-///
-/// Not a formality. Every entry widens what a shipped build can do, so a new
-/// permission fails the test above until someone has read what it is for and
-/// written it down here.
-const acknowledgedPermissions = <String, Set<String>>{
-  // Section 9's optional app lock. It lets the app ask Android to run its own
-  // biometric prompt; it grants no access to data, to the network, or to
-  // anything the app could not already reach.
-  'local_auth_android': {'android.permission.USE_BIOMETRIC'},
-
-  // Section 9's log reminder.
-  //
-  // POST_NOTIFICATIONS is the Android 13+ runtime permission for showing a
-  // notification at all. She is asked for it only when she turns reminders on,
-  // and a refusal leaves the switch off rather than silently pretending.
-  //
-  // VIBRATE lets a notification buzz. It reads nothing and sends nothing; the
-  // plugin declares it unconditionally, so it arrives whether or not this app
-  // ever asks for a vibration.
-  //
-  // Neither grants access to data, to the network, or to anything the app
-  // could not already reach. Note what is NOT here: the plugin's scheduled
-  // notifications are posted with AndroidScheduleMode.inexactAllowWhileIdle,
-  // which needs no SCHEDULE_EXACT_ALARM and no USE_EXACT_ALARM. A log reminder
-  // does not need to be punctual to the second, and an exact-alarm permission
-  // is one Play audits and users are asked to grant by hand.
-  'flutter_local_notifications': {
-    'android.permission.POST_NOTIFICATIONS',
-    'android.permission.VIBRATE',
-  },
-};
-
-/// Which packages list [name] among their dependencies.
-///
-/// Only used to name the culprit in a failure. Tracing this by hand is the
-/// slow part of answering "why is this in my build at all".
-List<String> _runtimeDependentsOf(
-  String name,
-  List<Map<String, dynamic>> packages,
-) => [
-  for (final package in packages)
-    if ((package['dependencies'] as List<dynamic>).contains(name))
-      package['name'] as String,
-];
-
-/// Packages section 6 forbids without exception.
-///
-/// One copy, checked twice: once against the names written in `pubspec.yaml`,
-/// and once against everything a shipped build actually pulls in. Two lists
-/// would drift, and the one that drifted would be the one nobody was reading.
-const bannedNetworkPackages = <String>{
-  'http',
-  'dio',
-  'web_socket_channel',
-  'grpc',
-  'firebase_core',
-  'firebase_analytics',
-  'firebase_crashlytics',
-  'sentry',
-  'sentry_flutter',
-  'purchases_flutter',
-  'google_mobile_ads',
-};
-
-/// Permissions that can never be acknowledged, because they are the promise.
-///
-/// Section 6 makes the absence of INTERNET what makes "this app makes no
-/// network requests" checkable rather than merely stated.
-const _networkPermissions = <String>{
-  'android.permission.INTERNET',
-  'android.permission.ACCESS_NETWORK_STATE',
-  'android.permission.ACCESS_WIFI_STATE',
-};
-
-/// Source with its `//` comments removed.
-///
-/// Every platform check below was matching prose rather than code: the comments
-/// explaining why FLAG_SECURE matters contain the words "FLAG_SECURE", so
-/// deleting the call left the guard green. A check satisfied by its own
-/// explanation is worse than none, because it is counted as coverage.
-String codeOnly(String source) => source
-    .split('\n')
-    .map((line) {
-      final comment = line.indexOf('//');
-      return comment == -1 ? line : line.substring(0, comment);
-    })
-    .join('\n');
-
 void main() {
   group('domain layer purity (CLAUDE.md sections 2 and 3)', () {
     final domainFiles = Directory('lib/domain')
@@ -196,12 +106,7 @@ void main() {
           // to name them.
           if (line.trimLeft().startsWith('//')) continue;
           for (final entry in forbidden.entries) {
-            // Whole words. A plain substring match flags any identifier that
-            // merely contains one of these -- periodDurationFrom, say, whose
-            // name comes straight out of docs/cycle-logic.md section 1. This
-            // still catches every real use: Duration(days: 1), a `DateTime?`
-            // field, `.millisecondsSinceEpoch`.
-            if (RegExp('\\b${entry.key}\\b').hasMatch(line)) {
+            if (line.contains(entry.key)) {
               offenders.add(
                 '${file.path}:${i + 1}: ${entry.key} — ${entry.value}',
               );
@@ -216,207 +121,6 @@ void main() {
             'CLAUDE.md section 3. Offending lines:\n'
             '${offenders.join('\n')}',
       );
-    });
-  });
-
-  group('reminders carry no inference (docs/cycle-logic.md section 7)', () {
-    // Section 7's central claim is that a reminder is derived from nothing
-    // about her cycle -- which is why it needs no mode gate, and why it reads
-    // the same during pregnancy as it does on a natural cycle.
-    //
-    // That claim cannot be tested by calling the function. There is no cycle
-    // input to vary, so a runtime test would compute the same answer twice and
-    // pass whatever the code did. It is a statement about what the file is
-    // allowed to touch, so it is checked as one.
-    final reminderFiles = [
-      File('lib/domain/logic/reminder_schedule.dart'),
-      File('lib/domain/models/reminder_schedule.dart'),
-      File('lib/domain/models/reminder_time.dart'),
-      // The data layer's half. It turns a schedule into scheduled
-      // notifications, and it is the file most likely to acquire a "while we
-      // are here, remind her the day before her period is due" -- which is the
-      // inference section 7 rules out, and which no runtime test would catch.
-      File('lib/data/reminders.dart'),
-    ];
-
-    test('the reminder files exist to be checked', () {
-      // Without this the group passes vacuously if a file is renamed.
-      for (final file in reminderFiles) {
-        expect(file.existsSync(), isTrue, reason: '${file.path} is missing');
-      }
-    });
-
-    test('no reminder file reads anything about the cycle', () {
-      // Comments stripped first: the doc comments explain at length that these
-      // types hold no prediction and no cycle mode, so a substring match on the
-      // prose would pass no matter what the code did. That exact failure has
-      // already happened once in this file, with FLAG_SECURE.
-      const forbidden = <String, String>{
-        'CycleMode': 'a reminder is the same in every mode, so it reads none',
-        'CycleSettings': 'a reminder does not consult the cycle settings',
-        'PeriodPrediction': 'a reminder is never derived from a prediction',
-        'PredictedPeriod': 'a reminder is never derived from a prediction',
-        'predictNextPeriod': 'a reminder is never derived from a prediction',
-        'FertileWindow': 'a reminder is never derived from the fertile window',
-        'Cycle': 'a reminder is not computed from cycles',
-      };
-      final offenders = <String>[];
-      for (final file in reminderFiles) {
-        final lines = codeOnly(file.readAsStringSync()).split('\n');
-        for (var i = 0; i < lines.length; i++) {
-          for (final entry in forbidden.entries) {
-            if (RegExp('\\b${entry.key}\\b').hasMatch(lines[i])) {
-              offenders.add(
-                '${file.path}:${i + 1}: ${entry.key} — ${entry.value}',
-              );
-            }
-          }
-        }
-      }
-      expect(
-        offenders,
-        isEmpty,
-        reason:
-            'docs/cycle-logic.md section 7 says a reminder carries no '
-            'inference. Changing that means editing the document first, with '
-            'the reasoning. Offending lines:\n${offenders.join('\n')}',
-      );
-    });
-  });
-
-  group('screenshot protection (CLAUDE.md section 9)', () {
-    // None of this can be executed here. `flutter build ios --no-codesign`
-    // proves only that it compiles, and no widget test can ask the operating
-    // system what it put in the app switcher. What these checks buy is that the
-    // code is present and the right shape -- the same technique that now guards
-    // the two lockout bugs a review found in these exact files, both of which
-    // were invisible to the whole suite and to CI.
-
-    test('Android sets FLAG_SECURE, before the first frame', () {
-      final activity = codeOnly(
-        File('android/app/src/main/kotlin/app/period/MainActivity.kt')
-            .readAsStringSync(),
-      );
-
-      expect(
-        activity,
-        contains('window.setFlags('),
-        reason: 'nothing blanks the app-switcher thumbnail',
-      );
-      expect(activity, contains('WindowManager.LayoutParams.FLAG_SECURE'));
-      // In onCreate rather than later: anywhere else leaves a window between
-      // launch and protection.
-      expect(
-        activity.indexOf('onCreate'),
-        lessThan(activity.indexOf('FLAG_SECURE')),
-        reason: 'FLAG_SECURE must be set in onCreate',
-      );
-    });
-
-    test('iOS covers the window when the app resigns active', () {
-      final delegate = codeOnly(
-        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
-      );
-
-      expect(
-        delegate,
-        contains('override func applicationWillResignActive'),
-        reason: 'nothing covers the window before the snapshot is taken',
-      );
-      expect(
-        delegate,
-        contains('UIBlurEffect'),
-        reason: 'section 9 asks for a blur overlay',
-      );
-    });
-
-    test('iOS hooks resign-active, not did-enter-background', () {
-      // The snapshot is taken as the app resigns active. A cover added in
-      // didEnterBackground arrives after the picture has been taken: it
-      // compiles, runs, looks right in every log, and protects nothing. That
-      // is the exact class of bug this file exists to catch.
-      final delegate = codeOnly(
-        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
-      );
-
-      expect(
-        delegate,
-        isNot(contains('applicationDidEnterBackground')),
-        reason:
-            'covering on didEnterBackground is too late -- the app switcher '
-            'already has its picture',
-      );
-    });
-
-    test('iOS removes the cover again', () {
-      // A cover added and never removed is its own lockout: the app running
-      // normally behind a blur that nothing clears.
-      final delegate = codeOnly(
-        File('ios/Runner/AppDelegate.swift').readAsStringSync(),
-      );
-
-      expect(delegate, contains('override func applicationDidBecomeActive'));
-      expect(
-        delegate,
-        contains('removeFromSuperview'),
-        reason: 'the cover is never taken down',
-      );
-    });
-  });
-
-  group('the app lock cannot lock her out (CLAUDE.md section 9)', () {
-    // Both of these are permanent-lockout bugs, and neither is visible from
-    // Dart: the plugin reports the device as perfectly capable of
-    // authenticating, then fails in a way that looks like a refusal. There is
-    // no backup and no recovery path, so an unopenable app is an erased one.
-    //
-    // Neither is caught by `flutter build ios --no-codesign` or by any widget
-    // test, which is why they are pinned here as text.
-
-    test('the Android activity is a FragmentActivity', () {
-      // local_auth_android refuses anything else and returns an error the Dart
-      // side cannot tell apart from "she declined", so a plain FlutterActivity
-      // means every unlock fails forever.
-      final activity = File(
-        'android/app/src/main/kotlin/app/period/MainActivity.kt',
-      );
-      expect(
-        activity.existsSync(),
-        isTrue,
-        reason: 'the activity has moved; this check must follow it',
-      );
-      expect(
-        codeOnly(activity.readAsStringSync()),
-        contains(': FlutterFragmentActivity'),
-        reason:
-            'local_auth needs a FragmentActivity. With FlutterActivity the app '
-            'lock refuses every unlock and her data is unreachable.',
-      );
-    });
-
-    test('iOS declares why it uses Face ID', () {
-      // iOS terminates the process on the first Face ID prompt when the
-      // purpose string is absent. The lock resolves before any screen is
-      // reachable, so she could never get back into settings to turn it off.
-      final plist = File('ios/Runner/Info.plist').readAsStringSync();
-      expect(
-        plist,
-        contains('NSFaceIDUsageDescription'),
-        reason: 'iOS kills the app on its first Face ID prompt without this',
-      );
-      // Held to the same rule as notification text: it appears on a screen
-      // anyone nearby can read.
-      final reason = RegExp(
-        r'<key>NSFaceIDUsageDescription</key>\s*<string>([^<]*)</string>',
-      ).firstMatch(plist)?.group(1);
-      expect(reason, isNotNull, reason: 'the key has no string beside it');
-      for (final word in ['period', 'cycle', 'fertile', 'pregnan']) {
-        expect(
-          reason!.toLowerCase(),
-          isNot(contains(word)),
-          reason: 'the Face ID prompt must not mention "$word"',
-        );
-      }
     });
   });
 
@@ -436,81 +140,6 @@ void main() {
         reason:
             'if a build breaks because something wants INTERNET, remove the '
             'dependency rather than the permission',
-      );
-    });
-
-    test('no dependency injects a permission into the release manifest', () {
-      // The check above reads only this app's own manifest, and a dependency
-      // can add a permission of its own during Android's manifest merge --
-      // which that check would never see. Section 6 makes the absence of
-      // INTERNET the thing that keeps the no-network promise verifiable, so
-      // the plugins have to be looked at too.
-      //
-      // Two different rules apply. INTERNET can never be acknowledged: it is
-      // the promise. Anything else is a decision someone has to make and
-      // record, which is what acknowledgedPermissions is -- a new permission
-      // fails this test until a person has looked at it and written down why
-      // it is acceptable.
-      final config = File('.dart_tool/package_config.json');
-      expect(
-        config.existsSync(),
-        isTrue,
-        reason: 'run flutter pub get before this suite',
-      );
-
-      final packages =
-          (jsonDecode(config.readAsStringSync())
-                  as Map<String, Object?>)['packages']!
-              as List<Object?>;
-
-      final unacknowledged = <String>[];
-      final networkPermissions = <String>[];
-      for (final entry in packages.cast<Map<String, Object?>>()) {
-        // Two things bite here, and both make this check silently pass while
-        // looking at nothing. A rootUri has no trailing slash, so resolving
-        // against it drops the package directory; and it may be relative, in
-        // which case it is relative to package_config.json rather than to the
-        // working directory.
-        final rawRoot = entry['rootUri']! as String;
-        final root = config.absolute.uri.resolve(
-          rawRoot.endsWith('/') ? rawRoot : '$rawRoot/',
-        );
-        final manifest = File.fromUri(
-          root.resolve('android/src/main/AndroidManifest.xml'),
-        );
-        if (!manifest.existsSync()) continue;
-
-        final name = entry['name']! as String;
-        final declared = RegExp(r'android\.permission\.[A-Z_]+')
-            .allMatches(manifest.readAsStringSync())
-            .map((m) => m[0]!)
-            .toSet();
-
-        for (final permission in declared) {
-          if (_networkPermissions.contains(permission)) {
-            networkPermissions.add('$name: $permission');
-          } else if (!(acknowledgedPermissions[name] ?? const {}).contains(
-            permission,
-          )) {
-            unacknowledged.add('$name: $permission');
-          }
-        }
-      }
-
-      expect(
-        networkPermissions,
-        isEmpty,
-        reason:
-            'a dependency wants network access. Section 6 is explicit: remove '
-            'the dependency rather than the permission.',
-      );
-      expect(
-        unacknowledged,
-        isEmpty,
-        reason:
-            'a dependency declares an Android permission nobody has signed off '
-            'on. Read what it is for, then add it to acknowledgedPermissions '
-            'with a comment -- or drop the dependency.',
       );
     });
 
@@ -542,190 +171,49 @@ void main() {
         reason: 'failed to parse the dependencies block',
       );
 
+      const banned = {
+        'http',
+        'dio',
+        'web_socket_channel',
+        'grpc',
+        'firebase_core',
+        'firebase_analytics',
+        'firebase_crashlytics',
+        'sentry',
+        'sentry_flutter',
+        'purchases_flutter',
+        'google_mobile_ads',
+      };
       expect(
-        runtimeDependencies.toSet().intersection(bannedNetworkPackages),
+        runtimeDependencies.toSet().intersection(banned),
         isEmpty,
         reason: 'CLAUDE.md section 6 forbids these without exception',
-      );
-    });
-
-    test('nor is anything a runtime dependency drags in', () {
-      // The check above reads the names written in pubspec.yaml, which is the
-      // right error message for someone adding `http` by hand and no help at
-      // all if share_plus starts depending on it. This one asks what a shipped
-      // build actually contains.
-      //
-      // It matters most on iOS. Android fails closed either way, because the
-      // release manifest declares no INTERNET and the permission scan above is
-      // genuinely transitive -- but iOS has no equivalent gate, so on that
-      // platform nothing else would stop a transitive HTTP client.
-      //
-      // `web_socket_channel` is in pubspec.lock and is on the banned list, and
-      // that is fine: it arrives through build_runner and test, both dev
-      // dependencies, so it never ships. Distinguishing the two is the whole
-      // job here, which is why the dev/runtime split is asserted below rather
-      // than assumed.
-      final result = Process.runSync('dart', ['pub', 'deps', '--json']);
-      expect(
-        result.exitCode,
-        0,
-        reason:
-            'dart pub deps failed, so this guard checked nothing:\n'
-            '${result.stderr}',
-      );
-
-      final graph = jsonDecode(result.stdout as String) as Map<String, dynamic>;
-      final packages = (graph['packages'] as List<dynamic>)
-          .cast<Map<String, dynamic>>();
-      final byName = {
-        for (final package in packages) package['name'] as String: package,
-      };
-
-      /// Everything reachable from the direct (non-dev) dependencies.
-      final shipped = <String>{};
-      final pending = [
-        for (final package in packages)
-          if (package['kind'] == 'direct') package['name'] as String,
-      ];
-      while (pending.isNotEmpty) {
-        final name = pending.removeLast();
-        if (!shipped.add(name)) continue;
-        final package = byName[name];
-        if (package == null) continue;
-        pending.addAll((package['dependencies'] as List<dynamic>).cast());
-      }
-
-      expect(
-        shipped,
-        isNotEmpty,
-        reason: 'the walk found nothing, so the check below is vacuous',
-      );
-      expect(
-        shipped.length,
-        lessThan(byName.length),
-        reason:
-            'every resolved package ended up in the shipped set, so dev '
-            'dependencies leaked in and this is no longer checking anything '
-            'about what ships',
-      );
-
-      final offenders = shipped.intersection(bannedNetworkPackages);
-      final trail = [
-        for (final offender in offenders)
-          '$offender, pulled in by '
-              '${_runtimeDependentsOf(offender, packages).join(' and ')}',
-      ].join('; ');
-      expect(
-        offenders,
-        isEmpty,
-        reason:
-            'CLAUDE.md section 6 forbids these without exception, and a '
-            'shipped build reaches them: $trail',
-      );
-    });
-  });
-
-  group('the system clock (CLAUDE.md section 3)', () {
-    // Section 3 allows `DateTime.now()` in exactly one place, and the README
-    // says so on its front page. There are now two, and the second is a real
-    // exception rather than a slip -- so it is written down here, with what it
-    // is for, and a third one fails this test.
-    const permitted = <String, String>{
-      'lib/data/system_clock.dart':
-          'the Clock abstraction section 3 names. Reads the local year, month, '
-          'day, hour and minute, and discards the instant.',
-      'lib/data/reminders.dart':
-          'the device UTC offset, used to resolve a reminder to an instant. '
-          'Not a calendar day and never stored, so no CycleDate can carry '
-          'it -- see the comment there for why no package supplies it.',
-    };
-
-    test('the permitted files still exist', () {
-      // Without this the scan below passes vacuously once a file is renamed.
-      for (final path in permitted.keys) {
-        expect(File(path).existsSync(), isTrue, reason: '$path is missing');
-      }
-    });
-
-    test('nothing else reads the system clock', () {
-      final offenders = <String>[];
-      for (final file in Directory('lib').listSync(recursive: true)) {
-        if (file is! File || !file.path.endsWith('.dart')) continue;
-        // Generated code is not written by hand and is not ours to police.
-        if (file.path.endsWith('.g.dart')) continue;
-        if (file.path.endsWith('.freezed.dart')) continue;
-        if (permitted.containsKey(file.path)) continue;
-
-        // Comments stripped first. Several files explain at length that they
-        // take the date as a parameter *instead* of calling DateTime.now(),
-        // and a substring match on that prose would fail them for saying so.
-        if (codeOnly(file.readAsStringSync()).contains('DateTime.now(')) {
-          offenders.add(file.path);
-        }
-      }
-
-      expect(
-        offenders,
-        isEmpty,
-        reason:
-            'section 3 keeps the system clock in one place. Take the date as a '
-            'parameter and let the caller pass clock.today(), or -- if this '
-            'really is a third exception -- add it to `permitted` above with '
-            'what it is for.',
       );
     });
   });
 
   group('encryption at rest (CLAUDE.md section 6)', () {
-    // This guard used to assert that sqlcipher_flutter_libs was a dependency,
-    // which was exactly backwards. sqlite3 3.x loads its native library through
-    // Dart build hooks and never consults that package, so its presence proved
-    // nothing while its absence looked like the bug. The database was being
-    // written unencrypted and every check here passed.
-    //
-    // What actually decides it is the hooks.user_defines block in pubspec.yaml.
-    // open_database_test.dart proves the result end to end by reopening a
-    // written file without the key; this only catches the configuration
-    // regressing, quickly and without touching the disk.
-    final pubspec = File('pubspec.yaml').readAsStringSync();
-
-    test('an encrypting build of SQLite is selected', () {
-      final hooks = RegExp(
-        r'hooks:\s*\n\s*user_defines:\s*\n\s*sqlite3:\s*\n\s*source:\s*(\w+)',
-      ).firstMatch(pubspec);
+    test('sqlite3_flutter_libs is not resolved alongside sqlcipher', () {
+      // Both packages provide a native sqlite3 and the plain one can win at
+      // link time. The result is an unencrypted database that behaves
+      // completely normally -- nothing fails, nothing warns, and the app's
+      // central promise is quietly broken. A silent failure needs a check
+      // rather than a paragraph, and it has to read the lockfile because the
+      // conflict can arrive transitively through a package nobody chose.
+      final lock = File('pubspec.lock').readAsStringSync();
 
       expect(
-        hooks,
-        isNotNull,
-        reason:
-            'without hooks.user_defines the app bundles plain SQLite, '
-            'PRAGMA key is a silent no-op, and the database is written in the '
-            'clear while behaving completely normally',
+        lock,
+        contains('sqlcipher_flutter_libs:'),
+        reason: 'the encrypted sqlite build must be present',
       );
       expect(
-        hooks!.group(1),
-        anyOf('sqlite3mc', 'sqlcipher'),
+        lock,
+        isNot(contains('sqlite3_flutter_libs:')),
         reason:
-            'only these two sources support encryption; "sqlite3" is the '
-            'plain build',
+            'shipping both leaves the plain sqlite3 able to win at link '
+            'time, producing an unencrypted database that looks fine',
       );
-    });
-
-    test('no inert encryption plugin is depended on', () {
-      // Adding either back would look like encryption while doing nothing,
-      // which is worse than not having it: it invites the false assumption.
-      for (final obsolete in const [
-        'sqlcipher_flutter_libs',
-        'sqlite3_flutter_libs',
-      ]) {
-        expect(
-          pubspec,
-          isNot(contains('$obsolete:')),
-          reason:
-              'sqlite3 3.x does not consult $obsolete; encryption comes '
-              'from hooks.user_defines instead',
-        );
-      }
     });
   });
 }

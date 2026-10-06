@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -48,6 +49,26 @@ Future<void> _loadFonts() async {
     'Roboto-Bold.ttf',
   ]);
   await _load(fonts, 'MaterialIcons', const ['MaterialIcons-Regular.otf']);
+  await _load(
+    _packageDirectory('cupertino_icons', 'assets'),
+    'packages/cupertino_icons/CupertinoIcons',
+    const ['CupertinoIcons.ttf'],
+  );
+}
+
+/// [subdirectory] inside [package] as `flutter pub get` resolved it, read
+/// from the package config so it works wherever the pub cache lives.
+Directory _packageDirectory(String package, String subdirectory) {
+  final config = File('.dart_tool/package_config.json');
+  final packages =
+      (jsonDecode(config.readAsStringSync())
+              as Map<String, Object?>)['packages']
+          as List<Object?>;
+  final entry = packages.cast<Map<String, Object?>>().firstWhere(
+    (entry) => entry['name'] == package,
+  );
+  final root = config.parent.uri.resolve('${entry['rootUri']}/');
+  return Directory.fromUri(root.resolve(subdirectory));
 }
 
 Future<void> _load(

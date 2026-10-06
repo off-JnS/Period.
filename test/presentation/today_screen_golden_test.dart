@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
-import 'package:period/domain/models/cycle_date.dart';
+import 'package:period/domain/logic/pregnancy_week.dart';
 import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/today/today_screen.dart';
 
-import '../support/views.dart';
 import '../support/dates.dart';
+import '../support/models.dart';
 import '../support/widgets.dart';
 
 /// Golden tests for the Today screen, as CLAUDE.md section 7 requires.
@@ -23,16 +24,6 @@ import '../support/widgets.dart';
 /// A diff in these files is a change to what a person sees. Read it before
 /// accepting it.
 void main() {
-  // The cycle these goldens describe began on 3 April, which is what puts the
-  // estimate below at the end of the month.
-  //
-  // The date is on screen now that the app bar carries it, so it has to agree
-  // with the rest of the picture. Derived from the cycle day rather than fixed:
-  // a golden showing "Wednesday, April 24" above "Day 12" is a picture of a bug
-  // that is not there, and a reviewer cannot tell that from one that is.
-  final cycleStart = aDate(2024, 4, 3);
-  CycleDate dayOfCycle(int? day) => cycleStart.addDays((day ?? 1) - 1);
-
   final predicted = PredictedPeriod(
     earliest: aDate(2024, 4, 26),
     latest: aDate(2024, 4, 30),
@@ -52,9 +43,7 @@ void main() {
   }) async {
     await pumpApp(
       tester,
-      // A callback so the log button renders: it is the only way into the app,
-      // and a golden without it would not show what the user actually sees.
-      TodayScreen(data: data, onLogToday: () {}),
+      TodayScreen(data: data),
       locale: locale,
       brightness: brightness,
       textScale: textScale,
@@ -68,10 +57,7 @@ void main() {
   testWidgets('a fresh install', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(1),
-        prediction: NotEnoughCycles(have: 0, need: 2),
-      ),
+      const TodayViewData(prediction: NotEnoughCycles(have: 0, need: 2)),
       'fresh_install',
     );
   });
@@ -79,8 +65,7 @@ void main() {
   testWidgets('an estimate', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(22),
+      TodayViewData(
         cycleDay: 22,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -92,8 +77,7 @@ void main() {
   testWidgets('an estimate with the fertile window opted in', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(12),
+      TodayViewData(
         cycleDay: 12,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -106,11 +90,7 @@ void main() {
   testWidgets('cycles too variable to estimate', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(31),
-        cycleDay: 31,
-        prediction: CyclesTooVariable(9),
-      ),
+      const TodayViewData(cycleDay: 31, prediction: CyclesTooVariable(9)),
       'too_variable',
     );
   });
@@ -118,10 +98,7 @@ void main() {
   testWidgets('predictions off during pregnancy', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(1),
-        prediction: PredictionsDisabled(CycleMode.pregnancy),
-      ),
+      const TodayViewData(prediction: PredictionsDisabled(CycleMode.pregnancy)),
       'pregnancy',
     );
   });
@@ -129,8 +106,7 @@ void main() {
   testWidgets('predictions off on hormonal contraception', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(9),
+      const TodayViewData(
         cycleDay: 9,
         prediction: PredictionsDisabled(CycleMode.hormonalContraception),
       ),
@@ -141,8 +117,7 @@ void main() {
   testWidgets('the doctor hint', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(34),
+      TodayViewData(
         cycleDay: 34,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -157,8 +132,7 @@ void main() {
     // second lap in a different colour, and the day number says it in words.
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(34),
+      TodayViewData(
         cycleDay: 34,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -167,25 +141,10 @@ void main() {
     );
   });
 
-  testWidgets('running past the usual length', (tester) async {
-    // The ring alone shows this in a second colour; section 9 needs words too.
-    await expectGolden(
-      tester,
-      aTodayView(
-        today: dayOfCycle(34),
-        cycleDay: 34,
-        typicalCycleLength: 28,
-        prediction: predicted,
-      ),
-      'late',
-    );
-  });
-
   testWidgets('dark mode', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(22),
+      TodayViewData(
         cycleDay: 22,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -201,8 +160,7 @@ void main() {
   ) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(22),
+      const TodayViewData(
         cycleDay: 22,
         typicalCycleLength: 28,
         prediction: PredictionsDisabled(CycleMode.perimenopause),
@@ -215,8 +173,7 @@ void main() {
   testWidgets('at 200% text size', (tester) async {
     await expectGolden(
       tester,
-      aTodayView(
-        today: dayOfCycle(22),
+      TodayViewData(
         cycleDay: 22,
         typicalCycleLength: 28,
         prediction: predicted,
@@ -224,5 +181,81 @@ void main() {
       'large_text',
       textScale: 2,
     );
+  });
+
+  testWidgets('everything logged today', (tester) async {
+    await expectGolden(
+      tester,
+      TodayViewData(
+        cycleDay: 3,
+        typicalCycleLength: 28,
+        prediction: predicted,
+        isTodayPeriodStart: false,
+        todayEntry: aDayEntry(
+          date: aDate(2024, 5, 17),
+          flow: FlowIntensity.medium,
+          note: 'Long walk helped',
+          symptoms: {
+            aSymptom(key: 'cramps'),
+            aSymptom(key: 'fatigue'),
+            aSymptom(key: 'mood.calm'),
+            aSymptom(key: 'mood.sensitive'),
+            aSymptom(key: 'discharge.creamy'),
+            aSymptom(key: 'sex.protected'),
+          },
+        ),
+      ),
+      'logged_everything',
+    );
+  });
+
+  testWidgets('pregnancy week counter', (tester) async {
+    await expectGolden(
+      tester,
+      const TodayViewData(
+        cycleDay: 88,
+        prediction: PredictionsDisabled(CycleMode.pregnancy),
+        pregnancy: PregnancyCounting(PregnancyWeek(weeks: 12, days: 3)),
+      ),
+      'pregnancy_week',
+    );
+  });
+
+  group('the date and countdown at the top', () {
+    for (final (name, today) in [
+      ('countdown_upcoming', aDate(2024, 4, 14)),
+      ('countdown_in_window', aDate(2024, 4, 27)),
+      ('countdown_past', aDate(2024, 5, 3)),
+    ]) {
+      testWidgets(name, (tester) async {
+        await expectGolden(
+          tester,
+          TodayViewData(
+            today: today,
+            countdown: countdownTo(predicted, today),
+            cycleDay: 20,
+            typicalCycleLength: 28,
+            prediction: predicted,
+          ),
+          name,
+        );
+      });
+    }
+
+    testWidgets('German', (tester) async {
+      final today = aDate(2024, 4, 14);
+      await expectGolden(
+        tester,
+        TodayViewData(
+          today: today,
+          countdown: countdownTo(predicted, today),
+          cycleDay: 20,
+          typicalCycleLength: 28,
+          prediction: predicted,
+        ),
+        'countdown_german',
+        locale: const Locale('de'),
+      );
+    });
   });
 }

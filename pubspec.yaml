@@ -24,61 +24,39 @@ dependencies:
   # shipping both links two sqlite3 builds and the plain one can win silently,
   # producing an unencrypted database that behaves normally.
   drift: ^2.30.0
-  # Encryption comes from the `hooks.user_defines` block at the bottom of this
-  # file, NOT from a plugin package. sqlite3 3.x loads its native library
-  # through Dart build hooks, and its changelog is explicit that
-  # sqlcipher_flutter_libs should be dropped when upgrading. Adding that package
-  # back would link a library nothing uses and quietly leave the database
-  # unencrypted.
-  sqlite3: ^3.5.2
+  sqlcipher_flutter_libs: ^0.6.6
   path_provider: ^2.1.5
   # Holds the database key in the Android Keystore / iOS Keychain. Wrapped
   # behind DatabaseKeyStore so this package stays swappable.
   flutter_secure_storage: ^9.2.4
   # Annotations only; the generator is a dev dependency.
   freezed_annotation: ^3.1.0
-  # Charts on the analysis screen. Allowlisted in section 6. Draws only what
-  # was logged: no trend line and no projection, because section 8 forbids
-  # implying a direction and a line sloping off the right-hand edge is a
-  # prediction whatever the axis says. Makes no network request.
-  fl_chart: ^1.2.0
-  # The optional app lock section 9 asks for. Prompts with the device's own
-  # biometric or passcode; this app never stores a PIN of its own, so there is
-  # no secret here to hold or leak. Allowlisted in section 6. Makes no network
-  # request.
   local_auth: ^3.0.2
-  # Hands a finished backup to the system share sheet, so the user chooses
-  # where it lands and the app never writes her data anywhere shared on its
-  # own. Allowlisted in section 6. Makes no network request.
-  share_plus: ^12.0.0
-  # Lets her pick a backup file to restore from. The app's own documents
-  # directory is not reachable by a person on either platform, so without this
-  # an exported backup could never come back. Allowlisted in section 6. Makes
-  # no network request.
-  file_picker: ^10.3.9
-  # State management. Allowlisted in section 6. Wires the database to the UI
-  # without threading objects through constructors, and lets tests and goldens
-  # swap in an in-memory database.
-  flutter_riverpod: ^3.0.3
-  # Section 9's log reminder. Allowlisted in section 6, and pinned to an exact
-  # version rather than a caret range for a reason that is not style:
-  #
-  # flutter_local_notifications 19.0.0 and later depend on timezone ^0.10.0,
-  # and timezone 0.10.0 was the release that added `http` to its own
-  # dependencies. Section 6 forbids http without exception, and every later
-  # version of the plugin -- including each federated piece -- pins timezone
-  # ^0.10.0 or above, so there is no combination above 18.0.0 that keeps it
-  # out. 18.0.0 is the last release that pins timezone ^0.9.0.
-  #
-  # So this cannot be upgraded, and an upgrade will not fail quietly:
-  # architecture_test.dart walks what a shipped build actually pulls in and
-  # will name http and what dragged it in. If that test fails after an
-  # upgrade, revert the upgrade -- do not add http to the allowed list.
-  flutter_local_notifications: 18.0.0
-  # Required by the plugin above to schedule against a wall clock. Held below
-  # 0.10.0 for the same reason, which is why this is written out rather than
-  # left to come along transitively: a caret here would be an invitation.
-  timezone: ^0.9.0
+  flutter_local_notifications: ^22.3.1
+  timezone: ^0.11.1
+  pdf: ^3.13.1
+  share_plus: ^12.0.2
+  # Apple-style icons. A font and the constants naming its glyphs: no code
+  # that runs, nothing that reaches the network. Approved 2026-09-25.
+  cupertino_icons: ^1.0.8
+
+# Build configuration for package:sqlite3, which drift reaches sqlite through.
+# Adds no package -- sqlite3 is already resolved as drift's own dependency.
+#
+# Without this, package:sqlite3 downloads a plain, unencrypted SQLite and bundles
+# it as its own native asset. The app then ships two sqlite builds: that one and
+# the SQLCipher provided by sqlcipher_flutter_libs. package:sqlite3 loads its own,
+# so every write goes to a database with no encryption -- exactly the silent
+# failure section 6 describes, reached by a different route than the forbidden
+# sqlite3_flutter_libs dependency, and invisible in pubspec.lock.
+#
+# "process" makes it resolve sqlite symbols from the running process instead,
+# which is the SQLCipher that sqlcipher_flutter_libs links in. That is what that
+# package is for. openEncryptedDatabase asserts the result at runtime.
+hooks:
+  user_defines:
+    sqlite3:
+      source: process
 
 dev_dependencies:
   flutter_test:
@@ -101,17 +79,3 @@ flutter:
   # Generates AppLocalizations from lib/l10n/*.arb per l10n.yaml. Section 8: no
   # user-facing string is ever hardcoded in a widget.
   generate: true
-
-# Selects an encrypting build of SQLite. Without this the app bundles plain
-# SQLite, `PRAGMA key` is silently ignored -- unknown pragmas are a no-op in
-# SQLite -- and the database is written in the clear while behaving completely
-# normally. Section 1 makes that the worst failure this app can have.
-#
-# sqlite3mc (SQLite3MultipleCiphers) rather than sqlcipher: it does not link
-# OpenSSL, which keeps a third-party crypto library out of a privacy-critical
-# app and the binary smaller, and it tracks a more current SQLite than the
-# SQLCipher build shipped by package:sqlite3.
-hooks:
-  user_defines:
-    sqlite3:
-      source: sqlite3mc

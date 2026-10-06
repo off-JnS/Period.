@@ -47,6 +47,12 @@ abstract class DayEntry with _$DayEntry {
     /// The user's own note. Free text, never parsed.
     String? note,
 
+    /// Basal body temperature in hundredths of a degree Celsius, e.g. 3645
+    /// for 36.45 °C. Whole hundredths so no floating-point rounding can alter
+    /// what she entered. Recorded only; no estimate reads it
+    /// (docs/cycle-logic.md §9).
+    int? temperatureCentiCelsius,
+
     /// What the user logged on this day. Empty when nothing was.
     ///
     /// Required rather than defaulted so a caller cannot accidentally construct

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -19,15 +20,8 @@ abstract class DatabaseKeyStore {
 
   /// Forgets the key.
   ///
-  /// **Nothing calls this.** Section 9's "delete all data" deliberately does
-  /// not: the database is still open and in use afterwards, and a key that no
-  /// longer opens it would take the app down along with the data. See
-  /// `eraseEverything`, which empties the rows, vacuums the freed pages and
-  /// removes the migration copies instead.
-  ///
-  /// It stays because rotating the key -- generating a new one and re-encrypting
-  /// -- is a reasonable thing to want, and that would start here. Read this as
-  /// an unused affordance rather than as a protection that is wired up.
+  /// Only meaningful alongside deleting the database itself -- section 9's
+  /// "delete all data" -- since without the key the file is unreadable anyway.
   Future<void> deleteKey();
 }
 
@@ -83,4 +77,21 @@ class SecureDatabaseKeyStore implements DatabaseKeyStore {
     );
     return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
+}
+
+/// Escapes [key] for use in `PRAGMA key`.
+///
+/// The key is generated hex so it cannot contain a quote today, but building SQL
+/// by concatenation without escaping is a habit worth not forming, and a future
+/// key format might not be so tidy.
+String pragmaKeyStatement(String key) {
+  final escaped = key.replaceAll("'", "''");
+  return "PRAGMA key = '$escaped'";
+}
+
+/// Never log or serialise the key. This exists to make that explicit at the
+/// call site rather than relying on nobody being curious.
+extension DatabaseKeySafety on String {
+  /// A redacted form safe to appear in an error message.
+  String get redactedKey => '<${utf8.encode(this).length} byte key, redacted>';
 }

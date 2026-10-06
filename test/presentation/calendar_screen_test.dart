@@ -1,356 +1,460 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:period/domain/logic/fertile_window.dart';
 import 'package:period/domain/logic/period_prediction.dart';
 import 'package:period/domain/models/cycle_date.dart';
+import 'package:period/domain/models/day_entry.dart';
+import 'package:period/presentation/calendar/calendar_markers.dart';
 import 'package:period/presentation/calendar/calendar_screen.dart';
-import 'package:period/presentation/calendar/month_grid.dart';
 
 import '../support/dates.dart';
 import '../support/widgets.dart';
 
-/// The calendar as a pure widget, with no database behind it.
-///
-/// The spoken labels are checked as closely as the drawing, because CLAUDE.md
-/// section 9 forbids meaning that rests on colour alone and a calendar is the
-/// easiest place in the app to break that rule: forty-two circles that differ
-/// only in shade say nothing to a screen reader and nothing to a user who
-/// cannot tell them apart.
 void main() {
-  // April 2024 begins on a Monday, so a Monday-first grid has no leading
-  // padding and five clean weeks -- the days in it are easy to reason about.
-  final april = MonthGrid.of(aDate(2024, 4, 1), firstWeekday: 1);
-  final today = aDate(2024, 4, 15);
+  final today = aDate(2024, 5, 17);
 
   CalendarViewData data({
-    CycleDate? now,
+    CycleDate? on,
     Set<CycleDate> periodStarts = const {},
+    Map<CycleDate, FlowIntensity> flowByDay = const {},
     Set<CycleDate> loggedDays = const {},
-    PredictedPeriod? prediction,
+    PredictedPeriod? predicted,
+    FertileWindowEstimate? fertileWindow,
   }) => CalendarViewData(
-    today: now ?? today,
+    today: on ?? today,
     periodStarts: periodStarts,
+    flowByDay: flowByDay,
     loggedDays: loggedDays,
-    prediction: prediction,
+    predicted: predicted,
+    fertileWindow: fertileWindow,
   );
 
-  final busyMonth = data(
-    periodStarts: {aDate(2024, 4, 3)},
-    loggedDays: {aDate(2024, 4, 3), aDate(2024, 4, 4), aDate(2024, 4, 5)},
-    // Runs off the end of the month and into the padding days, which is where a
-    // window that straddles a month boundary would otherwise vanish.
-    prediction: PredictedPeriod(
-      earliest: aDate(2024, 4, 29),
-      latest: aDate(2024, 5, 3),
-    ),
-  );
-
-  // No ensureSemantics: testWidgets enables semantics by default, and a handle
-  // taken here would outlive the framework's own end-of-test check.
-  Future<void> pumpCalendar(
-    WidgetTester tester, {
-    CalendarViewData? view,
-    MonthGrid? grid,
+  Future<void> pump(
+    WidgetTester tester,
+    CalendarViewData data, {
     void Function(CycleDate)? onSelectDay,
-    VoidCallback? onPreviousMonth,
-    VoidCallback? onNextMonth,
     Locale locale = const Locale('en'),
-  }) async {
-    await pumpApp(
-      tester,
-      CalendarScreen(
-        data: view ?? busyMonth,
-        grid: grid ?? april,
-        onSelectDay: onSelectDay ?? (_) {},
-        onPreviousMonth: onPreviousMonth,
-        onNextMonth: onNextMonth,
-      ),
-      locale: locale,
-    );
-  }
+    double textScale = 1,
+  }) => pumpApp(
+    tester,
+    CalendarScreen(data: data, onSelectDay: onSelectDay),
+    locale: locale,
+    textScale: textScale,
+  );
 
-  group('every state is said in words, not only drawn', () {
-    testWidgets('a period start', (tester) async {
-      await pumpCalendar(tester);
-      expect(
-        find.bySemanticsLabel('April 3, 2024, Period start'),
-        findsOneWidget,
-      );
-    });
+  Finder day(String pattern) => find.bySemanticsLabel(RegExp(pattern));
 
-    testWidgets('a logged day', (tester) async {
-      await pumpCalendar(tester);
-      expect(find.bySemanticsLabel('April 4, 2024, Logged'), findsOneWidget);
-    });
-
-    testWidgets('today', (tester) async {
-      await pumpCalendar(tester);
-      expect(find.bySemanticsLabel('April 15, 2024, Today'), findsOneWidget);
-    });
-
-    testWidgets('an estimated day', (tester) async {
-      await pumpCalendar(tester);
-      expect(
-        find.bySemanticsLabel('April 29, 2024, Estimated period'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('a day with nothing on it says only its date', (tester) async {
-      await pumpCalendar(tester);
-      expect(find.bySemanticsLabel('April 10, 2024'), findsOneWidget);
-    });
-
-    testWidgets('a day that is several things at once says all of them', (
+  group('the scroll', () {
+    testWidgets('opens on the current month, with every day of it', (
       tester,
     ) async {
-      await pumpCalendar(
-        tester,
-        view: data(
-          periodStarts: {today},
-          loggedDays: {today},
-          prediction: PredictedPeriod(earliest: today, latest: today),
-        ),
-      );
-      // "Logged" is left out: a period start is by definition a logged day, and
-      // saying both would pad the label without adding anything.
-      expect(
-        find.bySemanticsLabel(
-          'April 15, 2024, Today, Period start, '
-          'Estimated period',
-        ),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('the legend names every marker it draws', (tester) async {
-      await pumpCalendar(tester);
-      for (final label in ['Period start', 'Logged', 'Estimated period']) {
-        expect(find.widgetWithText(Row, label), findsWidgets);
+      await pump(tester, data());
+      expect(find.text('May'), findsOneWidget);
+      for (var d = 1; d <= 31; d++) {
+        expect(day('^May $d, 2024'), findsOneWidget, reason: 'May $d');
       }
     });
-  });
 
-  group('logging a day', () {
-    testWidgets('reports the day that was tapped', (tester) async {
-      CycleDate? selected;
-      await pumpCalendar(tester, onSelectDay: (day) => selected = day);
-
-      await tester.tap(find.bySemanticsLabel('April 10, 2024'));
-      expect(selected, aDate(2024, 4, 10));
-    });
-
-    testWidgets('a padding day from the next month is still a real day', (
+    testWidgets('leaves out the neighbouring months\' days in each grid', (
       tester,
     ) async {
-      CycleDate? selected;
-      // Looking back at April from May, so the padding days at the foot of the
-      // grid are in the past and therefore loggable.
-      await pumpCalendar(
-        tester,
-        view: data(now: aDate(2024, 5, 20)),
-        onSelectDay: (day) => selected = day,
+      await pump(tester, data());
+      // May 2024 starts on a Wednesday: the grid would otherwise show the
+      // end of April on its first row.
+      expect(day('^April 30, 2024'), findsNothing);
+    });
+
+    testWidgets('names months of other years with their year', (tester) async {
+      await pump(tester, data());
+      await tester.scrollUntilVisible(
+        find.text('December 2023'),
+        -300,
+        scrollable: find.byType(Scrollable).first,
       );
-
-      // May 1 is drawn faintly because it is not this month, but refusing to
-      // log it would be arbitrary: it is a day like any other.
-      await tester.tap(find.bySemanticsLabel('May 1, 2024'));
-      expect(selected, aDate(2024, 5, 1));
+      expect(find.text('December 2023'), findsOneWidget);
     });
 
-    testWidgets('a future day cannot be logged', (tester) async {
-      CycleDate? selected;
-      await pumpCalendar(tester, onSelectDay: (day) => selected = day);
-
-      // Drawn, because the estimate lives in the future and is the reason to
-      // look ahead. Not writable, because a period start dated forward would
-      // invent a cycle and move every estimate on the strength of a plan.
-      await tester.tap(
-        find.bySemanticsLabel('April 29, 2024, Estimated period'),
-      );
-      expect(selected, isNull);
-    });
-
-    testWidgets('tomorrow is already too far ahead', (tester) async {
-      CycleDate? selected;
-      await pumpCalendar(tester, onSelectDay: (day) => selected = day);
-
-      await tester.tap(find.bySemanticsLabel('April 16, 2024'));
-      expect(selected, isNull);
-    });
-
-    testWidgets('today itself can still be logged', (tester) async {
-      CycleDate? selected;
-      await pumpCalendar(tester, onSelectDay: (day) => selected = day);
-
-      await tester.tap(find.bySemanticsLabel('April 15, 2024, Today'));
-      expect(selected, today);
-    });
-  });
-
-  group('an empty month', () {
-    testWidgets('says so rather than showing a blank grid', (tester) async {
-      await pumpCalendar(tester, view: data());
-      expect(find.text('Nothing logged this month'), findsOneWidget);
-    });
-
-    testWidgets('stays quiet once anything is logged', (tester) async {
-      await pumpCalendar(tester);
-      expect(find.text('Nothing logged this month'), findsNothing);
-    });
-
-    testWidgets('a logged day in the padding does not count as this month', (
+    testWidgets('keeps going forward, past the end of the year', (
       tester,
     ) async {
-      await pumpCalendar(tester, view: data(loggedDays: {aDate(2024, 5, 2)}));
-      expect(find.text('Nothing logged this month'), findsOneWidget);
-    });
-  });
-
-  group('moving between months', () {
-    testWidgets('the header names the month and year', (tester) async {
-      await pumpCalendar(tester);
-      expect(find.text('April 2024'), findsOneWidget);
-    });
-
-    testWidgets('the arrows are labelled for a screen reader', (tester) async {
-      // Two icons with no text beside them. Without a label they are announced
-      // as an unnamed button, which is the whole of what a user hears.
-      await pumpCalendar(tester, onPreviousMonth: () {}, onNextMonth: () {});
-      expect(find.bySemanticsLabel('Previous month'), findsOneWidget);
-      expect(find.bySemanticsLabel('Next month'), findsOneWidget);
-    });
-
-    testWidgets('the arrows call back', (tester) async {
-      var back = 0;
-      var forward = 0;
-      await pumpCalendar(
-        tester,
-        onPreviousMonth: () => back++,
-        onNextMonth: () => forward++,
+      await pump(tester, data());
+      await tester.scrollUntilVisible(
+        find.text('February 2025'),
+        300,
+        scrollable: find.byType(Scrollable).first,
       );
-
-      await tester.tap(find.byIcon(Icons.chevron_left));
-      await tester.tap(find.byIcon(Icons.chevron_right));
-      expect(back, 1);
-      expect(forward, 1);
-    });
-  });
-
-  group('the week starts where the reader expects', () {
-    testWidgets('Monday first', (tester) async {
-      await pumpCalendar(tester);
-      final headings = tester
-          .widgetList<Text>(
-            find.descendant(
-              of: find.byType(ExcludeSemantics),
-              matching: find.byType(Text),
-            ),
-          )
-          .map((text) => text.data)
-          .toList();
-      expect(headings.first, 'Mon');
-      expect(headings.last, 'Sun');
+      expect(find.text('February 2025'), findsOneWidget);
     });
 
-    testWidgets('Sunday first', (tester) async {
-      await pumpCalendar(
-        tester,
-        grid: MonthGrid.of(aDate(2024, 4, 1), firstWeekday: 7),
-      );
-      final headings = tester
-          .widgetList<Text>(
-            find.descendant(
-              of: find.byType(ExcludeSemantics),
-              matching: find.byType(Text),
-            ),
-          )
-          .map((text) => text.data)
-          .toList();
-      expect(headings.first, 'Sun');
-      expect(headings.last, 'Sat');
-    });
-
-    testWidgets('the headings cannot disagree with the days beneath them', (
+    testWidgets('reaches years back without building every month between', (
       tester,
     ) async {
-      // The grid carries its own first weekday, so the heading row and the day
-      // rows are computed from the same number rather than from two callers
-      // that have to remember to agree. April 1 2024 was a Monday.
-      final sundayFirst = MonthGrid.of(aDate(2024, 4, 1), firstWeekday: 7);
-      expect(sundayFirst.firstWeekday, 7);
-      expect(sundayFirst.days.first, aDate(2024, 3, 31));
+      await pump(tester, data());
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 20000));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('20'), findsWidgets);
+    });
 
-      await pumpCalendar(tester, grid: sundayFirst);
-      expect(find.bySemanticsLabel('March 31, 2024'), findsOneWidget);
+    testWidgets('names months in the reader locale', (tester) async {
+      await pump(tester, data(), locale: const Locale('de'));
+      expect(find.text('Mai'), findsOneWidget);
+      expect(find.text('Heute'), findsOneWidget);
     });
   });
 
-  testWidgets('German', (tester) async {
-    await pumpCalendar(tester, locale: const Locale('de'));
-    expect(find.text('April 2024'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('3. April 2024, Periodenbeginn'),
-      findsWidgets,
-    );
+  group('what a day shows', () {
+    testWidgets('a period start says so aloud', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, data(periodStarts: {aDate(2024, 5, 3)}));
+      expect(day(r'^May 3, 2024.*Period start'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('every day with flow is a period day; none is not', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        data(
+          periodStarts: {aDate(2024, 5, 3)},
+          flowByDay: {
+            aDate(2024, 5, 3): FlowIntensity.heavy,
+            aDate(2024, 5, 4): FlowIntensity.light,
+            aDate(2024, 5, 5): FlowIntensity.none,
+          },
+          loggedDays: {aDate(2024, 5, 3), aDate(2024, 5, 4), aDate(2024, 5, 5)},
+        ),
+      );
+      expect(day(r'^May 4, 2024.*Period'), findsOneWidget);
+      expect(day(r'^May 5, 2024, Logged$'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('a logged day says so aloud', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, data(loggedDays: {aDate(2024, 5, 9)}));
+      expect(day(r'^May 9, 2024.*Logged'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('an estimated day says so aloud', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        data(
+          predicted: PredictedPeriod(
+            earliest: aDate(2024, 5, 26),
+            latest: aDate(2024, 5, 30),
+          ),
+        ),
+      );
+      expect(day(r'^May 28, 2024.*Estimated period'), findsOneWidget);
+      expect(day(r'^May 25, 2024.*Estimated period'), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('today says so aloud', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, data());
+      expect(day(r'^May 17, 2024, Today'), findsOneWidget);
+      handle.dispose();
+    });
   });
 
-  group('the month keeps its year at any text size', () {
-    // The month moved into the app bar, between two icon buttons, which is a
-    // far tighter box than the full-width row it replaced. On a 320px phone at
-    // 200% text "September 2024" wants 216px and is given 184, so without a
-    // second line the year is what gets dropped -- and the year is the half
-    // that matters when paging across January.
-    //
-    // Checked rather than clamped: the comment on the day grid promises that
-    // everything outside it, the month included, still scales all the way.
-    for (final month in [9, 11, 12]) {
-      for (final width in [320.0, 400.0]) {
-        testWidgets('month $month at 200% on ${width.toInt()}px', (
-          tester,
-        ) async {
-          final day = aDate(2024, month, 15);
-          await pumpApp(
-            tester,
-            CalendarScreen(
-              data: data(now: day),
-              grid: MonthGrid.of(day, firstWeekday: 1),
-              onSelectDay: (_) {},
-            ),
-            locale: const Locale('de'),
-            textScale: 2,
-            surface: Size(width, 900),
-          );
+  group('text', () {
+    testWidgets('a month says nothing beyond its name', (tester) async {
+      await pump(
+        tester,
+        data(
+          periodStarts: {aDate(2024, 5, 3)},
+          flowByDay: {
+            for (var d = 3; d <= 7; d++)
+              aDate(2024, 5, d): FlowIntensity.medium,
+          },
+          predicted: PredictedPeriod(
+            earliest: aDate(2024, 5, 29),
+            latest: aDate(2024, 6, 2),
+          ),
+        ),
+      );
+      expect(find.textContaining('Period'), findsNothing);
+      expect(find.textContaining('estimated'), findsNothing);
+    });
 
-          final title = find.descendant(
-            of: find.byType(AppBar),
-            matching: find.byType(Text),
-          );
-          final paragraph = tester.renderObject<RenderParagraph>(title.first);
-          expect(
-            paragraph.didExceedMaxLines,
-            isFalse,
-            reason:
-                'the month title is truncated at 200% text on '
-                '${width.toInt()}px',
-          );
+    testWidgets('not even for the fertile window, whose caveat lives in the '
+        'legend, the preview and the switch', (tester) async {
+      await pump(
+        tester,
+        data(
+          fertileWindow: FertileWindowEstimate(
+            earliest: aDate(2024, 5, 10),
+            latest: aDate(2024, 5, 19),
+          ),
+        ),
+      );
+      expect(
+        find.textContaining('Not suitable for preventing pregnancy'),
+        findsNothing,
+      );
+    });
 
-          // Both halves are needed and only this catches the second. Letting
-          // the text take a second line without growing the bar to hold it
-          // puts the title at -9..65 inside a 0..56 bar: it spills out of both
-          // ends and is clipped, and nothing throws. A test that only asked
-          // whether the paragraph was truncated passed that happily.
-          final bar = tester.getRect(find.byType(AppBar));
-          final rect = tester.getRect(title.first);
-          expect(
-            rect.top >= bar.top && rect.bottom <= bar.bottom,
-            isTrue,
-            reason:
-                'the month title is drawn outside the app bar at 200% text on '
-                '${width.toInt()}px: title $rect, bar $bar',
-          );
-        });
+    testWidgets('a pregnancy test carries a ± beside any heart, and says so', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        CalendarViewData(
+          today: today,
+          loggedDays: {aDate(2024, 5, 9), aDate(2024, 5, 10)},
+          sexDays: {aDate(2024, 5, 9)},
+          pregnancyTestDays: {aDate(2024, 5, 9), aDate(2024, 5, 10)},
+        ),
+      );
+      expect(find.byType(PregnancyTestMark), findsNWidgets(2));
+      expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+      expect(day(r'^May 9, 2024.*Sex.*Pregnancy test'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('a day she had sex carries a heart and says so', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pump(
+        tester,
+        CalendarViewData(
+          today: today,
+          loggedDays: {aDate(2024, 5, 9)},
+          sexDays: {aDate(2024, 5, 9)},
+        ),
+      );
+      expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+      expect(day(r'^May 9, 2024.*Sex'), findsOneWidget);
+      handle.dispose();
+    });
+  });
+
+  group('the legend', () {
+    testWidgets('names every marker in words', (tester) async {
+      await pump(tester, data());
+      await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+      await tester.pumpAndSettle();
+      for (final label in [
+        'What the marks mean',
+        'Period',
+        'Estimated period',
+        'Today',
+        'Logged',
+        'Sex',
+        'Pregnancy test',
+      ]) {
+        expect(find.text(label), findsWidgets, reason: label);
       }
+      expect(find.text('Estimated fertile window'), findsNothing);
+    });
+
+    testWidgets('names the fertile window, with its caveat, when it shows', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        data(
+          fertileWindow: FertileWindowEstimate(
+            earliest: aDate(2024, 5, 10),
+            latest: aDate(2024, 5, 19),
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(CupertinoIcons.info_circle));
+      await tester.pumpAndSettle();
+      expect(find.text('Estimated fertile window'), findsOneWidget);
+      expect(
+        find.textContaining('Not suitable for preventing pregnancy'),
+        findsWidgets,
+      );
+    });
+  });
+
+  group('the filter', () {
+    CalendarViewData marked() => CalendarViewData(
+      today: today,
+      loggedDays: {aDate(2024, 5, 9), aDate(2024, 5, 10), aDate(2024, 5, 11)},
+      sexDays: {aDate(2024, 5, 9)},
+      pregnancyTestDays: {aDate(2024, 5, 10)},
+    );
+
+    double opacityOf(WidgetTester tester, String pattern) {
+      final cell = find.ancestor(
+        of: find.text(pattern),
+        matching: find.byType(AnimatedOpacity),
+      );
+      return tester.widget<AnimatedOpacity>(cell.first).opacity;
     }
+
+    Future<void> choose(WidgetTester tester, String option) async {
+      await tester.tap(find.bySemanticsLabel('Filter'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(option).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('opens a menu with every option', (tester) async {
+      await pump(tester, marked());
+      await tester.tap(find.bySemanticsLabel('Filter'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show everything'), findsOneWidget);
+      expect(find.widgetWithText(MenuItemButton, 'Sex'), findsOneWidget);
+      expect(
+        find.widgetWithText(MenuItemButton, 'Pregnancy test'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sex fades every other day, and says it is on', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Sex');
+      expect(opacityOf(tester, '9'), 1);
+      expect(opacityOf(tester, '10'), lessThan(1));
+      expect(opacityOf(tester, '17'), 1, reason: 'today stays');
+      expect(find.bySemanticsLabel('Clear filter'), findsOneWidget);
+    });
+
+    testWidgets('pregnancy test picks out the test days', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Pregnancy test');
+      expect(opacityOf(tester, '10'), 1);
+      expect(opacityOf(tester, '9'), lessThan(1));
+    });
+
+    testWidgets('the tag clears it', (tester) async {
+      await pump(tester, marked());
+      await choose(tester, 'Sex');
+      await tester.tap(find.bySemanticsLabel('Clear filter'));
+      await tester.pumpAndSettle();
+      expect(opacityOf(tester, '10'), 1);
+      expect(find.bySemanticsLabel('Clear filter'), findsNothing);
+    });
+  });
+
+  group('tapping', () {
+    testWidgets('opens the day that was tapped', (tester) async {
+      final handle = tester.ensureSemantics();
+      final opened = <CycleDate>[];
+      await pump(tester, data(), onSelectDay: opened.add);
+      await tester.tap(day(r'^May 6, 2024'));
+      expect(opened, [aDate(2024, 5, 6)]);
+      handle.dispose();
+    });
+
+    testWidgets('opens a future day too, which says it has not happened', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      final opened = <CycleDate>[];
+      await pump(tester, data(), onSelectDay: opened.add);
+      await tester.tap(day(r'^May 20, 2024'));
+      expect(opened, [aDate(2024, 5, 20)]);
+      expect(day(r'^May 20, 2024.*Not yet'), findsOneWidget);
+      handle.dispose();
+    });
+
+    testWidgets('still allows today itself', (tester) async {
+      final handle = tester.ensureSemantics();
+      final opened = <CycleDate>[];
+      await pump(tester, data(), onSelectDay: opened.add);
+      await tester.tap(day(r'^May 17, 2024'));
+      expect(opened, [today]);
+      handle.dispose();
+    });
+  });
+
+  group('layout', () {
+    testWidgets('does not overflow at 160% text', (tester) async {
+      await pump(tester, data(), textScale: 1.6);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('handles February in a leap year', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, data(on: aDate(2024, 2, 10)));
+      expect(day(r'^February 29, 2024'), findsOneWidget);
+      handle.dispose();
+    });
+  });
+
+  group('the year view', () {
+    Future<void> zoomOut(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Year view'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('zooms out to twelve months of the year', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+
+      expect(find.text('2024'), findsOneWidget);
+      expect(find.bySemanticsLabel('January 2024'), findsOneWidget);
+      expect(find.bySemanticsLabel('December 2024'), findsOneWidget);
+      // The months' own marks are not repeated day by day.
+      expect(day(r'^May 17, 2024'), findsNothing);
+    });
+
+    testWidgets('a month opens at the top of the month view', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+      await tester.tap(find.bySemanticsLabel('February 2024'));
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Year view'), findsOneWidget);
+      expect(day(r'^February 1, 2024'), findsOneWidget);
+      expect(day(r'^May 17, 2024'), findsNothing);
+    });
+
+    testWidgets('Today comes back from anywhere', (tester) async {
+      await pump(tester, data());
+      await zoomOut(tester);
+      await tester.tap(find.bySemanticsLabel('February 2024'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Today'));
+      await tester.pumpAndSettle();
+
+      expect(day(r'^May 17, 2024'), findsOneWidget);
+    });
+
+    testWidgets('a pinch zooms out, and back in to the same month', (
+      tester,
+    ) async {
+      await pump(tester, data());
+      final centre = tester.getCenter(find.byType(CustomScrollView));
+
+      final a = await tester.startGesture(centre - const Offset(0, 120));
+      final b = await tester.startGesture(centre + const Offset(0, 120));
+      await a.moveTo(centre - const Offset(0, 40));
+      await b.moveTo(centre + const Offset(0, 40));
+      await a.up();
+      await b.up();
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Month view'), findsOneWidget);
+
+      final c = await tester.startGesture(centre - const Offset(0, 40));
+      final d = await tester.startGesture(centre + const Offset(0, 40));
+      await c.moveTo(centre - const Offset(0, 140));
+      await d.moveTo(centre + const Offset(0, 140));
+      await c.up();
+      await d.up();
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Year view'), findsOneWidget);
+      expect(day(r'^May 17, 2024'), findsOneWidget);
+    });
+
+    testWidgets('fits at the largest text size', (tester) async {
+      await pump(tester, data(), textScale: 2);
+      await zoomOut(tester);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

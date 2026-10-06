@@ -92,44 +92,23 @@ adding a symptom must never require a migration.
 
 Allowed:
 
-`drift`, `sqlite3`, `path_provider`,
+`drift`, `sqlite3_flutter_libs`, `sqlcipher_flutter_libs`, `path_provider`,
 `flutter_riverpod`, `freezed`, `json_serializable`, `go_router`, `fl_chart`,
 `flutter_local_notifications`, `timezone`, `local_auth`, `health`,
 `in_app_purchase`, `intl`, `flutter_localizations`, `pdf`, `printing`,
 `share_plus`, `file_picker`, `flutter_secure_storage`, `mocktail`,
-`golden_toolkit`
+`golden_toolkit`, `cupertino_icons` (approved 2026-09-25: an icon font, no code)
 
 `flutter_secure_storage` holds the database encryption key in the Android
 Keystore and the iOS Keychain. Nothing else on this list can store a secret —
 `local_auth` only prompts. Keep it behind the `DatabaseKeyStore` interface so
 nothing else in the codebase depends on it directly.
 
-**Encryption comes from `hooks.user_defines` in `pubspec.yaml`, not from a
-package:**
-
-```yaml
-hooks:
-  user_defines:
-    sqlite3:
-      source: sqlite3mc
-```
-
-sqlite3 3.x loads its native library through Dart build hooks. It does **not**
-consult `sqlcipher_flutter_libs` or `sqlite3_flutter_libs`; adding either back
-links a library nothing uses and makes the app look encrypted while it is not.
-Neither belongs in this project.
-
-This is the most dangerous failure mode in the codebase, because it is silent.
-An unknown pragma is a no-op in SQLite, so on a plain build `PRAGMA key`
-succeeds, changes nothing, and every query works perfectly against a plaintext
-file. Nothing fails. Nothing warns. A green build proves only that the app
-links, never which library it linked.
-
-It has already happened once: schema v1 shipped configured the old way and wrote
-its database in the clear. Two things now stop a repeat, and both must stay:
-`applyKeyAndVerify` refuses to open a database when `PRAGMA cipher` returns
-nothing, and `open_database_test.dart` writes a file, reopens it without the
-key, and asserts the plaintext is not on disk. **Do not weaken either.**
+**Never ship `sqlite3_flutter_libs` and `sqlcipher_flutter_libs` together.** Both
+provide a native sqlite3, and the plain one can win at link time. The result is
+an unencrypted database that behaves completely normally, so nothing fails and
+nothing warns you. This app uses `sqlcipher_flutter_libs` alone; if you see
+`sqlite3_flutter_libs` appear in `pubspec.lock`, that is a bug, not a detail.
 
 **Forbidden, without exception:**
 
@@ -144,6 +123,14 @@ The Android release manifest must NOT declare `android.permission.INTERNET`.
 This makes the promise technically verifiable and makes any accidental network
 dependency fail loudly at build time. If a build breaks because something wants
 INTERNET, remove the dependency — do not add the permission.
+
+**One known exception, approved 2026-09-25:** `timezone` (allowlisted, and
+required by `flutter_local_notifications`) declares `http` as a dependency for
+its web-only data loader, so `http` appears in `pubspec.lock`. The app never
+imports it. `test/network_guard_test.dart` walks every import reachable from
+`lib/main.dart` and fails if any forbidden package is among them; that test, not
+the lockfile, is the check. Do not import `package:timezone/browser.dart` or
+`package:timezone/data/*` — the app uses only the built-in `tz.UTC`.
 
 Before adding ANY new package, ask the human first.
 
@@ -178,7 +165,10 @@ Instead:
 - Predictions are windows, never single dates. "26.–30." not "28th".
 - Say "estimated", "based on your entries", "usually".
 - The fertile window view always carries a visible note that it is an estimate and
-  not suitable for contraception.
+  not suitable for contraception. In the calendar (owner's decision, 2026-09-26)
+  that note is a dialog she confirms when turning the window on, plus the text
+  beside the switch, the ⓘ legend and each fertile day's preview, rather than
+  a line under every month.
 - Irregularity hints are phrased as "this might be worth mentioning to a doctor",
   never as a finding.
 

@@ -1,329 +1,401 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:period/presentation/log/log_entry_screen.dart';
 import 'package:period/data/database/database.dart';
-import 'package:period/domain/models/clock.dart';
-import 'package:period/domain/models/reminder_schedule.dart';
-import 'package:period/presentation/providers.dart';
+import 'package:period/domain/models/cycle_mode.dart';
+import 'package:period/domain/models/day_entry.dart';
 import 'package:period/presentation/today/today_page.dart';
 
 import '../support/database.dart';
 import '../support/dates.dart';
 import '../support/fixed_clock.dart';
-import '../support/reminders.dart';
+import '../support/models.dart';
 import '../support/widgets.dart';
 
-/// The whole loop, against a real database.
+/// Covers the page that connects the Today screen to the database.
 ///
-/// Every other test in this project checks one layer. This one checks that they
-/// are actually connected: tap the button, record a period start, and watch the
-/// number on the screen change. Until this existed the app had three working
-/// parts and no proof they were wired to each other.
+/// These go through the real DAO against an in-memory database rather than a
+/// mock, because what is being checked is that logging a day actually changes
+/// what the next read computes -- section 4's whole design. A mocked DAO would
+/// assert that a method was called and prove nothing about that.
 void main() {
-  late AppDatabase db;
-  late FixedClock clock;
-  late FakeReminders reminders;
+  late AppDatabase database;
+  final today = aDate(2024, 5, 17);
 
-  setUp(() {
-    db = aDatabase();
-    clock = FixedClock(aDate(2024, 5, 17));
-    reminders = FakeReminders();
-  });
-  // No tearDown closing the database: pumpWithDatabase closes it in the right
-  // order relative to unmounting the widget tree.
+  setUp(() => database = aDatabase());
+  tearDown(() => database.close());
 
-  Future<void> pumpToday(WidgetTester tester) async {
-    await pumpWithDatabase(
+  Future<void> pumpPage(WidgetTester tester, {Locale? locale}) async {
+    await pumpApp(
       tester,
-      const TodayPage(),
-      database: db,
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-        clockProvider.overrideWithValue(clock),
-        remindersProvider.overrideWithValue(reminders),
-      ],
+      TodayPage(
+        logDao: database.logDao,
+        settingsDao: database.settingsDao,
+        clock: FixedClock(today),
+      ),
+      locale: locale ?? const Locale('en'),
     );
   }
 
-  Future<void> logPeriodStart(WidgetTester tester) async {
-    await tester.tap(find.text('Log today'));
-    await settleDatabase(tester);
-    await tester.tap(find.byType(Switch));
-    await settleDatabase(tester);
-    await tester.tap(find.text('Save'));
-    await settleDatabase(tester);
-  }
-
-  testWidgets('a fresh install asks for more data rather than guessing', (
-    tester,
-  ) async {
-    await pumpToday(tester);
-    expect(find.text('No cycle yet'), findsOneWidget);
-    expect(
-      find.textContaining('before an estimate is possible'),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('marking a period start makes the cycle day appear', (
-    tester,
-  ) async {
-    await pumpToday(tester);
-    expect(find.text('No cycle yet'), findsOneWidget);
-
-    await logPeriodStart(tester);
-
-    // The whole point: the write reached the database, the stream re-emitted,
-    // and the derived value recomputed without anything being cached.
-    expect(find.text('Day 1'), findsOneWidget);
-  });
-
-  testWidgets('the cycle day counts on from a start logged earlier', (
-    tester,
-  ) async {
-    await db.logDao.addPeriodStart(aDate(2024, 5, 1));
-    await pumpToday(tester);
-    expect(find.text('Day 17'), findsOneWidget);
-  });
-
-  testWidgets('an estimate appears once there are enough cycles', (
-    tester,
-  ) async {
-    for (final start in [
-      aDate(2024, 3, 1),
-      aDate(2024, 3, 29),
-      aDate(2024, 4, 26),
-    ]) {
-      await db.logDao.addPeriodStart(start);
-    }
-    await pumpToday(tester);
-
-    expect(find.text('Next period'), findsOneWidget);
-    expect(find.text('Estimated, based on your entries'), findsOneWidget);
-    expect(find.textContaining('before an estimate is possible'), findsNothing);
-  });
-
-  testWidgets('a new start changes the estimate immediately', (tester) async {
-    // Section 4's whole design: nothing derived is stored, so the moment a
-    // start is recorded every number on screen is recomputed from scratch.
-    // 28 days apart, and today is 28 days after the second, so marking today
-    // gives two consistent cycles rather than a wildly variable pair.
-    for (final start in [aDate(2024, 3, 22), aDate(2024, 4, 19)]) {
-      await db.logDao.addPeriodStart(start);
-    }
-    await pumpToday(tester);
-    expect(
-      find.textContaining('before an estimate is possible'),
-      findsOneWidget,
-      reason: 'one completed cycle is not enough to estimate from',
-    );
-
-    await logPeriodStart(tester);
-
-    expect(find.text('Next period'), findsOneWidget);
-    expect(find.text('Estimated, based on your entries'), findsOneWidget);
-  });
-
-  testWidgets('what was logged is there when the sheet reopens', (
-    tester,
-  ) async {
-    await pumpToday(tester);
-
-    await tester.tap(find.text('Log today'));
-    await settleDatabase(tester);
-    await tester.tap(find.text('Medium'));
-    await tester.tap(find.text('Cramps'));
-    await tester.enterText(find.byType(TextField), 'sore');
-    await settleDatabase(tester);
-    await tester.tap(find.text('Save'));
-    await settleDatabase(tester);
-
-    await tester.tap(find.text('Log today'));
-    await settleDatabase(tester);
-
-    expect(find.text('sore'), findsOneWidget);
-    expect(
-      tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Medium'))
-          .selected,
-      isTrue,
-    );
-  });
-
-  testWidgets('unmarking a period start removes the cycle again', (
-    tester,
-  ) async {
-    await pumpToday(tester);
-    await logPeriodStart(tester);
-    expect(find.text('Day 1'), findsOneWidget);
-
-    // Reopen and switch it back off.
-    await tester.tap(find.text('Log today'));
-    await settleDatabase(tester);
-    await tester.tap(find.byType(Switch));
-    await settleDatabase(tester);
-    await tester.tap(find.text('Save'));
-    await settleDatabase(tester);
-
-    expect(find.text('No cycle yet'), findsOneWidget);
-  });
-
-  testWidgets('logging a day without marking it does not start a cycle', (
-    tester,
-  ) async {
-    // Recording symptoms is not the same as saying a period began. Section 4
-    // treats only an explicit mark as a cycle boundary.
-    await pumpToday(tester);
-    await tester.tap(find.text('Log today'));
-    await settleDatabase(tester);
-    await tester.tap(find.text('Cramps'));
-    await settleDatabase(tester);
-    await tester.tap(find.text('Save'));
-    await settleDatabase(tester);
-
-    expect(find.text('No cycle yet'), findsOneWidget);
-    expect(await db.logDao.entryOn(aDate(2024, 5, 17)), isNotNull);
-  });
-
-  group('feedback after saving', () {
-    testWidgets('confirms the save', (tester) async {
-      // Section: interaction. The sheet closing is not, on its own, evidence
-      // that anything was written.
-      await pumpToday(tester);
-      await logPeriodStart(tester);
-      expect(find.text('Saved'), findsOneWidget);
-    });
-
-    testWidgets('offers undo when a period start was removed', (tester) async {
-      // Removing a start silently changes every estimate on the screen. It is
-      // the one destructive thing this sheet can do, so it gets a way back.
-      await pumpToday(tester);
-      await logPeriodStart(tester);
-      expect(find.text('Day 1'), findsOneWidget);
-
-      await tester.tap(find.text('Log today'));
-      await settleDatabase(tester);
-      await tester.tap(find.byType(Switch));
-      await settleDatabase(tester);
-      await tester.tap(find.text('Save'));
-      await settleDatabase(tester);
-
-      expect(find.text('No cycle yet'), findsOneWidget);
-      expect(find.text('Undo'), findsOneWidget);
-    });
-
-    testWidgets('undo restores the period start', (tester) async {
-      await pumpToday(tester);
-      await logPeriodStart(tester);
-
-      await tester.tap(find.text('Log today'));
-      await settleDatabase(tester);
-      await tester.tap(find.byType(Switch));
-      await settleDatabase(tester);
-      await tester.tap(find.text('Save'));
-      await settleDatabase(tester);
-      expect(find.text('No cycle yet'), findsOneWidget);
-
-      await tester.tap(find.text('Undo'));
-      await settleDatabase(tester);
-
-      expect(find.text('Day 1'), findsOneWidget);
-      expect(await db.logDao.allPeriodStarts(), hasLength(1));
-    });
-
-    testWidgets('offers no undo when nothing was removed', (tester) async {
-      // Undo on an ordinary save would be noise, and would suggest something
-      // destructive happened when it did not.
-      await pumpToday(tester);
-      await tester.tap(find.text('Log today'));
-      await settleDatabase(tester);
-      await tester.tap(find.text('Cramps'));
-      await settleDatabase(tester);
-      await tester.tap(find.text('Save'));
-      await settleDatabase(tester);
-
-      expect(find.text('Saved'), findsOneWidget);
-      expect(find.text('Undo'), findsNothing);
-    });
-  });
-
-  group('a reminder she no longer needs', () {
-    /// Reminders on, every day, so today is always a reminder day.
-    Future<void> givenDailyReminder() => db.settingsDao.writeReminderSchedule(
-      const ReminderSchedule(enabled: true),
-    );
-
-    testWidgets('logging today drops it', (tester) async {
-      // docs/cycle-logic.md section 7: a reminder to do a thing already done is
-      // noise, and noise is what gets an app's notifications switched off
-      // entirely -- taking the useful ones with it.
-      await givenDailyReminder();
-      await pumpToday(tester);
-      await logPeriodStart(tester);
-
-      expect(reminders.skipped, [aDate(2024, 5, 17)]);
-    });
-
-    // Logging an earlier day must NOT drop tonight's reminder. That case lives
-    // in calendar_page_test.dart, because this screen can only ever log today.
-
-    testWidgets('nothing is dropped when reminders are off', (tester) async {
-      await pumpToday(tester);
-      await logPeriodStart(tester);
-
-      expect(reminders.skipped, isEmpty);
-    });
-
-    testWidgets('nothing is dropped on a weekday she did not choose', (
+  group('a fresh install', () {
+    testWidgets('says nothing is logged rather than showing an empty card', (
       tester,
     ) async {
-      // 2024-05-17 is a Friday, which is 5; this schedule is Mondays only.
-      await db.settingsDao.writeReminderSchedule(
-        const ReminderSchedule(enabled: true, weekdays: {1}),
-      );
-      await pumpToday(tester);
-      await logPeriodStart(tester);
+      await pumpPage(tester);
 
-      expect(reminders.skipped, isEmpty);
+      expect(find.text('Nothing logged today'), findsOneWidget);
+      expect(find.text('No cycle yet'), findsOneWidget);
+    });
+
+    testWidgets('offers a labelled way to add an entry', (tester) async {
+      await pumpPage(tester);
+      expect(find.text('Add entry'), findsOne);
     });
   });
 
-  group('when the data cannot be opened', () {
-    testWidgets('explains, and never shows the raw exception', (tester) async {
-      // The likeliest real cause is a failed decrypt. A user seeing that needs
-      // to know her entries are still on the device and that she can retry --
-      // not a SqliteException. Section 8 also puts every visible string in the
-      // ARB files, which a formatted error object can never be.
-      await pumpWithDatabase(
-        tester,
-        const TodayPage(),
-        database: db,
-        overrides: [
-          databaseProvider.overrideWithValue(db),
-          clockProvider.overrideWithValue(clock),
-          periodStartsProvider.overrideWith(
-            (ref) =>
-                throw StateError('SqliteException(26): file is not a database'),
-          ),
-        ],
+  group('what is already stored', () {
+    testWidgets('is summarised for today', (tester) async {
+      await database.logDao.saveEntry(
+        aDayEntry(
+          date: today,
+          flow: FlowIntensity.light,
+          note: 'a quiet day',
+          symptoms: {aSymptom(key: 'cramps')},
+        ),
       );
+      await database.logDao.addPeriodStart(today);
 
-      expect(find.text('Period. could not open your data'), findsOneWidget);
-      expect(find.text('Try again'), findsOneWidget);
-      expect(find.textContaining('SqliteException'), findsNothing);
-      expect(find.textContaining('not a database'), findsNothing);
+      await pumpPage(tester);
+
+      expect(find.text('Period started today'), findsOneWidget);
+      expect(find.text('Flow: Light'), findsOneWidget);
+      expect(find.text('Cramps'), findsOneWidget);
+      expect(find.text('a quiet day'), findsOneWidget);
+    });
+
+    testWidgets('counts the cycle day from the last recorded start', (
+      tester,
+    ) async {
+      await database.logDao.addPeriodStart(today.subtractDays(4));
+      await pumpPage(tester);
+
+      // The start itself is day 1, so four days later is day 5.
+      expect(find.bySemanticsLabel('Cycle day 5'), findsOneWidget);
+    });
+
+    testWidgets('shows a period start with no entry on it', (tester) async {
+      // A day can be marked as a start and hold nothing else. The summary has
+      // to say so rather than reading as an empty day.
+      await database.logDao.addPeriodStart(today);
+      await pumpPage(tester);
+
+      expect(find.text('Period started today'), findsOneWidget);
+      expect(find.text('Nothing logged today'), findsNothing);
+    });
+
+    testWidgets('estimates a window once there are enough cycles', (
+      tester,
+    ) async {
+      for (final start in regularPeriodStarts(
+        from: today.subtractDays(84),
+        length: 28,
+        count: 4,
+      )) {
+        await database.logDao.addPeriodStart(start);
+      }
+
+      await pumpPage(tester);
+
+      // Section 8: an estimate is always a range, and always qualified.
+      expect(find.textContaining('–'), findsWidgets);
+      expect(find.text('Estimated, based on your entries'), findsOneWidget);
     });
   });
 
-  test('the clock provider is the only source of today', () {
-    // Section 3 allows one DateTime.now(); this keeps the UI honest about it.
-    final container = ProviderContainer(
-      overrides: [
-        clockProvider.overrideWithValue(FixedClock(aDate(2030, 1, 1))),
-      ],
+  group('logging through the screen', () {
+    testWidgets('writes a period start and recomputes the cycle day', (
+      tester,
+    ) async {
+      await pumpPage(tester);
+      expect(find.text('No cycle yet'), findsOneWidget);
+
+      await tester.tap(find.text('Add entry'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(await database.logDao.allPeriodStarts(), [today]);
+      // Recomputed on read, not stored: the start is day 1.
+      expect(find.bySemanticsLabel('Cycle day 1'), findsOneWidget);
+      expect(find.text('Period started today'), findsOneWidget);
+    });
+
+    testWidgets('writes flow, symptoms and a note', (tester) async {
+      await pumpPage(tester);
+
+      await tester.tap(find.text('Add entry'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Heavy'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(EntryOption, 'Headache'));
+      await tester.pumpAndSettle();
+      // The note is the last section and sits below the fold.
+      await tester.scrollUntilVisible(
+        find.byKey(noteFieldKey),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(find.byKey(noteFieldKey), 'long day');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final stored = await database.logDao.entryOn(today);
+      expect(stored?.flow, FlowIntensity.heavy);
+      expect(stored?.note, 'long day');
+      expect(stored?.symptoms, contains(aSymptom(key: 'headache')));
+    });
+
+    testWidgets('unmarking a period start removes it', (tester) async {
+      // The correction path. Section 4 rests on this being cheap and on nothing
+      // derived surviving it.
+      await database.logDao.addPeriodStart(today);
+      await pumpPage(tester);
+      expect(find.bySemanticsLabel('Cycle day 1'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(await database.logDao.allPeriodStarts(), isEmpty);
+      expect(find.text('No cycle yet'), findsOneWidget);
+    });
+
+    testWidgets('deleting clears the entry and the period start', (
+      tester,
+    ) async {
+      // Section 9 requires deletion to actually delete, and the confirmation
+      // text promises the start goes with it.
+      await database.logDao.saveEntry(
+        aDayEntry(date: today, flow: FlowIntensity.medium),
+      );
+      await database.logDao.addPeriodStart(today);
+      await pumpPage(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Edit'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Delete entry'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Delete entry'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(await database.logDao.entryOn(today), isNull);
+      expect(await database.logDao.allPeriodStarts(), isEmpty);
+      expect(find.text('Nothing logged today'), findsOneWidget);
+    });
+
+    testWidgets('backing out without saving changes nothing', (tester) async {
+      await pumpPage(tester);
+
+      await tester.tap(find.text('Add entry'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Heavy'));
+      await tester.pumpAndSettle();
+      // The sheet's Cancel, which is what backing out is on iOS. Something
+      // was changed, so it asks first.
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Discard changes'));
+      await tester.pumpAndSettle();
+
+      expect(await database.logDao.entryOn(today), isNull);
+      expect(find.text('Nothing logged today'), findsOneWidget);
+    });
+  });
+
+  group('German', () {
+    testWidgets('renders the summary without an English string', (
+      tester,
+    ) async {
+      await database.logDao.addPeriodStart(today);
+      await pumpPage(tester, locale: const Locale('de'));
+
+      expect(find.text('Heute eingetragen'), findsOneWidget);
+      expect(find.text('Periode hat heute begonnen'), findsOneWidget);
+      expect(find.text('Eintrag hinzufügen'), findsOneWidget);
+    });
+  });
+
+  group('the stored settings', () {
+    Future<void> logRegularHistory() async {
+      for (final start in regularPeriodStarts(
+        from: today.subtractDays(84),
+        length: 28,
+        count: 4,
+      )) {
+        await database.logDao.addPeriodStart(start);
+      }
+    }
+
+    testWidgets('pregnancy turns the estimate off and says why', (
+      tester,
+    ) async {
+      await logRegularHistory();
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(mode: CycleMode.pregnancy),
+      );
+      await pumpPage(tester);
+
+      expect(
+        find.textContaining('Estimates are off during pregnancy'),
+        findsOne,
+      );
+      expect(find.text('Estimated, based on your entries'), findsNothing);
+    });
+
+    testWidgets('pregnancy hides the usual length and counts weeks instead', (
+      tester,
+    ) async {
+      await logRegularHistory();
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(mode: CycleMode.pregnancy),
+      );
+      await pumpPage(tester);
+
+      // The last start is today: 0+0, in place of cycle day 1.
+      expect(
+        find.bySemanticsLabel('Pregnancy: 0 weeks and 0 days'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('usually'), findsNothing);
+    });
+
+    testWidgets('hormonal contraception turns the estimate off and says why', (
+      tester,
+    ) async {
+      await logRegularHistory();
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(mode: CycleMode.hormonalContraception),
+      );
+      await pumpPage(tester);
+
+      expect(find.textContaining('follows your regimen'), findsOne);
+      expect(find.text('Estimated, based on your entries'), findsNothing);
+    });
+
+    testWidgets('the fertile window appears only once opted in', (
+      tester,
+    ) async {
+      await logRegularHistory();
+      await pumpPage(tester);
+      expect(find.text('Estimated fertile window'), findsNothing);
+
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(fertileWindowOptedIn: true),
+      );
+      await tester.pumpWidget(const SizedBox());
+      await pumpPage(tester);
+      await tester.scrollUntilVisible(
+        find.text('Estimated fertile window'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Estimated fertile window'), findsOneWidget);
+      expect(
+        find.textContaining('Not suitable for preventing pregnancy'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('an opted-in fertile window stays hidden without an estimate', (
+      tester,
+    ) async {
+      await logRegularHistory();
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(
+          mode: CycleMode.perimenopause,
+          fertileWindowOptedIn: true,
+        ),
+      );
+      await pumpPage(tester);
+      expect(find.text('Estimated fertile window'), findsNothing);
+    });
+  });
+
+  group('logging the newer kinds', () {
+    testWidgets('mood and sex are stored and summarised', (tester) async {
+      await pumpPage(tester);
+      await tester.tap(find.text('Add entry'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Sex'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.widgetWithText(EntryOption, 'Happy'));
+      await Scrollable.ensureVisible(tester.element(find.text('Sex')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sex'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(EntryOption, 'Protected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      final stored = await database.logDao.entryOn(today);
+      expect(stored!.symptoms.map((symptom) => symptom.key).toSet(), {
+        'mood.happy',
+        'sex.protected',
+      });
+      await tester.scrollUntilVisible(
+        find.text('Sex: Protected'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Mood: Happy'), findsOneWidget);
+    });
+
+    testWidgets('the pill is offered only on hormonal contraception', (
+      tester,
+    ) async {
+      Future<bool> offered() async {
+        await tester.pumpWidget(const SizedBox());
+        await pumpPage(tester);
+        await tester.tap(find.text('Add entry'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Note'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        return find.text('Pill taken').evaluate().isNotEmpty;
+      }
+
+      expect(await offered(), isFalse);
+      await database.settingsDao.saveCycleSettings(
+        const CycleSettings(mode: CycleMode.hormonalContraception),
+      );
+      expect(await offered(), isTrue);
+    });
+  });
+
+  testWidgets('pregnancy mode counts weeks from the last period start', (
+    tester,
+  ) async {
+    await database.logDao.addPeriodStart(today.subtractDays(87));
+    await database.settingsDao.saveCycleSettings(
+      const CycleSettings(mode: CycleMode.pregnancy),
     );
-    addTearDown(container.dispose);
-    expect(container.read(clockProvider), isA<Clock>());
-    expect(container.read(clockProvider).today(), aDate(2030, 1, 1));
+    await pumpPage(tester);
+    expect(find.text('12+3'), findsOneWidget);
   });
 }

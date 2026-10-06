@@ -1,320 +1,313 @@
-import 'dart:io';
+import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/backup/backup_document.dart';
-import '../../data/backup/backup_file.dart';
-import '../../domain/models/cycle_date.dart';
-import '../../domain/models/cycle_mode.dart';
-import '../../domain/models/reminder_schedule.dart';
-import '../../data/erase_everything.dart';
+import '../../data/database/daos/settings_dao.dart';
+import '../../data/system_clock.dart';
+import '../../domain/models/clock.dart';
+import '../../domain/models/profile.dart';
+import '../../domain/models/app_preferences.dart';
+import '../../domain/models/reminder_settings.dart';
 import '../../l10n/app_localizations.dart';
-import '../data_error.dart';
-import '../providers.dart';
-import 'passphrase_dialog.dart';
+import '../grouped_page.dart';
+import '../lock/app_lock.dart';
+import '../reminders/reminder_sync.dart';
+import 'reminders_screen.dart';
 import 'settings_screen.dart';
 
-/// The settings screen connected to the database.
+/// Loads the stored settings, hands them to [SettingsScreen], and saves every
+/// change as it is made.
 ///
-/// Stateful for one reason: the notification permission is the only thing this
-/// screen shows that the *operating system* can change while the app is in the
-/// background -- which is exactly what happens when she follows the warning to
-/// her phone's settings and comes back. The shell keeps every tab mounted in an
-/// IndexedStack, so without a resume hook the answer read at launch would stand
-/// for the rest of the session and the warning would outlive the problem.
-class SettingsPage extends ConsumerStatefulWidget {
+/// Saved immediately, with no Save button, as iOS Settings does: a switch that
+/// looks on but is not yet stored is a state the user cannot see.
+class SettingsPage extends StatefulWidget {
   /// Creates the page.
-  const SettingsPage({super.key});
+  const SettingsPage({
+    required this.settingsDao,
+    this.onPreferencesChanged,
+    this.appLock,
+    this.reminderSync,
+    this.onScheduleAffected,
+    this.onEraseEverything,
+    this.offerWidget = false,
+    this.backLabel,
+    this.clock = const SystemClock(),
+    super.key,
+  });
+
+  /// Supplies today, for the reminders' dates.
+  final Clock clock;
+
+  /// The title of the screen Settings was opened from, for its back button.
+  final String? backLabel;
+
+  /// Whether this platform has the home-screen widget to configure.
+  final bool offerWidget;
+
+  /// Deletes all data. Null hides the row.
+  final Future<void> Function(String done, String failed)? onEraseEverything;
+
+  /// Asks for notification permission. Null hides the reminders group.
+  final ReminderSync? reminderSync;
+
+  /// Told after any change that affects what lives outside the app: the
+  /// reminders, the lock and the widget.
+  final VoidCallback? onScheduleAffected;
+
+  /// The app lock. Null hides its switch, as for a device-less test.
+  final AppLock? appLock;
+
+  /// Reads and writes the settings.
+  final SettingsDao settingsDao;
+
+  /// Told once a changed appearance or language is stored, so the app can
+  /// apply it.
+  final ValueChanged<AppPreferences>? onPreferencesChanged;
 
   @override
-  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+  State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends ConsumerState<SettingsPage>
-    with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
+class _SettingsPageState extends State<SettingsPage> {
+  bool _loaded = false;
+  AppPreferences _preferences = const AppPreferences();
+  Object? _error;
+
+  /// Set when turning the lock on failed for want of a device passcode.
+  bool _lockUnavailable = false;
+
+  ReminderSettings _reminders = const ReminderSettings();
+
+  /// Her contraception, for the reminders page.
+  ContraceptionMethod? _method;
+
+  /// Rebuilds the reminders page, pushed on top, when its settings change.
+  final _remindersChanged = ValueNotifier<int>(0);
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _remindersChanged.dispose();
     super.dispose();
   }
 
+  Future<void> _openReminders() async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final profile = await widget.settingsDao.profile(
+        currentYear: widget.clock.today().year,
+      );
+      _method = profile.contraception;
+    } on Object {
+      _method = null;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => ValueListenableBuilder<int>(
+          valueListenable: _remindersChanged,
+          builder: (_, _, _) => RemindersScreen(
+            reminders: _reminders,
+            method: _method,
+            today: widget.clock.today(),
+            blocked: _remindersBlocked,
+            onChanged: _changeReminders,
+            backLabel: l10n.settingsTitle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _widgetDetailed = false;
+
+  Future<void> _changeWidgetDetailed(bool detailed) async {
+    setState(() => _widgetDetailed = detailed);
+    await widget.settingsDao.saveWidgetDetailed(detailed: detailed);
+    widget.onScheduleAffected?.call();
+  }
+
+  /// Asks, confirms the owner if the lock is on, then deletes everything.
+  Future<void> _confirmErase() async {
+    final erase = widget.onEraseEverything;
+    if (erase == null) return;
+    final l10n = AppLocalizations.of(context);
+    final isIos = Theme.of(context).platform == TargetPlatform.iOS;
+
+    final confirmed = await showAdaptiveDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog.adaptive(
+        title: Text(l10n.eraseAllQuestion),
+        content: Text(l10n.eraseAllExplanation),
+        actions: isIos
+            ? [
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                CupertinoDialogAction(
+                  isDestructiveAction: true,
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.eraseAllConfirm),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.eraseAllConfirm),
+                ),
+              ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final lock = widget.appLock;
+    if (lock != null && !await lock.confirmOwner(reason: l10n.eraseAllReason)) {
+      return;
+    }
+    await erase(l10n.eraseAllDone, l10n.eraseAllFailed);
+  }
+
+  /// Set when she turned a reminder on but notifications were refused.
+  bool _remindersBlocked = false;
+
+  Future<void> _changeReminders(ReminderSettings next) async {
+    final sync = widget.reminderSync;
+    if (sync == null) return;
+    // Permission is asked for the first time a reminder is turned on, with
+    // the switch she just touched as the explanation.
+    if (next.anyEnabled && !_reminders.anyEnabled) {
+      final granted = await sync.requestPermission();
+      if (!mounted) return;
+      if (!granted) {
+        setState(() => _remindersBlocked = true);
+        _remindersChanged.value++;
+        return;
+      }
+    }
+    final previous = _reminders;
+    setState(() {
+      _reminders = next;
+      _remindersBlocked = false;
+    });
+    _remindersChanged.value++;
+    try {
+      await widget.settingsDao.saveReminderSettings(next);
+      widget.onScheduleAffected?.call();
+    } on Object {
+      if (!mounted) return;
+      setState(() => _reminders = previous);
+      _remindersChanged.value++;
+    }
+  }
+
+  Future<void> _changeLock(bool enabled) async {
+    final lock = widget.appLock;
+    if (lock == null) return;
+    final result = await lock.setEnabled(
+      enabled: enabled,
+      reason: AppLocalizations.of(context).appLockConfirmReason,
+    );
+    if (!mounted) return;
+    setState(() => _lockUnavailable = result == LockChange.unavailable);
+    // The widget shows nothing while the lock is on; tell it.
+    if (result == LockChange.changed) widget.onScheduleAffected?.call();
+  }
+
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Only on the way back in. Re-asking as the app leaves would answer a
-    // question about a phone the user is no longer looking at.
-    if (state == AppLifecycleState.resumed) {
-      ref.invalidate(remindersAllowedProvider);
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final preferences = await widget.settingsDao.appPreferences();
+      final reminders = await widget.settingsDao.reminderSettings();
+      final widgetDetailed = await widget.settingsDao.widgetDetailed();
+      if (!mounted) return;
+      setState(() {
+        _widgetDetailed = widgetDetailed;
+        _reminders = reminders;
+        _error = null;
+        _loaded = true;
+        _preferences = preferences;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    }
+  }
+
+  Future<void> _changePreferences(AppPreferences next) async {
+    final previous = _preferences;
+    setState(() => _preferences = next);
+    try {
+      await widget.settingsDao.saveAppPreferences(next);
+      // Applied only once stored, so the app never shows a theme or language
+      // that would not survive a restart.
+      widget.onPreferencesChanged?.call(next);
+    } on Object {
+      if (!mounted) return;
+      setState(() => _preferences = previous);
+      await _load();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final settings = ref.watch(settingsProvider);
 
-    return settings.when(
-      loading: () =>
-          _frame(l10n, const Center(child: CircularProgressIndicator())),
-      // Reached when the stored mode is one this build cannot read. Showing the
-      // picker with a guessed selection would be worse than showing nothing:
-      // the user would see a mode she never chose and might save over the one
-      // she did.
-      error: (error, stack) => _frame(
-        l10n,
-        DataErrorPanel(onRetry: () => ref.invalidate(settingsProvider)),
-      ),
-      data: (stored) => SettingsScreen(
-        data: SettingsViewData(
-          cycle: stored.cycle,
-          fertileWindowOptedIn: stored.fertileWindowOptedIn,
-          appLockEnabled: stored.appLockEnabled,
-          reminder: stored.reminder,
-        ),
-        lockAvailable: ref.watch(lockAvailableProvider).value ?? false,
-        // Defaults to allowed while the check is in flight. The warning it
-        // controls accuses the operating system of blocking her reminder, and
-        // flashing that up for a frame before the answer arrives would be a
-        // worse lie than saying nothing.
-        remindersAllowed: ref.watch(remindersAllowedProvider).value ?? true,
-        onModeChanged: (mode) => _saveCycle(
-          ref,
-          // The opt-in belongs to perimenopause. Carrying it across a mode
-          // change would leave it silently set, ready to turn estimates on
-          // again the moment she came back -- so it is dropped on the way out.
-          mode == CycleMode.perimenopause
-              ? stored.cycle.copyWith(mode: mode)
-              : CycleSettings(mode: mode),
-        ),
-        onPredictionsOptInChanged: ({required optedIn}) =>
-            _saveCycle(ref, stored.cycle.copyWith(predictionsOptedIn: optedIn)),
-        onFertileWindowChanged: ({required optedIn}) async {
-          await ref
-              .read(databaseProvider)
-              .settingsDao
-              .writeFertileWindowOptIn(optedIn: optedIn);
-          ref.invalidate(settingsProvider);
-        },
-        onAppLockChanged: ({required enabled}) async {
-          await ref
-              .read(databaseProvider)
-              .settingsDao
-              .writeAppLockEnabled(enabled: enabled);
-          ref.invalidate(settingsProvider);
-        },
-        onReminderChanged: (schedule) => _saveReminder(
-          context,
-          ref,
-          schedule,
-          wasEnabled: stored.reminder.enabled,
-        ),
-        onDeleteEverything: () => _deleteEverything(context, ref),
-        onExportBackup: () => _export(context, ref),
-        onRestoreBackup: () => _restore(context, ref),
-      ),
-    );
-  }
-
-  Widget _frame(AppLocalizations l10n, Widget child) => Scaffold(
-    appBar: AppBar(title: Text(l10n.settingsTitle)),
-    body: child,
-  );
-
-  Future<void> _saveCycle(WidgetRef ref, CycleSettings value) async {
-    await ref.read(databaseProvider).settingsDao.writeCycleSettings(value);
-    // One invalidation refreshes the mode here and the estimate on every other
-    // screen together: nothing derived is stored, so there is no cache to keep
-    // in step (section 4).
-    ref.invalidate(settingsProvider);
-  }
-
-  /// Stores the reminder schedule and makes what is scheduled match it.
-  ///
-  /// The permission is asked for here, at the moment she turns reminders on,
-  /// and never at launch -- a notification prompt on first open, before she has
-  /// asked for anything, is the one everyone refuses.
-  Future<void> _saveReminder(
-    BuildContext context,
-    WidgetRef ref,
-    ReminderSchedule schedule, {
-    required bool wasEnabled,
-  }) async {
-    final l10n = AppLocalizations.of(context);
-    final reminders = ref.read(remindersProvider);
-    final clock = ref.read(clockProvider);
-    final database = ref.read(databaseProvider);
-
-    // Only when it is being switched on, and only when it was off before.
-    // Asking again on every change to the time would be its own nuisance, and
-    // on iOS the prompt is shown once ever regardless.
-    final turningOn = schedule.enabled && !wasEnabled;
-    if (turningOn && !await reminders.requestPermission()) {
-      // Refused. The switch stays off rather than springing back with no
-      // explanation, and nothing is written: a stored "on" that can never show
-      // anything is a setting that lies.
-      if (context.mounted) _say(context, l10n.reminderPermissionRefused);
-      return;
-    }
-
-    await database.settingsDao.writeReminderSchedule(schedule);
-    await reminders.applySchedule(
-      schedule,
-      today: clock.today(),
-      now: clock.timeOfDay(),
-      title: l10n.reminderNotificationTitle,
-      body: l10n.reminderNotificationBody,
-    );
-    ref.invalidate(settingsProvider);
-  }
-
-  /// Makes a backup and hands it to the share sheet.
-  Future<void> _export(BuildContext context, WidgetRef ref) async {
-    final l10n = AppLocalizations.of(context);
-    final passphrase = await askForPassphrase(context, confirming: true);
-    if (passphrase == null || !context.mounted) return;
-
-    final today = ref.read(clockProvider).today();
-    final transfer = ref.read(backupTransferProvider);
-    final service = ref.read(backupServiceProvider);
-
-    final box = context.findRenderObject() as RenderBox?;
-    final origin = box == null
-        ? null
-        : box.localToGlobal(Offset.zero) & box.size;
-
-    File? written;
-    try {
-      final file = written = await transfer.fileToWrite(_backupName(today));
-      await service.exportTo(file, today: today, passphrase: passphrase);
-      await transfer.send(file, origin: origin);
-    } on Object {
-      // No space, no permission, no share sheet. She needs to know it did not
-      // happen; which of the three it was would not change what she does next.
-      if (context.mounted) _say(context, l10n.backupFailed);
-      return;
-    } finally {
-      // Deleted whether the share succeeded, failed or was dismissed. The copy
-      // she keeps is wherever she sent it; leaving another one in the app's own
-      // storage is a second copy of her data that nobody asked for, and an
-      // offline file is unlimited guesses at her passphrase.
-      if (written != null && written.existsSync()) written.deleteSync();
-    }
-
-    if (context.mounted) _say(context, l10n.backupCreated);
-  }
-
-  /// Restores from a backup she chooses, after confirming what that replaces.
-  Future<void> _restore(BuildContext context, WidgetRef ref) async {
-    final l10n = AppLocalizations.of(context);
-    final file = await ref.read(backupTransferProvider).choose();
-    if (file == null || !context.mounted) return;
-
-    // Asked before the passphrase, so she can back out without having typed
-    // it, and so the consequence is on screen while she decides.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.replaceEverythingTitle),
-        content: Text(l10n.replaceEverythingBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text(l10n.replaceAction),
+    if (_error != null) {
+      return GroupedPage(
+        title: l10n.settingsTitle,
+        backLabel: widget.backLabel,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(l10n.couldNotOpenData, textAlign: TextAlign.center),
           ),
         ],
-      ),
-    );
-    if (!(confirmed ?? false) || !context.mounted) return;
-
-    final passphrase = await askForPassphrase(context, confirming: false);
-    if (passphrase == null || !context.mounted) return;
-
-    try {
-      await ref
-          .read(backupServiceProvider)
-          .importFrom(file, passphrase: passphrase);
-    } on Object catch (error) {
-      // Everything, not just BackupException. sqlite3.open throws for a file
-      // that cannot be opened read-write -- a read-only file-provider path, a
-      // revoked permission, a temp copy already gone -- and applyKeyAndVerify
-      // throws a StateError on a build with no encryption. Letting those escape
-      // meant the restore appeared to do nothing at all.
-      if (error is! BackupException) {
-        if (context.mounted) _say(context, l10n.backupDamaged);
-        return;
-      }
-      // Four separate messages, because they call for four different next
-      // steps: retype it, pick another file, update the app, or give up on
-      // this file. A single "import failed" would say none of that.
-      if (context.mounted) _say(context, _messageFor(l10n, error.problem));
-      return;
+      );
     }
 
-    _refresh(ref);
-    if (context.mounted) _say(context, l10n.backupRestored);
-  }
+    if (!_loaded) {
+      return GroupedPage(
+        title: l10n.settingsTitle,
+        backLabel: widget.backLabel,
+        children: const [
+          SizedBox(height: 80),
+          Center(child: CircularProgressIndicator.adaptive()),
+        ],
+      );
+    }
 
-  /// A name that sorts and says what it is. No clock time: section 3 keeps
-  /// timestamps out of cycle data, and the hour is not hers to hand over.
-  ///
-  /// The extension is not decoration. Android derives the share intent's MIME
-  /// type from it and iOS derives a UTI; without one, share targets refuse the
-  /// file or rename it, and it is indistinguishable from any other blob in the
-  /// picker on the way back.
-  String _backupName(CycleDate today) =>
-      'period-backup-${today.toIso8601()}$backupFileExtension';
-
-  String _messageFor(AppLocalizations l10n, BackupProblem problem) =>
-      switch (problem) {
-        BackupProblem.couldNotOpen => l10n.backupCouldNotOpen,
-        BackupProblem.notABackup => l10n.backupNotABackup,
-        BackupProblem.newerFormat => l10n.backupNewerVersion,
-        BackupProblem.damaged => l10n.backupDamaged,
-      };
-
-  void _say(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  /// Re-reads everything a restore can have changed.
-  void _refresh(WidgetRef ref) {
-    ref
-      ..invalidate(settingsProvider)
-      ..invalidate(periodStartsProvider)
-      ..invalidate(dayEntryProvider)
-      ..invalidate(loggedDaysProvider);
-  }
-
-  Future<void> _deleteEverything(BuildContext context, WidgetRef ref) async {
-    final l10n = AppLocalizations.of(context);
-    await eraseEverything(
-      ref.read(databaseProvider),
-      documents: ref.read(documentsDirectoryProvider),
+    final lock = widget.appLock;
+    Widget screen() => SettingsScreen(
+      backLabel: widget.backLabel,
+      preferences: _preferences,
+      onPreferencesChanged: _changePreferences,
+      lockEnabled: lock?.enabled,
+      // Held still while the system prompt is up.
+      onLockChanged: lock == null || lock.authenticating ? null : _changeLock,
+      lockUnavailable: _lockUnavailable,
+      reminders: widget.reminderSync == null ? null : _reminders,
+      onOpenReminders: _openReminders,
+      remindersBlocked: _remindersBlocked,
+      widgetDetailed: widget.offerWidget ? _widgetDetailed : null,
+      onWidgetDetailedChanged: _changeWidgetDetailed,
+      onEraseEverything: widget.onEraseEverything == null
+          ? null
+          : _confirmErase,
     );
 
-    // Everything, including the settings rows, the migration copies beside the
-    // database and the freed pages inside it -- so the app comes back as a
-    // fresh install, which is what the confirmation promised and what someone
-    // deleting under pressure needs it to mean. Dropping the rows alone left
-    // her dates in both of those places.
-    _refresh(ref);
-
-    if (!context.mounted) return;
-    _say(context, l10n.everythingDeleted);
+    return lock == null
+        ? screen()
+        : ListenableBuilder(listenable: lock, builder: (_, _) => screen());
   }
 }

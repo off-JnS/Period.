@@ -1,503 +1,192 @@
-import 'dart:ui' show Tristate;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:period/domain/models/cycle_mode.dart';
-import 'package:period/domain/models/reminder_schedule.dart';
+import 'package:period/domain/models/app_preferences.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:period/presentation/settings/settings_screen.dart';
 
 import '../support/widgets.dart';
 
-/// The settings screen as a pure widget.
 void main() {
-  Future<void> pumpSettings(
+  Future<void> pumpScreen(
     WidgetTester tester, {
-    SettingsViewData data = const SettingsViewData(),
-    void Function(CycleMode)? onModeChanged,
-    void Function({required bool optedIn})? onPredictionsOptInChanged,
-    void Function({required bool optedIn})? onFertileWindowChanged,
-    VoidCallback? onDeleteEverything,
-    void Function({required bool enabled})? onAppLockChanged,
-    void Function(ReminderSchedule)? onReminderChanged,
-    bool lockAvailable = true,
-    bool remindersAllowed = true,
-    bool alwaysUse24HourFormat = false,
     Locale locale = const Locale('en'),
-  }) async {
-    await pumpApp(
-      tester,
-      alwaysUse24HourFormat: alwaysUse24HourFormat,
-      // Tall enough to lay the whole list out. A ListView does not build what
-      // is below the fold, so at the default height these finders would miss
-      // the rows at the bottom and report them as absent rather than offscreen.
-      // The real height is what the goldens check.
-      surface: const Size(400, 1500),
-      SettingsScreen(
-        data: data,
-        onModeChanged: onModeChanged ?? (_) {},
-        onPredictionsOptInChanged:
-            onPredictionsOptInChanged ?? ({required optedIn}) {},
-        onFertileWindowChanged:
-            onFertileWindowChanged ?? ({required optedIn}) {},
-        onDeleteEverything: onDeleteEverything ?? () {},
-        onExportBackup: () {},
-        onRestoreBackup: () {},
-        onAppLockChanged: onAppLockChanged ?? ({required enabled}) {},
-        lockAvailable: lockAvailable,
-        remindersAllowed: remindersAllowed,
-        onReminderChanged: onReminderChanged ?? (_) {},
-      ),
-      locale: locale,
+    double textScale = 1,
+  }) => pumpApp(
+    tester,
+    const SettingsScreen(),
+    locale: locale,
+    textScale: textScale,
+  );
+
+  testWidgets('restates that settings stay encrypted on the device', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    await tester.scrollUntilVisible(
+      find.textContaining('stored encrypted on this device'),
+      200,
+      scrollable: find.byType(Scrollable).first,
     );
-  }
+    expect(
+      find.textContaining('stored encrypted on this device'),
+      findsOneWidget,
+    );
+  });
 
-  group('choosing a mode', () {
-    testWidgets('every mode is offered', (tester) async {
-      await pumpSettings(tester);
-      for (final label in [
-        'A natural cycle',
-        'Hormonal contraception',
-        'Pregnant',
-        'Perimenopause',
-      ]) {
-        expect(find.text(label), findsOneWidget);
+  testWidgets('German fits at 200% text size', (tester) async {
+    await pumpScreen(tester, locale: const Locale('de'), textScale: 2);
+    expect(tester.takeException(), isNull);
+    expect(find.text('Einstellungen'), findsWidgets);
+  });
+
+  group('appearance and language', () {
+    Future<List<AppPreferences>> pumpWithPreferences(
+      WidgetTester tester,
+      AppPreferences preferences, {
+      Locale locale = const Locale('en'),
+    }) async {
+      final changes = <AppPreferences>[];
+      await pumpApp(
+        tester,
+        SettingsScreen(
+          preferences: preferences,
+          onPreferencesChanged: changes.add,
+        ),
+        locale: locale,
+      );
+      return changes;
+    }
+
+    Future<void> scrollTo(WidgetTester tester, Finder finder) =>
+        tester.scrollUntilVisible(
+          finder,
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+
+    testWidgets('choosing Dark reports it and keeps the language', (
+      tester,
+    ) async {
+      final changes = await pumpWithPreferences(
+        tester,
+        const AppPreferences(language: LanguageChoice.german),
+        locale: const Locale('de'),
+      );
+      await scrollTo(tester, find.bySemanticsLabel('Dunkel'));
+      await tester.tap(find.bySemanticsLabel('Dunkel'));
+      await tester.pump();
+
+      expect(changes, [
+        const AppPreferences(
+          appearance: AppearanceChoice.dark,
+          language: LanguageChoice.german,
+        ),
+      ]);
+    });
+
+    testWidgets('choosing a language reports it', (tester) async {
+      final changes = await pumpWithPreferences(tester, const AppPreferences());
+      await scrollTo(tester, find.bySemanticsLabel('Deutsch'));
+      await tester.tap(find.bySemanticsLabel('Deutsch'));
+      await tester.pump();
+
+      expect(changes, [const AppPreferences(language: LanguageChoice.german)]);
+    });
+
+    testWidgets('each language is named in itself, whatever the app shows', (
+      tester,
+    ) async {
+      // Someone who switched to a language they cannot read has to be able to
+      // find their own way back.
+      for (final locale in const [Locale('en'), Locale('de')]) {
+        await pumpWithPreferences(
+          tester,
+          const AppPreferences(),
+          locale: locale,
+        );
+        await scrollTo(tester, find.bySemanticsLabel('English'));
+        expect(find.bySemanticsLabel('Deutsch'), findsOneWidget);
+        expect(find.bySemanticsLabel('English'), findsOneWidget);
       }
     });
 
-    testWidgets('each one says what it does to estimates', (tester) async {
-      // Section 10 requires every mode to state why estimates are off. Saying
-      // it only on the Today screen would leave her choosing blind here.
-      await pumpSettings(tester);
-      expect(
-        find.textContaining('follows your regimen rather than a cycle'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('Everything you log is still saved'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('Cycle lengths often change a lot'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('reports the mode that was chosen', (tester) async {
-      CycleMode? chosen;
-      await pumpSettings(tester, onModeChanged: (mode) => chosen = mode);
-
-      await tester.tap(find.text('Pregnant'));
-      expect(chosen, CycleMode.pregnancy);
-    });
-
-    testWidgets('the current mode is the selected one', (tester) async {
-      await pumpSettings(
+    testWidgets('marks the current choices as selected', (tester) async {
+      await pumpWithPreferences(
         tester,
-        data: const SettingsViewData(
-          cycle: CycleSettings(mode: CycleMode.pregnancy),
+        const AppPreferences(
+          appearance: AppearanceChoice.light,
+          language: LanguageChoice.english,
         ),
       );
-
-      final selected = tester
-          .widgetList<RadioListTile<CycleMode>>(
-            find.byType(RadioListTile<CycleMode>),
-          )
-          .where((tile) => tile.value == CycleMode.pregnancy);
-      expect(selected, hasLength(1));
-      expect(
-        tester
-            .widget<RadioGroup<CycleMode>>(find.byType(RadioGroup<CycleMode>))
-            .groupValue,
-        CycleMode.pregnancy,
-      );
-    });
-
-    testWidgets('no mode names a condition or diagnoses anything', (
-      tester,
-    ) async {
-      // Section 8: the app must not become a regulated medical device, and that
-      // line is crossed by claims. These are the words that would cross it.
-      await pumpSettings(tester);
-      for (final forbidden in [
-        'disorder',
-        'diagnos',
-        'abnormal',
-        'irregular',
-        'infertile',
-        'symptom of',
+      await scrollTo(tester, find.bySemanticsLabel('English'));
+      for (final (label, selected) in [
+        ('Automatic', false),
+        ('Light', true),
+        ('Dark', false),
+        ('Device language', false),
+        ('English', true),
       ]) {
         expect(
-          find.textContaining(RegExp(forbidden, caseSensitive: false)),
-          findsNothing,
-          reason: 'settings copy must not contain "$forbidden"',
+          tester.getSemantics(find.bySemanticsLabel(label)),
+          isSemantics(isSelected: selected, isInMutuallyExclusiveGroup: true),
+          reason: label,
         );
       }
     });
+
+    testWidgets('explains what following the device means', (tester) async {
+      await pumpWithPreferences(tester, const AppPreferences());
+      await scrollTo(tester, find.textContaining('English otherwise'));
+      expect(find.textContaining("device's light and dark"), findsOneWidget);
+      expect(find.textContaining('English otherwise'), findsOneWidget);
+    });
   });
 
-  group('the estimates opt-in', () {
-    testWidgets('appears only under perimenopause', (tester) async {
-      await pumpSettings(tester);
-      expect(find.text('Show estimates anyway'), findsNothing);
+  group('reminders', () {
+    testWidgets('are left out without reminder settings', (tester) async {
+      await pumpScreen(tester);
+      expect(find.text('Reminders'), findsNothing);
+    });
 
-      await pumpSettings(
+    testWidgets('are a row that opens their own page, saying if any is on', (
+      tester,
+    ) async {
+      var opened = 0;
+      await pumpApp(
         tester,
-        data: const SettingsViewData(
-          cycle: CycleSettings(mode: CycleMode.perimenopause),
+        SettingsScreen(
+          reminders: const ReminderSettings(pill: true),
+          onOpenReminders: () => opened++,
         ),
       );
-      expect(find.text('Show estimates anyway'), findsOneWidget);
-    });
+      expect(find.text('On'), findsOneWidget);
+      await tester.tap(find.byKey(SettingsKeys.reminders));
+      expect(opened, 1);
 
-    testWidgets('is not offered for contraception or pregnancy', (
-      tester,
-    ) async {
-      // Those two have no natural cycle to estimate from, so offering the
-      // switch would imply an estimate exists to be turned on.
-      for (final mode in [
-        CycleMode.hormonalContraception,
-        CycleMode.pregnancy,
-      ]) {
-        await pumpSettings(
-          tester,
-          data: SettingsViewData(cycle: CycleSettings(mode: mode)),
-        );
-        expect(find.text('Show estimates anyway'), findsNothing);
-      }
-    });
-
-    testWidgets('says the estimates will be wide before she opts in', (
-      tester,
-    ) async {
-      await pumpSettings(
+      await pumpApp(
         tester,
-        data: const SettingsViewData(
-          cycle: CycleSettings(mode: CycleMode.perimenopause),
+        const SettingsScreen(reminders: ReminderSettings()),
+      );
+      expect(find.text('Off'), findsOneWidget);
+    });
+
+    testWidgets('says the notification text is neutral', (tester) async {
+      await pumpApp(
+        tester,
+        const SettingsScreen(reminders: ReminderSettings()),
+      );
+      expect(find.textContaining('only ever say'), findsOneWidget);
+    });
+
+    testWidgets('says how to fix refused notifications', (tester) async {
+      await pumpApp(
+        tester,
+        const SettingsScreen(
+          reminders: ReminderSettings(),
+          remindersBlocked: true,
         ),
       );
-      expect(find.textContaining('wide ranges'), findsOneWidget);
-    });
-
-    testWidgets('reports the change', (tester) async {
-      bool? asked;
-      await pumpSettings(
-        tester,
-        data: const SettingsViewData(
-          cycle: CycleSettings(mode: CycleMode.perimenopause),
-        ),
-        onPredictionsOptInChanged: ({required optedIn}) => asked = optedIn,
-      );
-
-      await tester.tap(find.text('Show estimates anyway'));
-      expect(asked, isTrue);
-    });
-  });
-
-  group('the fertile window', () {
-    testWidgets('is off unless asked for', (tester) async {
-      await pumpSettings(tester);
-      final tile = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Show the fertile window estimate'),
-      );
-      expect(tile.value, isFalse);
-    });
-
-    testWidgets('carries the caveat beside the switch, not after it', (
-      tester,
-    ) async {
-      // Section 8 requires the note wherever the window appears. The moment it
-      // matters most is before she turns it on.
-      await pumpSettings(tester);
-      expect(
-        find.textContaining('Not suitable for preventing pregnancy'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('reports the change', (tester) async {
-      var turnedOn = false;
-      await pumpSettings(
-        tester,
-        onFertileWindowChanged: ({required optedIn}) => turnedOn = optedIn,
-      );
-
-      await tester.tap(find.text('Show the fertile window estimate'));
-      expect(turnedOn, isTrue);
-    });
-  });
-
-  group('the app lock', () {
-    testWidgets('is off unless asked for', (tester) async {
-      await pumpSettings(tester);
-      final tile = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Ask before opening the app'),
-      );
-      expect(tile.value, isFalse);
-    });
-
-    testWidgets('says it uses the phone\'s own lock and will not trap her', (
-      tester,
-    ) async {
-      // Both facts belong beside the switch: the app keeps no PIN of its own,
-      // and a phone with no lock set opens the app rather than shutting her
-      // out of her own data.
-      await pumpSettings(tester);
-      expect(
-        find.textContaining('Uses whatever unlocks your phone'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('opens as usual rather than shutting you out'),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('explains itself when the phone cannot authenticate', (
-      tester,
-    ) async {
-      await pumpSettings(tester, lockAvailable: false);
-
-      expect(find.textContaining('no lock set'), findsOneWidget);
-      final tile = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Ask before opening the app'),
-      );
-      expect(
-        tile.onChanged,
-        isNull,
-        reason: 'a switch that cannot do anything must not look like it can',
-      );
-    });
-
-    testWidgets('reports the change', (tester) async {
-      bool? asked;
-      await pumpSettings(
-        tester,
-        onAppLockChanged: ({required enabled}) => asked = enabled,
-      );
-
-      await tester.tap(find.text('Ask before opening the app'));
-      expect(asked, isTrue);
-    });
-  });
-
-  group('deleting everything', () {
-    testWidgets('asks first', (tester) async {
-      var deleted = false;
-      await pumpSettings(tester, onDeleteEverything: () => deleted = true);
-
-      await tester.tap(find.text('Delete all data'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Delete everything?'), findsOneWidget);
-      expect(deleted, isFalse);
-    });
-
-    testWidgets('says exactly what goes, including the settings', (
-      tester,
-    ) async {
-      await pumpSettings(tester);
-      await tester.tap(find.text('Delete all data'));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('setting'), findsOneWidget);
-      expect(find.textContaining('cannot be undone'), findsOneWidget);
-    });
-
-    testWidgets('cancelling deletes nothing', (tester) async {
-      var deleted = false;
-      await pumpSettings(tester, onDeleteEverything: () => deleted = true);
-
-      await tester.tap(find.text('Delete all data'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
-      expect(deleted, isFalse);
-    });
-
-    testWidgets('confirming deletes', (tester) async {
-      var deleted = false;
-      await pumpSettings(tester, onDeleteEverything: () => deleted = true);
-
-      await tester.tap(find.text('Delete all data'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Delete everything'));
-      await tester.pumpAndSettle();
-
-      expect(deleted, isTrue);
-    });
-  });
-
-  testWidgets('states the promise the app is built on', (tester) async {
-    await pumpSettings(tester);
-    expect(find.textContaining('stays on this device'), findsOneWidget);
-    expect(find.textContaining('there is no account'), findsOneWidget);
-  });
-
-  testWidgets('German', (tester) async {
-    await pumpSettings(tester, locale: const Locale('de'));
-    expect(find.text('Einstellungen'), findsOneWidget);
-    expect(find.text('Schwanger'), findsOneWidget);
-    expect(find.text('Alle Daten löschen'), findsOneWidget);
-  });
-
-  group('the reminder', () {
-    const daily = SettingsViewData(reminder: ReminderSchedule(enabled: true));
-
-    testWidgets('shows nothing but the switch while it is off', (tester) async {
-      await pumpSettings(tester);
-      expect(find.text('Remind me to log'), findsOneWidget);
-      // No time, no days. Controls for a reminder that does not exist would be
-      // settings that change nothing.
-      expect(find.text('Time'), findsNothing);
-      expect(find.byType(FilterChip), findsNothing);
-    });
-
-    testWidgets('shows the time and the days once it is on', (tester) async {
-      await pumpSettings(tester, data: daily);
-      expect(find.text('Time'), findsOneWidget);
-      expect(find.byType(FilterChip), findsNWidgets(7));
-    });
-
-    group('the clock she reads it on', () {
-      testWidgets('a 12-hour phone sees 8:00 PM', (tester) async {
-        await pumpSettings(tester, data: daily);
-        expect(find.text('8:00 PM'), findsOneWidget);
-      });
-
-      testWidgets('a 24-hour phone sees 20:00', (tester) async {
-        // The phone's setting, not the locale's. showTimePicker reads this, so
-        // a row that ignored it would show her back something different from
-        // what she just picked in the dial.
-        await pumpSettings(tester, data: daily, alwaysUse24HourFormat: true);
-        expect(find.text('20:00'), findsOneWidget);
-        expect(find.text('8:00 PM'), findsNothing);
-      });
-
-      testWidgets('German writes a 24-hour clock either way', (tester) async {
-        // Which is why German hid the bug above for as long as it did.
-        await pumpSettings(tester, data: daily, locale: const Locale('de'));
-        expect(find.text('20:00'), findsOneWidget);
-      });
-    });
-
-    group('when nothing will arrive', () {
-      testWidgets('says so when she has deselected every day', (tester) async {
-        await pumpSettings(
-          tester,
-          data: const SettingsViewData(
-            reminder: ReminderSchedule(enabled: true, weekdays: {}),
-          ),
-        );
-        expect(find.textContaining('No days are selected'), findsOneWidget);
-      });
-
-      testWidgets('says so when the system is blocking notifications', (
-        tester,
-      ) async {
-        await pumpSettings(tester, data: daily, remindersAllowed: false);
-        expect(
-          find.textContaining('notifications are switched off'),
-          findsOneWidget,
-        );
-      });
-
-      testWidgets('stays quiet about a permission never asked for', (
-        tester,
-      ) async {
-        // A fresh install has no permission either, and saying it is blocked
-        // would be wrong -- and would talk her out of turning it on.
-        await pumpSettings(
-          tester,
-          data: const SettingsViewData(),
-          remindersAllowed: false,
-        );
-        expect(
-          find.textContaining('notifications are switched off'),
-          findsNothing,
-        );
-      });
-
-      testWidgets('warns in colour and in shape, never colour alone', (
-        tester,
-      ) async {
-        await pumpSettings(tester, data: daily, remindersAllowed: false);
-        expect(find.byIcon(Icons.info_outline), findsOneWidget);
-      });
-    });
-
-    group('the weekday chooser', () {
-      testWidgets('speaks the full day and its state', (tester) async {
-        // One or two letters say nothing aloud, and several weekdays share
-        // them.
-        await pumpSettings(tester, data: daily);
-        expect(find.bySemanticsLabel('Wednesday, selected'), findsOne);
-      });
-
-      testWidgets('carries the selected flag, not just the words', (
-        tester,
-      ) async {
-        // Wrapping a FilterChip with excludeSemantics throws away the
-        // `selected` flag the chip sets for itself. Without it a screen reader
-        // has a plain button whose state is buried in prose, and toggling it
-        // announces no change of state at all.
-        await pumpSettings(
-          tester,
-          data: const SettingsViewData(
-            reminder: ReminderSchedule(enabled: true, weekdays: {3}),
-          ),
-        );
-
-        // A tristate, and the distinction matters: `none` means the flag was
-        // never set at all, which is what excluding the chip's own semantics
-        // without replacing this left behind.
-        expect(
-          tester
-              .getSemantics(find.bySemanticsLabel('Wednesday, selected'))
-              .flagsCollection
-              .isSelected,
-          Tristate.isTrue,
-        );
-        expect(
-          tester
-              .getSemantics(find.bySemanticsLabel('Thursday, not selected'))
-              .flagsCollection
-              .isSelected,
-          Tristate.isFalse,
-        );
-      });
-
-      testWidgets('reports the day she tapped', (tester) async {
-        ReminderSchedule? saved;
-        await pumpSettings(
-          tester,
-          data: daily,
-          onReminderChanged: (schedule) => saved = schedule,
-        );
-
-        await tester.tap(find.widgetWithText(FilterChip, 'Wed'));
-        await tester.pumpAndSettle();
-
-        expect(saved!.weekdays, {1, 2, 4, 5, 6, 7});
-      });
-
-      testWidgets('German starts the week on Monday', (tester) async {
-        await pumpSettings(tester, data: daily, locale: const Locale('de'));
-        final chips = tester
-            .widgetList<FilterChip>(find.byType(FilterChip))
-            .map((chip) => (chip.label as Text).data)
-            .toList();
-        expect(chips.first, 'Mo');
-      });
-
-      testWidgets('English starts the week on Sunday', (tester) async {
-        await pumpSettings(tester, data: daily);
-        final chips = tester
-            .widgetList<FilterChip>(find.byType(FilterChip))
-            .map((chip) => (chip.label as Text).data)
-            .toList();
-        expect(chips.first, 'Sun');
-      });
+      expect(find.textContaining("phone's settings"), findsOneWidget);
     });
   });
 }

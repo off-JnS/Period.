@@ -65,4 +65,45 @@ void main() {
     expect(settings.predictionsOptedIn, isFalse);
     expect(settings.predictionsEnabled, isTrue);
   });
+
+  group('fertileWindowOptedIn', () {
+    test('is off by default', () {
+      // docs/cycle-logic.md section 4: the highest-risk feature, opt-in only.
+      expect(const CycleSettings().fertileWindowOptedIn, isFalse);
+      for (final mode in CycleMode.values) {
+        expect(CycleSettings(mode: mode).fertileWindowOptedIn, isFalse);
+      }
+    });
+  });
+
+  group('cycleStatisticsVisible', () {
+    test('pregnancy hides cycle statistics', () {
+      expect(
+        const CycleSettings(mode: CycleMode.pregnancy).cycleStatisticsVisible,
+        isFalse,
+      );
+    });
+
+    test('pregnancy hides them even with predictions opted in', () {
+      expect(
+        const CycleSettings(
+          mode: CycleMode.pregnancy,
+          predictionsOptedIn: true,
+        ).cycleStatisticsVisible,
+        isFalse,
+      );
+    });
+
+    test('every other mode shows them', () {
+      for (final mode in CycleMode.values.where(
+        (mode) => mode != CycleMode.pregnancy,
+      )) {
+        expect(
+          CycleSettings(mode: mode).cycleStatisticsVisible,
+          isTrue,
+          reason: '$mode only turns predictions off, not the description',
+        );
+      }
+    });
+  });
 }

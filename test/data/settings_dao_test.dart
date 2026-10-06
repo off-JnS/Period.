@@ -1,233 +1,337 @@
 import 'package:period/data/database/daos/settings_dao.dart';
 import 'package:period/data/database/database.dart';
+import 'package:period/domain/models/app_preferences.dart';
+import 'package:period/domain/models/cycle_date.dart';
 import 'package:period/domain/models/cycle_mode.dart';
-import 'package:period/domain/models/reminder_schedule.dart';
-import 'package:period/domain/models/reminder_time.dart';
+import 'package:period/domain/models/profile.dart';
+import 'package:period/domain/models/reminder_settings.dart';
 import 'package:test/test.dart';
 
 import '../support/database.dart';
 
-/// What the app reads back out of the settings table.
-///
-/// The interesting tests are the two at the bottom. A value this build does not
-/// understand must not quietly become a natural cycle, because natural is the
-/// one mode that turns predictions *on*.
 void main() {
-  late AppDatabase db;
+  late AppDatabase database;
 
-  setUp(() => db = aDatabase());
-  tearDown(() => db.close());
+  setUp(() => database = aDatabase());
+  tearDown(() => database.close());
 
-  test('a fresh install is a natural cycle with predictions on', () async {
-    final stored = await db.settingsDao.readSettings();
+  Future<void> storeRaw(String key, String value) => database
+      .into(database.appSettings)
+      .insert(
+        AppSettingsCompanion.insert(settingKey: key, settingValue: value),
+      );
 
-    expect(stored.cycle.mode, CycleMode.natural);
-    expect(stored.cycle.predictionsOptedIn, isFalse);
-    expect(stored.cycle.predictionsEnabled, isTrue);
-    expect(stored.fertileWindowOptedIn, isFalse);
+  test('nothing stored reads as the defaults', () async {
+    expect(await database.settingsDao.cycleSettings(), const CycleSettings());
   });
 
-  for (final mode in CycleMode.values) {
-    test('${mode.name} survives a round trip', () async {
-      await db.settingsDao.writeCycleSettings(CycleSettings(mode: mode));
-      expect((await db.settingsDao.readSettings()).cycle.mode, mode);
-    });
-  }
+  test('every mode round-trips', () async {
+    for (final mode in CycleMode.values) {
+      final settings = CycleSettings(mode: mode);
+      await database.settingsDao.saveCycleSettings(settings);
+      expect(await database.settingsDao.cycleSettings(), settings);
+    }
+  });
 
-  test('the perimenopause opt-in survives a round trip', () async {
-    await db.settingsDao.writeCycleSettings(
-      const CycleSettings(
-        mode: CycleMode.perimenopause,
-        predictionsOptedIn: true,
-      ),
+  test('both opt-ins round-trip, on and back off', () async {
+    const on = CycleSettings(
+      mode: CycleMode.perimenopause,
+      predictionsOptedIn: true,
+      fertileWindowOptedIn: true,
     );
+    await database.settingsDao.saveCycleSettings(on);
+    expect(await database.settingsDao.cycleSettings(), on);
 
-    final stored = await db.settingsDao.readSettings();
-    expect(stored.cycle.predictionsOptedIn, isTrue);
-    expect(stored.cycle.predictionsEnabled, isTrue);
+    // Turning something off is a write, not a no-op.
+    const off = CycleSettings(mode: CycleMode.perimenopause);
+    await database.settingsDao.saveCycleSettings(off);
+    expect(await database.settingsDao.cycleSettings(), off);
   });
 
-  test('the fertile window opt-in survives a round trip', () async {
-    await db.settingsDao.writeFertileWindowOptIn(optedIn: true);
-    expect((await db.settingsDao.readSettings()).fertileWindowOptedIn, isTrue);
-
-    await db.settingsDao.writeFertileWindowOptIn(optedIn: false);
-    expect((await db.settingsDao.readSettings()).fertileWindowOptedIn, isFalse);
-  });
-
-  test('the app lock is off unless asked for, and round-trips', () async {
-    // Section 9 makes the lock optional, which is also why the database key is
-    // generated rather than derived from it: defaulting this on would be a
-    // different app than the one CLAUDE.md describes.
-    expect((await db.settingsDao.readSettings()).appLockEnabled, isFalse);
-
-    await db.settingsDao.writeAppLockEnabled(enabled: true);
-    expect((await db.settingsDao.readSettings()).appLockEnabled, isTrue);
-
-    await db.settingsDao.writeAppLockEnabled(enabled: false);
-    expect((await db.settingsDao.readSettings()).appLockEnabled, isFalse);
-  });
-
-  test('changing mode overwrites rather than accumulating rows', () async {
-    await db.settingsDao.writeCycleSettings(
+  test('saving again replaces rather than duplicating rows', () async {
+    await database.settingsDao.saveCycleSettings(const CycleSettings());
+    await database.settingsDao.saveCycleSettings(
       const CycleSettings(mode: CycleMode.pregnancy),
     );
-    await db.settingsDao.writeCycleSettings(
-      const CycleSettings(mode: CycleMode.natural),
-    );
-
-    expect((await db.settingsDao.readSettings()).cycle.mode, CycleMode.natural);
+    final rows = await database.select(database.appSettings).get();
+    expect(rows.map((row) => row.settingKey).toSet(), hasLength(rows.length));
   });
 
-  test('opting out of predictions is stored, not just omitted', () async {
-    await db.settingsDao.writeCycleSettings(
-      const CycleSettings(
-        mode: CycleMode.perimenopause,
-        predictionsOptedIn: true,
-      ),
+  test('a mode this build does not know reads as natural', () async {
+    // Written by a newer version, then the app was downgraded. Failing to
+    // start over a setting would lock her out of her own data.
+    await storeRaw(SettingKeys.cycleMode, 'someFutureMode');
+    expect(
+      (await database.settingsDao.cycleSettings()).mode,
+      CycleMode.natural,
     );
-    await db.settingsDao.writeCycleSettings(
-      const CycleSettings(mode: CycleMode.perimenopause),
-    );
-
-    final stored = await db.settingsDao.readSettings();
-    expect(stored.cycle.predictionsOptedIn, isFalse);
-    expect(stored.cycle.predictionsEnabled, isFalse);
   });
 
-  group('a value this build does not understand', () {
-    Future<void> storeRawMode(String value) => db.customStatement(
-      'INSERT INTO settings (key, value) VALUES (?, ?)',
-      [SettingKeys.cycleMode, value],
+  test('an unreadable opt-in reads as off', () async {
+    await storeRaw(SettingKeys.fertileWindowOptedIn, 'yes please');
+    await storeRaw(SettingKeys.predictionsOptedIn, '');
+    final settings = await database.settingsDao.cycleSettings();
+    expect(settings.fertileWindowOptedIn, isFalse);
+    expect(settings.predictionsOptedIn, isFalse);
+  });
+
+  test('settings unknown to this build are left alone', () async {
+    await storeRaw('some_future_setting', 'kept');
+    await database.settingsDao.saveCycleSettings(const CycleSettings());
+    final rows = await database.select(database.appSettings).get();
+    expect(
+      rows.where((row) => row.settingKey == 'some_future_setting').single,
+      isA<SettingRow>().having((row) => row.settingValue, 'value', 'kept'),
     );
+  });
 
-    test('throws rather than falling back to a natural cycle', () async {
-      // The scenario: a database written by a newer build, restored onto this
-      // one. Falling back would mean natural, and natural enables predictions
-      // -- so a pregnant user would silently get estimates she turned off.
-      // Failing loudly puts the error panel on screen instead.
-      await storeRawMode('lactational_amenorrhea');
-
-      expect(db.settingsDao.readSettings(), throwsStateError);
-    });
-
-    test('the message says what it found and that it will not guess', () async {
-      await storeRawMode('something_new');
-
-      await expectLater(
-        db.settingsDao.readSettings(),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            allOf(contains('something_new'), contains('will not guess')),
-          ),
-        ),
-      );
-    });
-
-    test('an unreadable opt-in flag resolves to off, not on', () async {
-      // Lenient where the mode is strict, and deliberately so: these flags are
-      // opt-ins, so an unreadable one showing less than she asked for is the
-      // safe direction. An unreadable *mode* is not, which is why it throws.
-      await db.customStatement(
-        'INSERT INTO settings (key, value) VALUES (?, ?)',
-        [SettingKeys.fertileWindowOptedIn, 'yes'],
-      );
-
+  group('app preferences', () {
+    test('nothing stored follows the device', () async {
       expect(
-        (await db.settingsDao.readSettings()).fertileWindowOptedIn,
-        isFalse,
+        await database.settingsDao.appPreferences(),
+        const AppPreferences(),
       );
+    });
+
+    test('every appearance and language round-trips', () async {
+      for (final appearance in AppearanceChoice.values) {
+        for (final language in LanguageChoice.values) {
+          final preferences = AppPreferences(
+            appearance: appearance,
+            language: language,
+          );
+          await database.settingsDao.saveAppPreferences(preferences);
+          expect(await database.settingsDao.appPreferences(), preferences);
+        }
+      }
+    });
+
+    test('values this build does not know fall back to the device', () async {
+      await storeRaw(SettingKeys.appearance, 'sepia');
+      await storeRaw(SettingKeys.language, 'klingon');
+      expect(
+        await database.settingsDao.appPreferences(),
+        const AppPreferences(),
+      );
+    });
+
+    test('saving preferences leaves the cycle settings alone', () async {
+      const cycle = CycleSettings(
+        mode: CycleMode.pregnancy,
+        fertileWindowOptedIn: true,
+      );
+      await database.settingsDao.saveCycleSettings(cycle);
+      await database.settingsDao.saveAppPreferences(
+        const AppPreferences(appearance: AppearanceChoice.dark),
+      );
+      expect(await database.settingsDao.cycleSettings(), cycle);
+    });
+
+    test('saving cycle settings leaves the preferences alone', () async {
+      const preferences = AppPreferences(language: LanguageChoice.german);
+      await database.settingsDao.saveAppPreferences(preferences);
+      await database.settingsDao.saveCycleSettings(const CycleSettings());
+      expect(await database.settingsDao.appPreferences(), preferences);
     });
   });
 
-  group('the reminder schedule', () {
-    Future<void> storeRaw(String key, String value) => db.customStatement(
-      'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-      [key, value],
-    );
-
-    test('a fresh install has reminders off, every day, at 20:00', () async {
-      // Off is what matters. The time and the days are only what a picker
-      // would open on, and neither means anything until she turns it on.
-      final stored = (await db.settingsDao.readSettings()).reminder;
-
-      expect(stored.enabled, isFalse);
-      expect(stored.time, const ReminderTime(20, 0));
-      expect(stored.validWeekdays, {1, 2, 3, 4, 5, 6, 7});
+  group('app lock', () {
+    test('is off until turned on', () async {
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
     });
 
-    test('round trips what she chose', () async {
-      const schedule = ReminderSchedule(
-        enabled: true,
-        time: ReminderTime(7, 5),
-        weekdays: {2, 4},
-      );
-
-      await db.settingsDao.writeReminderSchedule(schedule);
-      final stored = (await db.settingsDao.readSettings()).reminder;
-
-      expect(stored.enabled, isTrue);
-      expect(stored.time, const ReminderTime(7, 5));
-      expect(stored.validWeekdays, {2, 4});
+    test('round-trips on and off', () async {
+      await database.settingsDao.saveAppLockEnabled(enabled: true);
+      expect(await database.settingsDao.appLockEnabled(), isTrue);
+      await database.settingsDao.saveAppLockEnabled(enabled: false);
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
     });
 
-    test('stores the weekdays sorted, and drops the impossible ones', () async {
-      // The insertion order here is deliberately neither sorted nor its
-      // reverse: {3, 7, 1} would still read as '1,3,7' if the list were merely
-      // reversed, and this test would pass against code that never sorted at
-      // all. It was written that way first, and a mutation caught it.
-      await db.settingsDao.writeReminderSchedule(
-        const ReminderSchedule(enabled: true, weekdays: {3, 9, 7, 0, 1}),
-      );
+    test('an unreadable value reads as off', () async {
+      await storeRaw(SettingKeys.appLock, 'maybe');
+      expect(await database.settingsDao.appLockEnabled(), isFalse);
+    });
+  });
 
-      final raw = await db.settingsDao.readAll();
-      expect(raw[SettingKeys.reminderWeekdays], '1,3,7');
+  group('onboarding', () {
+    test('is not done on a fresh install', () async {
+      expect(await database.settingsDao.onboardingDone(), isFalse);
     });
 
-    test('an unreadable time falls back rather than throwing', () async {
-      // Lenient, like the opt-in flags and unlike the cycle mode. The worst it
-      // can do is remind her at an hour she did not pick; it cannot turn on
-      // something she turned off, which is what makes an unreadable mode throw.
-      await storeRaw(SettingKeys.reminderTime, 'half past eight');
+    test('stays done once saved', () async {
+      await database.settingsDao.saveOnboardingDone();
+      expect(await database.settingsDao.onboardingDone(), isTrue);
+    });
 
+    test('an unreadable value reads as not done', () async {
+      await storeRaw(SettingKeys.onboardingDone, 'maybe');
+      expect(await database.settingsDao.onboardingDone(), isFalse);
+    });
+  });
+
+  group('reminders', () {
+    test('are off until turned on, at 9:00, two days ahead', () async {
       expect(
-        (await db.settingsDao.readSettings()).reminder.time,
-        const ReminderTime(20, 0),
+        await database.settingsDao.reminderSettings(),
+        const ReminderSettings(),
       );
     });
 
-    test('an unreadable weekday list means nothing fires', () async {
-      // The safe direction for an opt-in: less than she asked for, never a
-      // notification on a day she never chose.
-      await storeRaw(SettingKeys.reminderWeekdays, 'weekends,maybe');
+    test('round-trip', () async {
+      const chosen = ReminderSettings(
+        periodComing: true,
+        daysBefore: 4,
+        dailyLog: true,
+        hour: 7,
+        minute: 5,
+      );
+      await database.settingsDao.saveReminderSettings(chosen);
+      expect(await database.settingsDao.reminderSettings(), chosen);
+    });
 
+    test('an out-of-range lead time falls back to the default', () async {
+      await storeRaw(SettingKeys.reminderDaysBefore, '12');
       expect(
-        (await db.settingsDao.readSettings()).reminder.validWeekdays,
-        isEmpty,
+        (await database.settingsDao.reminderSettings()).daysBefore,
+        ReminderSettings.defaultDaysBefore,
       );
     });
 
-    test('deselecting every day is honoured, not treated as unset', () async {
-      // Absent means she has never chosen and defaults to daily. An empty
-      // stored value means she deliberately cleared them, and reverting that to
-      // daily would hand her back seven notifications she just removed.
-      await storeRaw(SettingKeys.reminderWeekdays, '');
+    test('a malformed or impossible time falls back to 9:00', () async {
+      for (final raw in ['7:5', '25:00', '09:60', 'noon', '']) {
+        await database.settingsDao.saveReminderSettings(
+          const ReminderSettings(),
+        );
+        await database
+            .into(database.appSettings)
+            .insertOnConflictUpdate(
+              AppSettingsCompanion.insert(
+                settingKey: SettingKeys.reminderTime,
+                settingValue: raw,
+              ),
+            );
+        final read = await database.settingsDao.reminderSettings();
+        expect((read.hour, read.minute), (9, 0), reason: raw);
+      }
+    });
+  });
 
+  group('contraception reminders', () {
+    Future<void> putRaw(String key, String value) => database
+        .into(database.appSettings)
+        .insertOnConflictUpdate(
+          AppSettingsCompanion.insert(settingKey: key, settingValue: value),
+        );
+
+    test('round-trip, every field', () async {
+      final chosen = ReminderSettings(
+        pill: true,
+        pillHour: 22,
+        pillMinute: 45,
+        pillPack: PillPack.days24,
+        pillPackStart: CycleDate(2024, 5, 3),
+        ring: true,
+        ringInserted: CycleDate(2024, 5, 10),
+        patch: true,
+        patchStarted: CycleDate(2024, 4, 30),
+        injection: true,
+        injectionLast: CycleDate(2024, 3, 1),
+        injectionWeeks: 13,
+        device: true,
+        deviceReplaceBy: CycleDate(2030, 1, 31),
+        deviceWeeksBefore: 8,
+        methodHour: 7,
+        methodMinute: 30,
+      );
+      await database.settingsDao.saveReminderSettings(chosen);
+      expect(await database.settingsDao.reminderSettings(), chosen);
+    });
+
+    test('a date can be cleared again', () async {
+      await database.settingsDao.saveReminderSettings(
+        ReminderSettings(ringInserted: CycleDate(2024, 5, 10)),
+      );
+      await database.settingsDao.saveReminderSettings(const ReminderSettings());
       expect(
-        (await db.settingsDao.readSettings()).reminder.validWeekdays,
-        isEmpty,
+        (await database.settingsDao.reminderSettings()).ringInserted,
+        isNull,
       );
     });
 
-    test('a partly unreadable list keeps the days that are real', () async {
-      await storeRaw(SettingKeys.reminderWeekdays, '1,x,5');
+    test('values this build cannot read fall back to the defaults', () async {
+      await putRaw(SettingKeys.reminderPillPack, 'days99');
+      await putRaw(SettingKeys.reminderRingInserted, '2023-02-29');
+      await putRaw(SettingKeys.reminderPatchStarted, 'yesterday');
+      await putRaw(SettingKeys.reminderInjectionWeeks, '40');
+      await putRaw(SettingKeys.reminderDeviceWeeks, '3');
+      await putRaw(SettingKeys.reminderPillTime, '24:00');
+      final read = await database.settingsDao.reminderSettings();
+      expect(read.pillPack, PillPack.everyDay);
+      expect(read.ringInserted, isNull);
+      expect(read.patchStarted, isNull);
+      expect(read.injectionWeeks, ReminderSettings.defaultInjectionWeeks);
+      expect(read.deviceWeeksBefore, ReminderSettings.defaultDeviceWeeksBefore);
+      expect((read.pillHour, read.pillMinute), (21, 0));
+    });
+  });
 
-      expect((await db.settingsDao.readSettings()).reminder.validWeekdays, {
-        1,
-        5,
-      });
+  group('profile', () {
+    Future<Profile> read() => database.settingsDao.profile(currentYear: 2026);
+
+    test('nothing stored reads as an empty profile', () async {
+      expect(await read(), const Profile());
+    });
+
+    test('a full profile round-trips', () async {
+      const profile = Profile(
+        birthYear: 1998,
+        usualCycleLength: 31,
+        usualPeriodLength: 5,
+        contraception: ContraceptionMethod.copperIud,
+        conditions: {KnownCondition.pcos, KnownCondition.thyroid},
+      );
+      await database.settingsDao.saveProfile(profile);
+      expect(await read(), profile);
+    });
+
+    test('every method and condition round-trips', () async {
+      for (final method in ContraceptionMethod.values) {
+        await database.settingsDao.saveProfile(Profile(contraception: method));
+        expect((await read()).contraception, method);
+      }
+      await database.settingsDao.saveProfile(
+        Profile(conditions: KnownCondition.values.toSet()),
+      );
+      expect((await read()).conditions, KnownCondition.values.toSet());
+    });
+
+    test('clearing a field deletes it', () async {
+      await database.settingsDao.saveProfile(
+        const Profile(birthYear: 1990, conditions: {KnownCondition.pmdd}),
+      );
+      await database.settingsDao.saveProfile(const Profile());
+      expect(await read(), const Profile());
+      final keys = (await database.select(database.appSettings).get()).map(
+        (row) => row.settingKey,
+      );
+      expect(keys.where((key) => key.startsWith('profile_')), isEmpty);
+    });
+
+    test('values out of range or not understood read as unsaid', () async {
+      await storeRaw(SettingKeys.profileBirthYear, '2025');
+      await storeRaw(SettingKeys.profileCycleLength, '200');
+      await storeRaw(SettingKeys.profilePeriodLength, 'five');
+      await storeRaw(SettingKeys.profileContraception, 'tomorrowPill');
+      await storeRaw(SettingKeys.profileConditions, 'pcos,,somethingNew');
+      expect(await read(), const Profile(conditions: {KnownCondition.pcos}));
+    });
+
+    test('does not disturb the other settings', () async {
+      const settings = CycleSettings(mode: CycleMode.pregnancy);
+      await database.settingsDao.saveCycleSettings(settings);
+      await database.settingsDao.saveProfile(const Profile(birthYear: 1990));
+      await database.settingsDao.saveProfile(const Profile());
+      expect(await database.settingsDao.cycleSettings(), settings);
     });
   });
 }

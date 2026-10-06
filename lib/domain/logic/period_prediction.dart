@@ -125,3 +125,72 @@ PeriodPrediction predictNextPeriod({
 /// Convenience for the common case of asking only whether a prediction exists.
 PredictedPeriod? predictedWindowOrNull(PeriodPrediction prediction) =>
     prediction is PredictedPeriod ? prediction : null;
+
+/// How far away the estimated window is from [today], in the only form
+/// docs/cycle-logic.md §3 allows: the window counted in days, never one
+/// number.
+sealed class PeriodCountdown {
+  const PeriodCountdown();
+}
+
+/// The window has not opened: it starts in [fromDays] and ends in [toDays].
+class CountdownUpcoming extends PeriodCountdown {
+  /// Creates the result.
+  const CountdownUpcoming({required this.fromDays, required this.toDays});
+
+  /// Days until the window's first day. At least 1.
+  final int fromDays;
+
+  /// Days until the window's last day. Greater than [fromDays].
+  final int toDays;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CountdownUpcoming &&
+      other.fromDays == fromDays &&
+      other.toDays == toDays;
+
+  @override
+  int get hashCode => Object.hash(fromDays, toDays);
+
+  @override
+  String toString() => 'CountdownUpcoming($fromDays–$toDays)';
+}
+
+/// Today is inside the window.
+class CountdownInWindow extends PeriodCountdown {
+  /// Creates the result.
+  const CountdownInWindow();
+
+  @override
+  bool operator ==(Object other) => other is CountdownInWindow;
+
+  @override
+  int get hashCode => 1;
+}
+
+/// The window has passed with no new start recorded.
+class CountdownPastWindow extends PeriodCountdown {
+  /// Creates the result.
+  const CountdownPastWindow();
+
+  @override
+  bool operator ==(Object other) => other is CountdownPastWindow;
+
+  @override
+  int get hashCode => 2;
+}
+
+/// Where [today] stands against [prediction]'s window, or null when there is
+/// no window to count towards.
+PeriodCountdown? countdownTo(PeriodPrediction prediction, CycleDate today) {
+  if (prediction is! PredictedPeriod) return null;
+  if (today.isBefore(prediction.earliest)) {
+    return CountdownUpcoming(
+      fromDays: today.daysUntil(prediction.earliest),
+      toDays: today.daysUntil(prediction.latest),
+    );
+  }
+  if (today.isAfter(prediction.latest)) return const CountdownPastWindow();
+  return const CountdownInWindow();
+}

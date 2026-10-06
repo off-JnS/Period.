@@ -2,81 +2,68 @@ import '../../domain/models/cycle_date.dart';
 
 /// One month laid out as whole weeks.
 ///
-/// Pure calendar arithmetic over [CycleDate], so the grid can be reasoned about
-/// and tested without building a widget. Layout rather than cycle logic, which
-/// is why it lives here and not in `domain/logic`.
+/// Pure date arithmetic on [CycleDate], with no [DateTime] anywhere: section 3
+/// applies to a calendar grid as much as to an entry, and a grid built by adding
+/// `Duration(days: 1)` can repeat or skip a day across a clock change. Every day
+/// here comes from [CycleDate.addDays].
 class MonthGrid {
-  /// Builds the grid for [month], padded to whole weeks.
-  ///
-  /// [firstWeekday] is the locale's first day, 1 (Monday) through 7 (Sunday) --
-  /// Germany starts on Monday, the United States on Sunday, and the calendar has
-  /// to follow the reader rather than a hardcoded choice.
-  factory MonthGrid.of(CycleDate month, {required int firstWeekday}) {
-    if (firstWeekday < 1 || firstWeekday > 7) {
-      throw ArgumentError.value(
-        firstWeekday,
-        'firstWeekday',
-        'must be 1 (Monday) through 7 (Sunday)',
-      );
-    }
-
-    final first = CycleDate(month.year, month.month, 1);
-    final length = CycleDate.lastDayOfMonth(month.year, month.month);
-
-    // How many days of the previous month to show before the 1st, so the grid
-    // starts on the locale's first weekday.
-    final lead = (first.weekday - firstWeekday + 7) % 7;
-    final start = first.subtractDays(lead);
-
-    // Whole weeks only: a ragged final row makes the grid harder to scan.
-    final total = ((lead + length) / 7).ceil() * 7;
-
-    return MonthGrid._(
-      month: first,
-      firstWeekday: firstWeekday,
-      days: [for (var i = 0; i < total; i++) start.addDays(i)],
-    );
-  }
-
-  const MonthGrid._({
+  /// Creates a grid.
+  const MonthGrid({
+    required this.year,
     required this.month,
-    required this.firstWeekday,
     required this.days,
   });
 
-  /// The first day of the month this grid represents.
-  final CycleDate month;
+  /// The year the grid is centred on.
+  final int year;
 
-  /// The weekday this grid's rows begin on, 1 (Monday) through 7 (Sunday).
+  /// The month the grid is centred on, 1 through 12.
+  final int month;
+
+  /// Every cell, in reading order, covering whole weeks.
   ///
-  /// Kept here rather than passed alongside the grid, so the column headings
-  /// drawn above it cannot be computed from a different answer than the days
-  /// beneath them. That mismatch shifts every label one column and looks
-  /// entirely plausible.
-  final int firstWeekday;
-
-  /// Every cell, in order, including the padding days either side.
+  /// Includes the tail of the previous month and the head of the next, so the
+  /// grid is rectangular. [isInMonth] tells them apart.
   final List<CycleDate> days;
 
-  /// The cells grouped into weeks of seven.
+  /// Whether [date] belongs to the month this grid is centred on.
+  bool isInMonth(CycleDate date) => date.year == year && date.month == month;
+
+  /// The grid split into rows of seven.
   List<List<CycleDate>> get weeks => [
     for (var i = 0; i < days.length; i += 7) days.sublist(i, i + 7),
   ];
+}
 
-  /// Whether [date] belongs to this month rather than the padding.
-  ///
-  /// Padding days are shown so the weeks line up, but they are not this month's
-  /// and are drawn faintly.
-  bool isInMonth(CycleDate date) =>
-      date.year == month.year && date.month == month.month;
+/// Builds the grid for [month] of [year].
+///
+/// [firstDayOfWeekIndex] follows `MaterialLocalizations`: 0 is Sunday through 6
+/// is Saturday. It is a parameter rather than a constant because the week starts
+/// on Monday in German and on Sunday in American English, and a calendar that
+/// gets that wrong is wrong in a way every user notices immediately.
+MonthGrid monthGrid({
+  required int year,
+  required int month,
+  required int firstDayOfWeekIndex,
+}) {
+  final first = CycleDate(year, month, 1);
 
-  /// The month before this one, laid out the same way.
-  MonthGrid previous() =>
-      MonthGrid.of(month.subtractDays(1), firstWeekday: firstWeekday);
+  // CycleDate.weekday is ISO: 1 Monday through 7 Sunday. The Material index is
+  // 0 Sunday through 6 Saturday. Convert, then walk back to the start of the
+  // week the first of the month falls in.
+  final firstAsMaterialIndex = first.weekday % 7;
+  final lead = (firstAsMaterialIndex - firstDayOfWeekIndex + 7) % 7;
+  final start = first.subtractDays(lead);
 
-  /// The month after this one, laid out the same way.
-  MonthGrid next() => MonthGrid.of(
-    month.addDays(CycleDate.lastDayOfMonth(month.year, month.month)),
-    firstWeekday: firstWeekday,
+  final lastDay = CycleDate.lastDayOfMonth(year, month);
+  final last = CycleDate(year, month, lastDay);
+  final lastAsMaterialIndex = last.weekday % 7;
+  final trail = (firstDayOfWeekIndex + 6 - lastAsMaterialIndex + 7) % 7;
+  final end = last.addDays(trail);
+
+  return MonthGrid(
+    year: year,
+    month: month,
+    days: [for (var i = 0; i <= start.daysUntil(end); i++) start.addDays(i)],
   );
 }

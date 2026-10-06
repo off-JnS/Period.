@@ -62,6 +62,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
       date: row.date,
       flow: row.flow,
       note: row.note,
+      temperatureCentiCelsius: row.temperatureCenti,
       symptoms: symptoms,
     );
   }
@@ -85,39 +86,73 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
           date: row.date,
           flow: row.flow,
           note: row.note,
+          temperatureCentiCelsius: row.temperatureCenti,
           symptoms: await _symptomsOn(row.date.toIso8601()),
         ),
     ];
   }
 
-  /// Every logged day, oldest first.
+  /// Every day she logged anything on, the flow of those that have one, and
+  /// the days she recorded having sex or taking a pregnancy test.
   ///
-  /// Dates are collected from both tables, not just [DayEntries]. A day can
-  /// carry symptoms and no entry row -- [entryOn] already treats that as a
-  /// logged day -- and a backup that read only the entries would drop those
-  /// days silently, which is the exact failure an export exists to prevent.
-  Future<List<DayEntry>> allEntries() async {
-    final rows = await select(dayEntries).get();
-    final symptomRows = await select(daySymptoms).get();
+  /// Two plain queries over the whole history, rather than [entriesBetween]'s
+  /// query per day: the calendar scrolls through all of it, and needs only
+  /// which days carry something and which carry bleeding, not what.
+  Future<
+    ({
+      Set<CycleDate> logged,
+      Map<CycleDate, FlowIntensity> flow,
+      Set<CycleDate> sex,
+      Set<CycleDate> pregnancyTest,
+    })
+  >
+  loggedDays() async {
+    final entries = await (selectOnly(
+      dayEntries,
+    )..addColumns([dayEntries.date, dayEntries.flow])).get();
+    final symptomDays = await (selectOnly(
+      daySymptoms,
+      distinct: true,
+    )..addColumns([daySymptoms.date])).get();
 
-    final byDate = {for (final row in rows) row.date: row};
-    final symptomsByDate = <CycleDate, Set<Symptom>>{};
-    for (final row in symptomRows) {
-      (symptomsByDate[row.date] ??= {}).add(Symptom(key: row.symptomKey));
+    final marked =
+        await (selectOnly(daySymptoms)
+              ..addColumns([daySymptoms.date, daySymptoms.symptomKey])
+              ..where(
+                daySymptoms.symptomKey.isIn([
+                  ...hadSexKeys,
+                  ...offeredPregnancyTestKeys,
+                ]),
+              ))
+            .get();
+    final sex = <CycleDate>{};
+    final pregnancyTest = <CycleDate>{};
+    for (final row in marked) {
+      final date = daySymptoms.date.converter.fromSql(
+        row.read(daySymptoms.date)!,
+      );
+      final key = row.read(daySymptoms.symptomKey)!;
+      (hadSexKeys.contains(key) ? sex : pregnancyTest).add(date);
     }
 
-    final dates = {...byDate.keys, ...symptomsByDate.keys}.toList()
-      ..sort((a, b) => a.compareTo(b));
-
-    return [
-      for (final date in dates)
-        DayEntry(
-          date: date,
-          flow: byDate[date]?.flow,
-          note: byDate[date]?.note,
-          symptoms: symptomsByDate[date] ?? const {},
-        ),
-    ];
+    final flow = <CycleDate, FlowIntensity>{};
+    final logged = <CycleDate>{};
+    for (final row in entries) {
+      final date = dayEntries.date.converter.fromSql(
+        row.read(dayEntries.date)!,
+      );
+      logged.add(date);
+      final raw = row.read(dayEntries.flow);
+      if (raw != null) {
+        flow[date] = dayEntries.flow.converter.fromSql(raw)!;
+      }
+    }
+    for (final row in symptomDays) {
+      logged.add(
+        daySymptoms.date.converter.fromSql(row.read(daySymptoms.date)!),
+      );
+    }
+    return (logged: logged, flow: flow, sex: sex, pregnancyTest: pregnancyTest);
   }
 
   /// Writes [entry], replacing whatever was logged on that day.
@@ -132,6 +167,7 @@ class LogDao extends DatabaseAccessor<AppDatabase> with _$LogDaoMixin {
           date: entry.date,
           flow: Value(entry.flow),
           note: Value(entry.note),
+          temperatureCenti: Value(entry.temperatureCentiCelsius),
         ),
         mode: InsertMode.replace,
       );

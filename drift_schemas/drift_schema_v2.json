@@ -140,12 +140,12 @@
       "references": [],
       "type": "table",
       "data": {
-        "name": "settings",
+        "name": "app_settings",
         "was_declared_in_moor": false,
         "columns": [
           {
-            "name": "key",
-            "getter_name": "key",
+            "name": "setting_key",
+            "getter_name": "settingKey",
             "moor_type": "string",
             "nullable": false,
             "customConstraints": null,
@@ -154,8 +154,8 @@
             "dsl_features": []
           },
           {
-            "name": "value",
-            "getter_name": "value",
+            "name": "setting_value",
+            "getter_name": "settingValue",
             "moor_type": "string",
             "nullable": false,
             "customConstraints": null,
@@ -168,7 +168,7 @@
         "without_rowid": false,
         "constraints": [],
         "explicit_pk": [
-          "key"
+          "setting_key"
         ]
       }
     }
@@ -202,11 +202,11 @@
       ]
     },
     {
-      "name": "settings",
+      "name": "app_settings",
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"settings\" (\"key\" TEXT NOT NULL, \"value\" TEXT NOT NULL, PRIMARY KEY (\"key\"));"
+          "sql": "CREATE TABLE IF NOT EXISTS \"app_settings\" (\"setting_key\" TEXT NOT NULL, \"setting_value\" TEXT NOT NULL, PRIMARY KEY (\"setting_key\"));"
         }
       ]
     }

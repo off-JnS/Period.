@@ -1,351 +1,738 @@
+import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../domain/logic/calendar_month.dart';
+import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/period_prediction.dart';
 import '../../domain/models/cycle_date.dart';
+import '../../domain/models/day_entry.dart';
 import '../../l10n/app_localizations.dart';
+import '../theme.dart';
+import 'calendar_markers.dart';
 import 'month_grid.dart';
+import 'year_view.dart';
 
-/// Everything the calendar needs for one month, already computed.
+/// Everything the calendar needs, already computed.
 ///
-/// Like the Today screen, the widget is a pure function of this so every state
-/// can be rendered in a golden file without a database.
+/// Like [TodayViewData], results rather than raw rows: the screen renders and
+/// nothing else, so every state is reachable in a test without a database.
 class CalendarViewData {
   /// Creates the view data.
   const CalendarViewData({
     required this.today,
     this.periodStarts = const {},
+    this.flowByDay = const {},
     this.loggedDays = const {},
-    this.prediction,
+    this.sexDays = const {},
+    this.pregnancyTestDays = const {},
+    this.predicted,
+    this.fertileWindow,
   });
 
-  /// The current day, marked distinctly.
+  /// The day it is now: the calendar opens on its month, marks it, and
+  /// refuses the days after it.
   final CycleDate today;
 
-  /// Days the user marked as a period start.
+  /// Days she marked as a period start.
   final Set<CycleDate> periodStarts;
 
-  /// Days with any entry at all.
+  /// The flow she logged, by day.
+  final Map<CycleDate, FlowIntensity> flowByDay;
+
+  /// Days she logged anything on.
   final Set<CycleDate> loggedDays;
 
-  /// The estimated next period, when there is one.
-  final PredictedPeriod? prediction;
+  /// Days she recorded having sex, protected or not.
+  final Set<CycleDate> sexDays;
+
+  /// Days she recorded a pregnancy test, whatever the result: the mark says
+  /// a test was taken, never what it showed.
+  final Set<CycleDate> pregnancyTestDays;
+
+  /// The estimated next-period window, when there is one.
+  final PredictedPeriod? predicted;
+
+  /// The estimated fertile window, only when she opted in and there is an
+  /// estimate to count back from.
+  final FertileWindowEstimate? fertileWindow;
+
+  /// Whether [date] is drawn as a period day.
+  bool isPeriod(CycleDate date) =>
+      isPeriodDay(date, starts: periodStarts, flowByDay: flowByDay);
+
+  /// Whether [date] lies in the estimated window and is not already a
+  /// logged period day.
+  bool isEstimated(CycleDate date) =>
+      (predicted?.contains(date) ?? false) && !isPeriod(date);
+
+  /// Whether [date] lies in the estimated fertile window.
+  bool isFertile(CycleDate date) =>
+      (fertileWindow?.contains(date) ?? false) &&
+      !isPeriod(date) &&
+      !isEstimated(date);
+
+  /// The band drawn on [date], if any.
+  CalendarMarker? markerOn(CycleDate date) {
+    if (isPeriod(date)) return CalendarMarker.period;
+    if (isEstimated(date)) return CalendarMarker.estimated;
+    if (isFertile(date)) return CalendarMarker.fertile;
+    return null;
+  }
 }
 
-/// The locale's first weekday, in [MonthGrid]'s convention.
+/// Every month in one continuous scroll, the current one first on screen.
 ///
-/// Flutter reports 0 (Sunday) through 6 (Saturday); [MonthGrid] takes 1 (Monday)
-/// through 7 (Sunday). Converted here, once, so no caller has to remember which
-/// of the two conventions it is holding. Germany starts the week on Monday and
-/// the United States on Sunday, and the calendar has to follow the reader.
-int firstWeekdayOf(BuildContext context) {
-  final index = MaterialLocalizations.of(context).firstDayOfWeekIndex;
-  return index == 0 ? 7 : index;
-}
-
-/// A month at a time, with every logged day visible and every past day tappable.
+/// Scrolls in both directions: back through her history, forward through the
+/// estimate. Months are built only as they come into view.
 ///
-/// This screen exists because section 4's whole design assumes users
-/// retroactively correct their entries. Without a way to reach a past day, the
-/// database supports corrections the interface cannot make.
-class CalendarScreen extends StatelessWidget {
+/// Section 9 forbids carrying information by colour alone here specifically,
+/// so each state has a shape of its own: a period is a filled band, the
+/// estimated period a dashed outline, the fertile window a band with no
+/// outline, today a ring around the number, and a logged day a dot under it.
+/// Every cell also says its state aloud, and tapping a day shows it in words.
+class CalendarScreen extends StatefulWidget {
   /// Creates the screen.
-  const CalendarScreen({
-    required this.data,
-    required this.grid,
-    this.onSelectDay,
-    this.onPreviousMonth,
-    this.onNextMonth,
-    super.key,
-  });
+  const CalendarScreen({required this.data, this.onSelectDay, super.key});
 
-  /// The month's computed state.
+  /// What to draw.
   final CalendarViewData data;
 
-  /// The month being shown.
-  final MonthGrid grid;
+  /// Shows a day. Called for any day, future ones included, which have an
+  /// estimate to show even though they cannot be logged yet.
+  final void Function(CycleDate date)? onSelectDay;
 
-  /// Called with the day the user tapped.
-  final void Function(CycleDate day)? onSelectDay;
+  @override
+  State<CalendarScreen> createState() => _CalendarScreenState();
+}
 
-  /// Moves back a month.
-  final VoidCallback? onPreviousMonth;
+/// What the calendar can be narrowed to, so those days stand out.
+enum CalendarFilter {
+  /// Days she recorded having sex.
+  sex,
 
-  /// Moves forward a month.
-  final VoidCallback? onNextMonth;
+  /// Days she recorded a pregnancy test.
+  pregnancyTest,
+}
+
+/// The earliest year the calendar scrolls back to.
+const _firstYear = 1900;
+
+/// The last year the calendar scrolls forward to.
+const _lastYear = 2199;
+
+class _CalendarScreenState extends State<CalendarScreen> {
+  final _controller = ScrollController();
+
+  /// The sliver the scroll is anchored on: the current month, at offset 0.
+  final _centreKey = UniqueKey();
+
+  /// What the calendar is narrowed to, or null for everything.
+  CalendarFilter? _filter;
+
+  /// The month the scroll is anchored on, counted as year * 12 + month - 1;
+  /// null for the current one. Opening a month from the year view anchors
+  /// on it, so it lands at the top without measuring the months between.
+  int? _anchor;
+
+  /// Whether whole years are shown rather than months, and which year first.
+  bool _yearView = false;
+  int _year = 0;
+
+  /// Fingers on the screen, for a pinch between the two views.
+  final Map<int, Offset> _pointers = {};
+  double? _pinchStart;
+
+  int get _current => widget.data.today.year * 12 + widget.data.today.month - 1;
+
+  /// Roughly the month at the top of the screen, from the scroll offset and
+  /// each month's height: its rows of days and its name above them.
+  int _monthOnScreen() {
+    var month = _anchor ?? _current;
+    if (!_controller.hasClients) return month;
+    final firstDay = MaterialLocalizations.of(context).firstDayOfWeekIndex;
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    double height(int absolute) {
+      final rows = monthGrid(
+        year: absolute ~/ 12,
+        month: absolute % 12 + 1,
+        firstDayOfWeekIndex: firstDay,
+      ).weeks.length;
+      return 24 + 34 * scale + rows * 58 * scale;
+    }
+
+    // A little way down, so a month mostly scrolled past does not count.
+    var offset = _controller.offset + 60;
+    if (offset >= 0) {
+      while (offset > height(month)) {
+        offset -= height(month);
+        month++;
+      }
+    } else {
+      while (offset < 0) {
+        month--;
+        offset += height(month);
+      }
+    }
+    return month;
+  }
+
+  void _zoomOut() {
+    if (_yearView) return;
+    final month = _monthOnScreen();
+    setState(() {
+      // Kept, so zooming back in returns to the same month.
+      _anchor = month;
+      _year = month ~/ 12;
+      _yearView = true;
+    });
+  }
+
+  void _openMonth(int year, int month) => setState(() {
+    _anchor = year * 12 + month - 1;
+    _yearView = false;
+  });
+
+  void _zoomIn() {
+    if (!_yearView) return;
+    setState(() => _yearView = false);
+  }
+
+  void _pointerMoved(PointerEvent event) {
+    _pointers[event.pointer] = event.position;
+    if (_pointers.length != 2) {
+      _pinchStart = null;
+      return;
+    }
+    final [a, b] = _pointers.values.toList();
+    final distance = (a - b).distance;
+    final start = _pinchStart ??= distance;
+    if (start < 1) return;
+    if (distance / start < 0.7) {
+      _pinchStart = null;
+      _zoomOut();
+    } else if (distance / start > 1.4) {
+      _pinchStart = null;
+      _zoomIn();
+    }
+  }
+
+  void _pointerGone(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    _pinchStart = null;
+  }
+
+  void _setFilter(CalendarFilter? filter) {
+    if (filter == _filter) return;
+    setState(() => _filter = filter);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Back to the current month: a glide when it is near, a jump when it is
+  /// years away, where a glide would only be a blur.
+  void _scrollToToday() {
+    if (_yearView || (_anchor != null && _anchor != _current)) {
+      setState(() {
+        _anchor = null;
+        _yearView = false;
+      });
+      return;
+    }
+    if (!_controller.hasClients) return;
+    if (_controller.offset.abs() > 4000) {
+      _controller.jumpTo(0);
+    } else {
+      _controller.animateTo(
+        0,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final locale = Localizations.localeOf(context).toLanguageTag();
+    final scheme = theme.colorScheme;
+    final materialL10n = MaterialLocalizations.of(context);
+    final today = widget.data.today;
+    final current = _anchor ?? today.year * 12 + today.month - 1;
+    final still = MediaQuery.of(context).disableAnimations;
 
-    final anythingLogged = grid.days.any(
-      (day) =>
-          grid.isInMonth(day) &&
-          (data.loggedDays.contains(day) || data.periodStarts.contains(day)),
+    Widget month(int absolute) => _MonthSection(
+      key: ValueKey(absolute),
+      year: absolute ~/ 12,
+      month: absolute % 12 + 1,
+      data: widget.data,
+      firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
+      onSelectDay: widget.onSelectDay,
+      filter: _filter,
     );
 
-    return Scaffold(
-      // The month, not the word "Calendar". The tab directly below already says
-      // that, so the bar said nothing and the month -- the only part of this
-      // screen that changes -- was a smaller heading underneath it. Moving the
-      // arrows up with it removes a whole row from a screen that scrolls.
-      appBar: AppBar(
-        // Grows with the text, so the title can take a second line instead of
-        // losing its end. A bar with two icon buttons in it is a much tighter
-        // box than the full-width row this replaced: at 200% text on a 320px
-        // phone "September 2024" wants 216px and would be given 184, and the
-        // year is what gets cut. The grid below clamps rather than wraps
-        // because seven columns of digits cannot do this; the month can, and
-        // the comment there promises it still scales all the way.
-        toolbarHeight: MediaQuery.textScalerOf(context).scale(kToolbarHeight),
-        // The label goes on the icon, not only in the tooltip: a tooltip is
-        // announced when it is shown, and on a touch device it never is, so
-        // these two would reach a screen reader as unnamed buttons. They are
-        // the only way to move through the calendar.
-        leading: IconButton(
-          onPressed: onPreviousMonth,
-          icon: Icon(Icons.chevron_left, semanticLabel: l10n.previousMonth),
-          tooltip: l10n.previousMonth,
-        ),
-        title: Text(
-          DateFormat.yMMMM(locale)
-              .format(DateTime(grid.month.year, grid.month.month)),
-          maxLines: 2,
-        ),
-        actions: [
-          IconButton(
-            onPressed: onNextMonth,
-            icon: Icon(Icons.chevron_right, semanticLabel: l10n.nextMonth),
-            tooltip: l10n.nextMonth,
+    String filterLabel(CalendarFilter filter) => switch (filter) {
+      CalendarFilter.sex => l10n.sexHeading,
+      CalendarFilter.pregnancyTest => l10n.pregnancyTestLabel,
+    };
+    Widget filterIcon(CalendarFilter filter, {double size = 16}) =>
+        switch (filter) {
+          CalendarFilter.sex => Icon(
+            CupertinoIcons.heart_fill,
+            size: size,
+            color: scheme.primary,
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-          children: [
-            // Seven columns of digits is the one part of this screen that
-            // cannot absorb unlimited text scaling: past about 1.3 the numbers
-            // are wider than a seventh of a phone and get cut off, which is
-            // worse for the user who enlarged them than slightly smaller text
-            // would be. Everything outside this grid -- the legend, the month,
-            // the empty-month line -- still scales all the way.
-            MediaQuery.withClampedTextScaling(
-              maxScaleFactor: 1.3,
+          CalendarFilter.pregnancyTest => PregnancyTestMark(
+            size: size,
+            color: scheme.primary,
+            onColor: scheme.onPrimary,
+          ),
+        };
+
+    // The same tinted page as every other screen, rather than a white one.
+    return Scaffold(
+      backgroundColor: scheme.groupedBackground,
+      body: Column(
+        children: [
+          // A fixed bar rather than a collapsing one: the scroll runs both
+          // ways from the middle, so a large title in it would sit above the
+          // earliest month instead of at the top of the screen.
+          Material(
+            color: scheme.groupedBackground,
+            child: SafeArea(
+              bottom: false,
               child: Column(
                 children: [
-                  _WeekdayHeader(
-                    firstWeekday: grid.firstWeekday,
-                    locale: locale,
-                  ),
-                  const SizedBox(height: 4),
-                  for (final week in grid.weeks)
-                    Row(
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 4, 0),
+                    child: Row(
                       children: [
-                        for (final day in week)
-                          Expanded(
-                            child: _DayCell(
-                              day: day,
-                              inMonth: grid.isInMonth(day),
-                              isToday: day == data.today,
-                              isPeriodStart: data.periodStarts.contains(day),
-                              isLogged: data.loggedDays.contains(day),
-                              isEstimated:
-                                  data.prediction?.contains(day) ?? false,
-                              // Future days are drawn -- the estimated window lives
-                              // there and is the reason to look ahead -- but cannot
-                              // be logged. This app records what happened, and a
-                              // period start dated in the future would invent a
-                              // cycle the user has not had, moving every estimate on
-                              // the strength of a plan. Passing no callback also
-                              // stops a screen reader announcing them as buttons.
-                              onTap:
-                                  onSelectDay == null || day.isAfter(data.today)
-                                  ? null
-                                  : () => onSelectDay!(day),
+                        Expanded(
+                          child: Semantics(
+                            header: true,
+                            // Shrinks rather than breaking the word when
+                            // large text leaves the buttons little room.
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                l10n.calendarTitle,
+                                maxLines: 1,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
+                        ),
+                        CupertinoButton(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          minimumSize: const Size(44, 44),
+                          onPressed: _scrollToToday,
+                          child: Text(
+                            l10n.todayTitle,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Semantics(
+                          button: true,
+                          label: _yearView
+                              ? l10n.calendarMonthView
+                              : l10n.calendarYearView,
+                          excludeSemantics: true,
+                          child: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(44, 44),
+                            onPressed: _yearView ? _zoomIn : _zoomOut,
+                            child: Icon(
+                              _yearView
+                                  ? CupertinoIcons.calendar
+                                  : CupertinoIcons.square_grid_2x2,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                        // A pull-down under the button, as iOS menus open.
+                        if (!_yearView)
+                          MenuAnchor(
+                            alignmentOffset: const Offset(-150, 0),
+                            style: MenuStyle(
+                              backgroundColor: WidgetStatePropertyAll(
+                                scheme.groupedCard,
+                              ),
+                              shape: WidgetStatePropertyAll(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              side: const WidgetStatePropertyAll(
+                                BorderSide.none,
+                              ),
+                              elevation: const WidgetStatePropertyAll(8),
+                              shadowColor: WidgetStatePropertyAll(
+                                Colors.black.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            menuChildren: [
+                              for (final option in [
+                                null,
+                                ...CalendarFilter.values,
+                              ])
+                                MenuItemButton(
+                                  onPressed: () => _setFilter(option),
+                                  leadingIcon: SizedBox(
+                                    width: 20,
+                                    child: Center(
+                                      child: option == null
+                                          ? Icon(
+                                              CupertinoIcons.calendar,
+                                              size: 18,
+                                              color: scheme.primary,
+                                            )
+                                          : filterIcon(option),
+                                    ),
+                                  ),
+                                  trailingIcon: option == _filter
+                                      ? Icon(
+                                          CupertinoIcons.checkmark_alt,
+                                          size: 18,
+                                          color: scheme.primary,
+                                        )
+                                      : const SizedBox(width: 18),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: Text(
+                                      option == null
+                                          ? l10n.calendarFilterAll
+                                          : filterLabel(option),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                            builder: (context, controller, _) => Semantics(
+                              button: true,
+                              label: l10n.calendarFilterButton,
+                              excludeSemantics: true,
+                              child: CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(44, 44),
+                                onPressed: () => controller.isOpen
+                                    ? controller.close()
+                                    : controller.open(),
+                                child: Icon(
+                                  _filter == null
+                                      ? CupertinoIcons
+                                            .line_horizontal_3_decrease_circle
+                                      : CupertinoIcons
+                                            .line_horizontal_3_decrease_circle_fill,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        Semantics(
+                          button: true,
+                          label: l10n.calendarLegendButton,
+                          excludeSemantics: true,
+                          child: CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(44, 44),
+                            onPressed: () => _showLegend(
+                              context,
+                              showFertile: widget.data.fertileWindow != null,
+                            ),
+                            child: Icon(
+                              CupertinoIcons.info_circle,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
+                  ),
+                  // Which filter is on, with a way off, so a calendar that
+                  // looks emptier than usual always says why.
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: switch (_filter) {
+                      final filter? when !_yearView => Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 4),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 10),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  filterIcon(filter, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    filterLabel(filter),
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: scheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Semantics(
+                                    button: true,
+                                    label: l10n.calendarFilterClear,
+                                    excludeSemantics: true,
+                                    child: CupertinoButton(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                      ),
+                                      minimumSize: const Size(36, 32),
+                                      onPressed: () => _setFilter(null),
+                                      child: Icon(
+                                        CupertinoIcons.xmark_circle_fill,
+                                        size: 18,
+                                        color: scheme.primary.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      _ => const SizedBox(width: double.infinity),
+                    },
+                  ),
+                  if (!_yearView)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: _WeekdayHeader(
+                        firstDayOfWeekIndex: materialL10n.firstDayOfWeekIndex,
+                        narrowWeekdays: materialL10n.narrowWeekdays,
+                      ),
+                    ),
+                  Divider(
+                    height: 0.5,
+                    thickness: 0.5,
+                    color: scheme.outlineVariant,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            if (!anythingLogged)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  l10n.nothingLoggedThisMonth,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+          ),
+          Expanded(
+            // A pinch in zooms out to years, a pinch out back in to months.
+            // Listened to rather than recognised, so it never takes a scroll
+            // away from the list underneath.
+            child: Listener(
+              onPointerDown: _pointerMoved,
+              onPointerMove: _pointerMoved,
+              onPointerUp: _pointerGone,
+              onPointerCancel: _pointerGone,
+              child: AnimatedSwitcher(
+                duration: still
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                // Months shrink away into the year, the year grows back
+                // into months: a zoom, kept small.
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween(
+                      begin: child.key == const ValueKey('year') ? 1.06 : 0.94,
+                      end: 1.0,
+                    ).animate(animation),
+                    child: child,
                   ),
                 ),
+                child: _yearView
+                    ? CalendarYearView(
+                        key: const ValueKey('year'),
+                        data: widget.data,
+                        year: _year,
+                        firstYear: _firstYear,
+                        lastYear: _lastYear,
+                        onSelectMonth: _openMonth,
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('months'),
+                        child: CustomScrollView(
+                          // A new anchor starts a new scroll, at that month.
+                          key: ValueKey(current),
+                          controller: _controller,
+                          center: _centreKey,
+                          slivers: [
+                            // Grows upwards from the current month, into the past.
+                            SliverList.builder(
+                              itemCount: current - _firstYear * 12,
+                              itemBuilder: (context, index) =>
+                                  month(current - 1 - index),
+                            ),
+                            // The current month and everything after it.
+                            SliverPadding(
+                              key: _centreKey,
+                              // Clear of the dock, which floats over the end.
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    24 + MediaQuery.paddingOf(context).bottom,
+                              ),
+                              sliver: SliverList.builder(
+                                itemCount: (_lastYear + 1) * 12 - current,
+                                itemBuilder: (context, index) =>
+                                    month(current + index),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
-            const _Legend(),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Names every marker the grid uses.
-///
-/// Not decoration. Section 9 forbids information carried by colour alone, and a
-/// calendar is where that rule is easiest to break: a grid of coloured dots is
-/// meaningless to anyone who cannot distinguish them. Each state has a distinct
-/// shape, and the legend says in words what each shape means.
-class _Legend extends StatelessWidget {
-  const _Legend();
+/// One month: its name, a line for each thing it holds, and its days.
+class _MonthSection extends StatelessWidget {
+  const _MonthSection({
+    required this.year,
+    required this.month,
+    required this.data,
+    required this.firstDayOfWeekIndex,
+    this.onSelectDay,
+    this.filter,
+    super.key,
+  });
+
+  final CalendarFilter? filter;
+  final int year;
+  final int month;
+  final CalendarViewData data;
+  final int firstDayOfWeekIndex;
+  final void Function(CycleDate date)? onSelectDay;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final today = data.today;
+    final isCurrent = year == today.year && month == today.month;
 
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      children: [
-        _LegendEntry(
-          label: l10n.legendPeriodStart,
-          marker: _Marker(
-            filled: true,
-            color: theme.colorScheme.primary,
-            child: Text(
-              '1',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onPrimary,
-              ),
+    final grid = monthGrid(
+      year: year,
+      month: month,
+      firstDayOfWeekIndex: firstDayOfWeekIndex,
+    );
+    final title = DateFormat(
+      year == today.year ? 'MMMM' : 'yMMMM',
+      locale,
+    ).format(DateTime(year, month));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 20, 8, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Above the column of the 1st, as iOS Calendar places it, so the
+          // name leads straight into the month's first day.
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final lead = grid.days.indexWhere(grid.isInMonth);
+              final column = constraints.maxWidth / 7;
+              return Padding(
+                padding: EdgeInsetsDirectional.only(
+                  start: math
+                      .min(
+                        lead * column + column / 2 - 12,
+                        constraints.maxWidth / 2,
+                      )
+                      .clamp(4.0, double.infinity),
+                  bottom: 6,
+                ),
+                child: Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: isCurrent ? scheme.primary : scheme.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          for (final week in grid.weeks)
+            Row(
+              children: [
+                for (final (column, date) in week.indexed)
+                  Expanded(
+                    child: grid.isInMonth(date)
+                        ? _DayCell(
+                            date: date,
+                            data: data,
+                            joinsLeft: column > 0,
+                            joinsRight: column < 6,
+                            inMonth: grid.isInMonth,
+                            onTap: onSelectDay,
+                            filter: filter,
+                          )
+                        // Days of the neighbouring months are left out: each
+                        // belongs to its own month, one scroll away.
+                        : const SizedBox.shrink(),
+                  ),
+              ],
             ),
-          ),
-        ),
-        _LegendEntry(
-          label: l10n.legendLogged,
-          marker: _Marker(
-            color: theme.colorScheme.onSurfaceVariant,
-            child: const _LoggedDot(),
-          ),
-        ),
-        _LegendEntry(
-          label: l10n.legendEstimated,
-          marker: _Marker(
-            strokeWidth: 1,
-            color: theme.colorScheme.primary,
-            child: const SizedBox.shrink(),
-          ),
-        ),
-        _LegendEntry(
-          label: l10n.today,
-          marker: _Marker(
-            strokeWidth: 2,
-            color: theme.colorScheme.onSurface,
-            child: const SizedBox.shrink(),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _LegendEntry extends StatelessWidget {
-  const _LegendEntry({required this.label, required this.marker});
-
-  final String label;
-  final Widget marker;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      marker,
-      const SizedBox(width: 6),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ],
-  );
-}
-
-class _Marker extends StatelessWidget {
-  const _Marker({
-    required this.color,
-    required this.child,
-    this.filled = false,
-    this.strokeWidth = 0,
+class _WeekdayHeader extends StatelessWidget {
+  const _WeekdayHeader({
+    required this.firstDayOfWeekIndex,
+    required this.narrowWeekdays,
   });
 
-  final Color color;
-  final Widget child;
-  final bool filled;
-
-  /// Zero for no ring. Matches the ring the day cell draws for the same state,
-  /// which is the whole point of a legend.
-  final double strokeWidth;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 22,
-    height: 22,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: filled ? color : null,
-      border: strokeWidth == 0
-          ? null
-          : Border.all(
-              color: color,
-              width: strokeWidth,
-              strokeAlign: BorderSide.strokeAlignInside,
-            ),
-    ),
-    child: child,
-  );
-}
-
-/// The small dot marking a day with an entry.
-class _LoggedDot extends StatelessWidget {
-  const _LoggedDot();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 5,
-    height: 5,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-    ),
-  );
-}
-
-class _WeekdayHeader extends StatelessWidget {
-  const _WeekdayHeader({required this.firstWeekday, required this.locale});
-
-  /// 1 (Monday) through 7 (Sunday), matching [MonthGrid].
-  final int firstWeekday;
-  final String locale;
+  final int firstDayOfWeekIndex;
+  final List<String> narrowWeekdays;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final format = DateFormat.E(locale);
 
     return Row(
       children: [
         for (var i = 0; i < 7; i++)
           Expanded(
             child: ExcludeSemantics(
+              // The day cells each say their own full date, so reading seven
+              // one-letter headers first would only add noise.
               child: Text(
-                // January 2024 began on a Monday, so the day of the month and
-                // the weekday number line up: the 1st is weekday 1, the 7th is
-                // weekday 7.
-                format.format(
-                  DateTime(2024, 1, (firstWeekday - 1 + i) % 7 + 1),
-                ),
+                narrowWeekdays[(firstDayOfWeekIndex + i) % 7],
                 textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
+                style: theme.textTheme.labelMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -355,114 +742,371 @@ class _WeekdayHeader extends StatelessWidget {
   }
 }
 
-/// One day in the grid.
-///
-/// Four states can be true at once, so they are drawn with different features
-/// rather than different colours of the same feature: a period start fills the
-/// circle, today outlines it, an estimated day dashes the outline, and a logged
-/// day puts a dot beneath the number. The spoken label lists whichever apply,
-/// because none of that reaches a screen reader.
 class _DayCell extends StatelessWidget {
   const _DayCell({
-    required this.day,
+    required this.date,
+    required this.data,
+    required this.joinsLeft,
+    required this.joinsRight,
     required this.inMonth,
-    required this.isToday,
-    required this.isPeriodStart,
-    required this.isLogged,
-    required this.isEstimated,
     this.onTap,
+    this.filter,
   });
 
-  final CycleDate day;
-  final bool inMonth;
-  final bool isToday;
-  final bool isPeriodStart;
-  final bool isLogged;
-  final bool isEstimated;
-  final VoidCallback? onTap;
+  /// When set, days that do not match fade back.
+  final CalendarFilter? filter;
+
+  final CycleDate date;
+  final CalendarViewData data;
+
+  /// Whether the cell has a neighbour on that side in its row, so a band can
+  /// run on into it.
+  final bool joinsLeft;
+  final bool joinsRight;
+  final bool Function(CycleDate date) inMonth;
+  final void Function(CycleDate date)? onTap;
+
+  CalendarMarker? _markerOn(CycleDate day) => data.markerOn(day);
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final locale = Localizations.localeOf(context).toLanguageTag();
 
-    final markers = [
-      if (isToday) l10n.today,
-      if (isPeriodStart) l10n.legendPeriodStart,
-      if (isLogged && !isPeriodStart) l10n.legendLogged,
-      if (isEstimated) l10n.legendEstimated,
-    ];
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6);
+    final extent = 58.0 * scale;
 
-    final label = l10n.dayAccessibility(
-      DateFormat.yMMMMd(locale).format(DateTime(day.year, day.month, day.day)),
-      markers.isEmpty ? '' : ', ${markers.join(', ')}',
-    );
+    final isToday = date == data.today;
+    final isFuture = date.isAfter(data.today);
+    final isLogged = data.loggedDays.contains(date);
+    final hadSex = data.sexDays.contains(date);
+    final hadTest = data.pregnancyTestDays.contains(date);
+    final matches = switch (filter) {
+      null => true,
+      CalendarFilter.sex => hadSex,
+      CalendarFilter.pregnancyTest => hadTest,
+    };
+    final marker = _markerOn(date);
+    final previous = date.subtractDays(1);
+    final next = date.addDays(1);
+    final left =
+        marker != null &&
+        joinsLeft &&
+        inMonth(previous) &&
+        _markerOn(previous) == marker;
+    // Whether the band carries on the next day at all, even if into the next
+    // row or month. Only where it truly stops does it fade out.
+    final continues = marker != null && _markerOn(next) == marker;
+    final right = continues && joinsRight && inMonth(next);
+    final fadesOut = marker != null && !continues;
+    // Weekend numbers in grey, as iOS Calendar sets them.
+    final isWeekend = date.weekday >= DateTime.saturday;
 
-    // Follows the text rather than a fixed 36: at a larger text size a fixed
-    // circle clips the number it exists to display, and the day of the month is
-    // the one thing on this screen a user cannot do without.
-    final diameter = MediaQuery.textScalerOf(context).scale(36);
-    final faded = !inMonth;
-    final numberColour = isPeriodStart
-        ? theme.colorScheme.onPrimary
-        : faded
-        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-        : theme.colorScheme.onSurface;
+    // Under a filter the bands step aside, so what was filtered for is all
+    // there is to look at.
+    final drawn = filter == null ? marker : null;
+    final onBand = drawn == CalendarMarker.period;
+    final foreground = onBand
+        ? scheme.onPrimary
+        : isWeekend
+        ? scheme.onSurfaceVariant
+        : scheme.onSurface;
+
+    // Everything a screen reader needs, in words, because none of the shapes
+    // below mean anything to one.
+    final spoken = <String>[
+      DateFormat.yMMMMd(locale)
+          .format(DateTime(date.year, date.month, date.day)),
+      if (isToday) l10n.todayTitle,
+      if (data.periodStarts.contains(date))
+        l10n.legendPeriodStart
+      else if (marker == CalendarMarker.period)
+        l10n.legendPeriodDay,
+      if (isLogged && marker != CalendarMarker.period) l10n.legendLogged,
+      if (hadSex) l10n.sexHeading,
+      if (hadTest) l10n.pregnancyTestLabel,
+      if (marker == CalendarMarker.estimated) l10n.legendEstimated,
+      if (marker == CalendarMarker.fertile) l10n.fertileWindowHeading,
+      if (isFuture) l10n.dayNotYetHappened,
+    ].join(', ');
 
     return Semantics(
-      label: label,
+      // Its own node, so each day is reached and read on its own rather than
+      // folded into the month around it.
+      container: true,
+      label: spoken,
       button: onTap != null,
       excludeSemantics: true,
-      // Its own node, explicitly. Without this, cells carrying no action --
-      // every day from tomorrow onwards -- are merged into their neighbours,
-      // and a screen reader reads a whole week as one run-on sentence instead
-      // of seven days a user can move between. It reads correctly on a past
-      // week and wrongly on a future one, which is exactly the kind of bug
-      // that ships.
-      container: true,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: diameter,
-                height: diameter,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isPeriodStart ? theme.colorScheme.primary : null,
-                  border: isToday
-                      ? Border.all(color: theme.colorScheme.onSurface, width: 2)
-                      : isEstimated
-                      ? Border.all(color: theme.colorScheme.primary)
-                      : null,
-                ),
-                child: Text(
-                  '${day.day}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: numberColour,
-                    fontWeight: isToday ? FontWeight.bold : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // Future days open too: there is an estimate to show, though the
+        // preview offers no editing until the day has happened.
+        onTap: onTap == null
+            ? null
+            : () {
+                onTap!(date);
+              },
+        // A hairline above every day, as iOS draws above each week: the
+        // first row's starts at the 1st, not at the edge.
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: scheme.outlineVariant, width: 0.5),
+            ),
+          ),
+          child: SizedBox(
+            height: extent,
+            // Under a filter, days that do not match fade back so the ones
+            // that do stand out; today stays, to keep her bearings.
+            child: AnimatedOpacity(
+              opacity: matches || isToday ? 1 : 0.3,
+              duration: const Duration(milliseconds: 220),
+              child: CustomPaint(
+                painter: BandPainter(
+                  marker: drawn,
+                  joinsLeft: left,
+                  joinsRight: right,
+                  fadesOut: fadesOut,
+                  colors: MarkerColors.of(
+                    scheme,
+                    background: scheme.groupedBackground,
                   ),
+                  scale: scale,
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // The number sits a little above centre, leaving room
+                    // beneath it, inside the band, for the day's mark. The
+                    // discs behind it stay small enough to clear that mark.
+                    Align(
+                      alignment: const Alignment(0, -0.22),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // A day that matches the filter gets a soft disc.
+                          if (filter != null && matches && !isToday)
+                            Container(
+                              width: 30 * scale,
+                              height: 30 * scale,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: scheme.primary.withValues(alpha: 0.16),
+                              ),
+                            ),
+                          // Today is a filled circle, as in iOS Calendar;
+                          // inverted on a period band so it still stands out.
+                          if (isToday)
+                            Container(
+                              width: 29 * scale,
+                              height: 29 * scale,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: onBand
+                                    ? scheme.onPrimary
+                                    : scheme.primary,
+                              ),
+                            ),
+                          Text(
+                            '${date.day}',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 19,
+                              color: isToday
+                                  ? (onBand ? scheme.primary : scheme.onPrimary)
+                                  : isFuture && !onBand
+                                  ? foreground.withValues(alpha: 0.45)
+                                  : foreground,
+                              fontWeight: isToday || onBand
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // A shape under the number rather than a tint of the cell,
+                    // so it survives being seen by someone who cannot tell the
+                    // tints apart. A heart for sex takes the dot's place: it is
+                    // a logged day too, and one mark reads cleaner than two.
+                    if (hadSex || hadTest || isLogged)
+                      Align(
+                        alignment: const Alignment(0, 0.68),
+                        child: hadSex || hadTest
+                            // Icons for the two things worth spotting at a
+                            // glance, side by side on a day with both; the
+                            // plain dot for anything else logged.
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (hadSex)
+                                    Icon(
+                                      CupertinoIcons.heart_fill,
+                                      size: 9 * scale,
+                                      color: onBand
+                                          ? scheme.onPrimary
+                                          : scheme.primary,
+                                    ),
+                                  if (hadSex && hadTest)
+                                    SizedBox(width: 2 * scale),
+                                  if (hadTest)
+                                    PregnancyTestMark(
+                                      size: 11 * scale,
+                                      color: onBand
+                                          ? scheme.onPrimary
+                                          : scheme.primary,
+                                      onColor: onBand
+                                          ? scheme.primary
+                                          : scheme.onPrimary,
+                                    ),
+                                ],
+                              )
+                            : Container(
+                                width: 5 * scale,
+                                height: 5 * scale,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: onBand
+                                      ? scheme.onPrimary
+                                      : scheme.primary,
+                                ),
+                              ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 2),
-              // Reserved whether or not it is drawn, so rows do not shift as
-              // days get logged.
-              SizedBox(
-                height: 5,
-                child: isLogged && !isPeriodStart
-                    ? const _LoggedDot()
-                    : const SizedBox.shrink(),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Names every marker in words.
+///
+/// Not decoration: it is what makes the shapes legible to someone who has not
+/// used the app before, and it is the written half of section 9's rule that no
+/// state is carried by colour alone. The fertile window's caveat comes with it
+/// whenever that band can appear (CLAUDE.md §8).
+Future<void> _showLegend(BuildContext context, {required bool showFertile}) {
+  final l10n = AppLocalizations.of(context);
+
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    backgroundColor: Theme.of(context).colorScheme.groupedCard,
+    builder: (context) {
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
+
+      Widget item(Widget swatch, String label, [String? detail]) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(width: 44, child: Center(child: swatch)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: theme.textTheme.bodyLarge),
+                  if (detail != null)
+                    Text(
+                      detail,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+      return SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  l10n.calendarLegendButton,
+                  style: theme.textTheme.titleLarge,
+                ),
+              ),
+              const SizedBox(height: 8),
+              item(
+                const MarkerSwatch(CalendarMarker.period),
+                l10n.legendPeriodDay,
+              ),
+              item(
+                const MarkerSwatch(CalendarMarker.estimated),
+                l10n.legendEstimated,
+              ),
+              if (showFertile)
+                item(
+                  const MarkerSwatch(CalendarMarker.fertile),
+                  l10n.fertileWindowHeading,
+                  l10n.fertileWindowCaveat,
+                ),
+              item(
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: scheme.primary, width: 2),
+                  ),
+                ),
+                l10n.todayTitle,
+              ),
+              item(
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.primary,
+                  ),
+                ),
+                l10n.legendLogged,
+              ),
+              item(
+                Icon(
+                  CupertinoIcons.heart_fill,
+                  size: 12,
+                  color: scheme.primary,
+                ),
+                l10n.sexHeading,
+              ),
+              item(
+                PregnancyTestMark(
+                  size: 14,
+                  color: scheme.primary,
+                  onColor: scheme.onPrimary,
+                ),
+                l10n.pregnancyTestLabel,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.legendTapHint,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

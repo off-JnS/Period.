@@ -56,6 +56,22 @@ flow recorded as light, medium or heavy. A day recorded as `none`, or a day with
 no flow recorded at all, ends the run. FIGO puts normal duration at 2–7 days;
 the app does not enforce that, it only reports what was logged.
 
+Three cases the run needs spelled out:
+
+- **Start day with no flow recorded** — the duration is *unknown*, not zero.
+  She marked a start and logged nothing else; a zero would be a figure she
+  never gave. Unknown durations are left out of every statistic.
+- **Still running** — when the run reaches today, the period may not be over.
+  Its duration is *so far*, is shown as ongoing, and is left out of every
+  statistic until a later day ends the run.
+- **Never past the next start** — a run stops the day before the next period
+  start, however the flow was logged.
+
+**Usual period duration** — the median of the known, finished durations, shown
+once there are at least **2** (the same bar as cycles, §3, so the two screens
+never disagree about how much history is enough). Pure description, so it is
+shown in **every** mode, pregnancy included (§6).
+
 **Completed cycle** — one with a known end. Only completed cycles feed any
 statistic.
 
@@ -116,6 +132,20 @@ band and call it a prediction.
 
 **Display** is a range — "26.–30." — with wording like "estimated, based on your
 entries", per §8. Never a single date. Never a countdown that implies certainty.
+
+**Countdown.** Today may say how far away the window is, but only as the
+window itself, counted in days — "in 12–16 days" — never a single number.
+Three states, from the window alone:
+
+- before the window opens: *in {days to first day}–{days to last day} days*;
+- inside the window: *could start any day* — no number, since every day in
+  it is equally a candidate;
+- past the window with no new start recorded: *later than estimated*,
+  stated plainly and without a reason. Lateness has many causes, and naming
+  any of them would be a diagnosis (§7, CLAUDE.md §8).
+
+No countdown at all when there is no window (predictions off, too few or
+too variable cycles).
 
 ---
 
@@ -215,6 +245,21 @@ first-class state, not a suppressed display.
 | **Pregnancy** | Off | Cycle statistics are hidden, not zeroed. Symptom logging matters more here, not less. |
 | **Perimenopause** | Off by default, user may opt in | STRAW+10 defines the transition *by* rising variability, so a confident prediction is most wrong exactly where it would be most trusted. If opted in, everything is shown as ranges with the widening spread made visible rather than smoothed away. |
 
+**Pregnancy week counter.** In pregnancy mode, Today shows how far along the
+pregnancy is, in place of the cycle day, counted the conventional way: from the
+**first day of the last period** (the most recent period start), written as
+completed weeks plus days — *12+3* is 12 weeks and 3 days. Pure date arithmetic
+on recorded starts; nothing is stored (§4).
+
+- No recorded period start: no counter; Today asks for the first day of the
+  last period instead.
+- **No due date**, not even a window: a due date is a prediction, and in the
+  one mode where predictions are off it would be the most trusted number on
+  the screen (CLAUDE.md §8).
+- The counter runs to **44+0**. Beyond that it stops, and Today asks — without
+  assuming anything — whether pregnancy mode is still right, since the mode is
+  easily left on after a birth or a loss.
+
 **Every mode states why predictions are off**, in place of where they would
 otherwise appear. Silently showing nothing reads as a bug and invites the user to
 conclude the app is broken.
@@ -224,93 +269,7 @@ still be shown in any mode. Anything predictive may not.
 
 ---
 
-## 7. Reminders (§9)
-
-A reminder is a nudge to **log**, at a time and on days the user chose herself.
-
-**A reminder carries no inference.** It is not derived from a prediction, a
-phase, a cycle day or a cycle length. Nothing about when it fires depends on
-anything this document computes.
-
-That is the load-bearing statement in this section, and everything else follows
-from it:
-
-- It is why reminders need **no mode gate**. §6 turns predictions off for
-  hormonal contraception, pregnancy and perimenopause; reminders behave
-  identically in every mode, including those, because there is nothing
-  predictive in them to turn off. A pregnant user who asked to be reminded to
-  log on Tuesdays gets reminded on Tuesdays.
-- It is why this section needs no citation. The basis is a product decision, not
-  a finding: a reminder that said anything about her cycle would be an
-  inference, and §7 of CLAUDE.md forbids stating one as certainty while §9
-  forbids putting cycle content on a lock screen. A reminder that says nothing
-  cannot be wrong about her.
-
-**The notification text is neutral**, per §9 of CLAUDE.md: a title of
-"Reminder" and a body that says only that the app is worth opening. It names no
-cycle, no day, no symptom and no prediction. A person who picks up her unlocked
-phone in front of someone else learns nothing from it, and neither does anyone
-reading over her shoulder. The cost is real and accepted: she has to open the
-app to know what the reminder was for.
-
-The body exists because a notification with an empty one reads as a bug on both
-platforms, not because there is anything to say. It is held to the same rule as
-the title, and `settings_page_test.dart` asserts that neither contains any of
-the words that would give her away.
-
-**A reminder is skipped when that day is already logged.** A reminder to do a
-thing already done is noise, and an app that generates noise gets its
-notifications turned off entirely — taking the useful ones with them.
-
-### Scheduling across a clock change
-
-A reminder is stored, and computed, as **a calendar day plus a wall-clock
-time**. It is never stored as an instant, and the next occurrence is never
-computed by advancing the previous one.
-
-This matters at a daylight-saving boundary. Adding twenty-four hours to the last
-fire time moves a 20:00 reminder to 19:00 or 21:00 and leaves it there. §3 of
-CLAUDE.md already forbids `Duration` arithmetic on calendar days for the same
-reason; this is the case where the consequence is visible to the user every day
-until she gives up on it.
-
-The domain therefore answers *which day and what wall time*, and resolving that
-to an instant is the platform layer's job, done fresh for each scheduling
-against the timezone in force at that moment.
-
-**How well that is actually done, as built.** Recurrence is handed to the
-operating system in wall-clock terms — a notification that repeats on an hour
-and a minute, or on a weekday, an hour and a minute — so every firing after the
-first follows the wall clock across a clock change without this app doing
-anything. On iOS that is a calendar trigger and is correct by construction.
-
-The *first* firing is not that strong. Resolving a day and a time to an instant
-needs to know when the clocks change, which needs the device's IANA timezone
-name, which needs a package §6 of CLAUDE.md does not allow. So the first firing
-is resolved against the UTC offset in force when it is scheduled. If the clocks
-change between scheduling and that first firing, it arrives an hour early or
-late, once, and every later one is correct.
-
-The bound is deliberate and worth stating plainly: **it can be wrong by an hour,
-never by a day, and it can never move anything in the database.** A notification
-writes nothing. The shift §3 of CLAUDE.md exists to prevent — an entry silently
-landing on the wrong calendar day — is not reachable from here.
-
-Closing the remaining hour needs five lines of platform code, not a package, and
-is written down in `lib/data/reminders.dart` where it would go.
-
-### Non-goal
-
-**No reminder derived from a predicted window** — nothing that says, or implies
-by its timing, that a period is due. That would be an inference, and would drag
-every constraint in §6 back into a feature deliberately built without them.
-
-Changing this means editing this section first, with the reasoning, per §11 of
-CLAUDE.md. It must not arrive as a quiet change in code.
-
----
-
-## 8. Non-goals
+## 7. Non-goals
 
 Stated explicitly so they are inherited rather than rediscovered:
 
@@ -322,6 +281,127 @@ Stated explicitly so they are inherited rather than rediscovered:
 - **No prediction stated as certainty.** Always a window, always qualified.
 - **No cycle-science behaviour invented in code.** If a case is not covered here,
   it goes in this document first, with its basis. That is what §11 requires.
+
+---
+
+## 8. Reminders
+
+Optional reminders, all off by default. None is cycle science; they are
+written here because the first one depends on the prediction, and §11 wants
+anything that depends on it defined in one place.
+
+**Period coming.** Fires `daysBefore` days before the **first day of the
+estimated window** (§3), at the time she chose. `daysBefore` is 1–5, default 2.
+
+- No estimate, no reminder: in any mode with predictions off (§6), and while
+  there are too few cycles or they vary too much (§3). The reminder is never a
+  prediction of its own.
+- Counted from the window's first day, not its middle, so it arrives before the
+  earliest plausible start rather than after it.
+- A reminder day already in the past, or today at a time already gone, is
+  skipped rather than fired late.
+- Recomputed from the stored period starts every time it is scheduled (§4);
+  nothing about it is stored except her settings.
+
+**Daily log.** Fires every day at the time she chose. Scheduled for the next 30
+days and rescheduled whenever the app is opened, so it keeps going as long as
+the app is used.
+
+**Contraception reminders** (added 2026-09-30). Not cycle science either:
+they follow the schedule *she* enters, never one the app works out, and never
+say whether she is protected. Each is off by default, belongs to one kind of
+method, and is planned **only while that method is the one in her profile**
+(§10), so changing method silences the old reminder instead of leaving it
+firing. Dates she enters are calendar days (§3); every reminder is planned
+from them on read (§4). A reminder day already past is skipped, as above.
+
+- **Pill** (combined or progestin-only). Every day at her pill time, for the
+  next 30 days. She picks the pack: taken every day with no break (the
+  default, and the only safe reading when she has not said), 21 days then a
+  7-day break, or 24 days then a 4-day break. With a break she gives the
+  first day of a pack; days are counted from it in 28-day packs, and break
+  days get no reminder. These three layouts are the common ones on pack
+  leaflets; the app does not know her brand, which is why she chooses.
+- **Vaginal ring.** From the day she put the current ring in: take it out on
+  day 22 (after three weeks), put a new one in on day 29 (after a week's
+  break), repeating every 28 days, planned 120 days ahead.
+- **Patch.** From the day she put on the first patch of a pack: change it on
+  days 8 and 15, take it off on day 22, a new pack on day 29, repeating every
+  28 days, planned 120 days ahead.
+- **Injection.** From the day of her last injection and the interval she was
+  given (4–14 weeks, default 12): one reminder a week before the next is due,
+  one on the day. Only the next injection; she enters the new date once she
+  has had it.
+- **IUD or implant** (hormonal or copper IUD, implant). The date it should be
+  replaced by, as she was told, and how long before to be reminded (1, 2, 4
+  or 8 weeks, default 4): one reminder then, one on the day.
+
+Pill reminders arrive at their own time (default 21:00); the others at one
+shared time (default 09:00). iOS keeps at most 64 pending notifications, so
+at most 60 are scheduled: the contraception and period reminders first, then
+the daily log reminder for as many of its 30 days as still fit.
+
+**Wording.** Every notification reads only *Reminder* / *Erinnerung*. No
+cycle, period, date or day number appears on the lock screen (CLAUDE.md §9),
+and the kinds are deliberately indistinguishable there, contraception
+included: a lock screen reading "take your pill" says what she uses. Inside
+the app, the reminders page lists what each upcoming one is for.
+
+---
+
+## 9. Body signals
+
+**Recorded only.** Basal body temperature and ovulation (LH) test results are
+logged, charted and kept, and **never used by any estimate**: not the period
+window (§3), not the fertile window (§4). §4 names body signals as the only
+honest way a fertile window could ever be narrowed; doing so would need a
+method written here first, with its sources, and a decision by the owner. Until
+then the app draws no conclusion from them, and says so beside the chart.
+
+- **Temperature** is stored in hundredths of a degree Celsius, one reading per
+  day, so 36.45 °C is 3645 and no floating-point rounding can alter what was
+  entered. Accepted range 34.00–43.00 °C: anything outside is a typo, not a
+  reading, and is refused at entry rather than stored.
+- **Ovulation test** is *negative* or *positive*, one per day, like discharge.
+- **Pregnancy test** likewise: *negative* or *positive*, one per day. Recorded
+  and shown back (a ± mark in the calendar), nothing more: no estimate reads
+  it, the app states no conclusion from it, and a positive result does not
+  switch to the pregnancy mode — that stays her choice (§6).
+- The chart shows the readings of one cycle by cycle day. It marks positive
+  tests with a shape as well as a colour (CLAUDE.md §9) and draws no line,
+  band or label that interprets them.
+
+---
+
+## 10. Profile
+
+What she tells the app about herself, as opposed to what she logs day by day.
+All of it optional, all of it **recorded only**: shown back to her and in the
+doctor report, and **never an input to any estimate**.
+
+- **Birth year**, not a birth date: the year is all a doctor's report needs,
+  and storing less is the safer default for data like this. Age is derived on
+  read (§4) and shown as the age she turns *this calendar year* — "28 this
+  year" — which the year alone determines exactly, where "28 years old" would
+  be wrong for part of every year. Accepted: 8 to 70 years before today's year.
+- **Usual cycle length** (15–90 days) and **usual period length** (1–14 days),
+  as she believes them to be. **Not used by §3**, deliberately: §2 requires
+  two logged cycles and refuses a default, and a remembered figure is a default
+  she supplied, checked against nothing — the §0 error with her own number in
+  it. (Product judgement, not a finding.) The report labels them as her own
+  statement, beside the figures from her entries.
+- **Contraception method**: none, condoms, combined pill, progestin-only pill,
+  hormonal IUD, copper IUD, implant, ring, patch, injection, or another method.
+  Product rule, not cycle science: when she picks a **hormonal** method while
+  in the natural-cycle mode, the profile offers to switch to the contraception
+  mode (§6), because estimates from a withdrawal bleed are meaningless. It
+  offers; it never switches by itself. Copper IUD and condoms are not hormonal
+  and change nothing.
+- **Known conditions**: ones she has *already been diagnosed with* — PCOS,
+  endometriosis, adenomyosis, uterine fibroids, a thyroid condition, PMDD.
+  The app never suggests, infers or asks about symptoms of any of them (§7,
+  CLAUDE.md §8); the list is worded "diagnosed with" so it cannot read as a
+  checklist of possibilities.
 
 ---
 

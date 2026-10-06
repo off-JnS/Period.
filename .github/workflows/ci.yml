@@ -23,7 +23,11 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # macOS, not Linux, for two reasons. pubspec.yaml sets sqlite3's source to
+    # "process", and a Linux test process has no sqlite symbols to resolve, so
+    # every database test crashes there. And the goldens are rendered on a Mac;
+    # Linux draws text a few pixels differently and fails them all.
+    runs-on: macos-latest
     steps:
       # Both actions are pinned by commit SHA rather than by tag: a tag can be
       # moved under us, a commit cannot. The trailing comment records which
@@ -34,7 +38,7 @@ jobs:
         with:
           # Pinned rather than "stable" so a Flutter release cannot turn this red
           # on its own schedule. Bump deliberately, with the suite re-run.
-          flutter-version: 3.47.2
+          flutter-version: 3.47.5
           channel: stable
           cache: true
 
@@ -50,13 +54,6 @@ jobs:
       # agreeing with the source.
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
-
-      # Rebuilds the old-schema classes the migration test needs, from the JSON
-      # dumps in drift_schemas/ -- which ARE committed and are the source of
-      # truth for what each shipped schema looked like. Section 5 requires that
-      # test, so this step is what lets it run from a clean checkout.
-      - name: Generate migration schemas
-        run: dart run drift_dev schema generate drift_schemas/ test/data/generated/
 
       # Only hand-written sources. git ls-files lists tracked files, and
       # generated output is gitignored, so it is excluded by construction rather
@@ -106,7 +103,7 @@ jobs:
 
       - uses: subosito/flutter-action@1c5eb12d812966ca84680edc38353a0851c8fd56 # v2.14.0
         with:
-          flutter-version: 3.47.2
+          flutter-version: 3.47.5
           channel: stable
           cache: true
 

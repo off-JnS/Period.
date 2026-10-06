@@ -1,106 +1,188 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/database/daos/log_dao.dart';
+import '../../data/database/daos/settings_dao.dart';
+import '../../domain/logic/cycle_analysis.dart';
+import '../../domain/logic/fertile_window.dart';
 import '../../domain/logic/period_prediction.dart';
+import '../../domain/models/clock.dart';
 import '../../domain/models/cycle_date.dart';
+import '../../domain/models/cycle_mode.dart';
 import '../../l10n/app_localizations.dart';
-import '../data_error.dart';
-import '../log_day.dart';
-import '../providers.dart';
+import '../grouped_page.dart';
+import '../log/log_entry_screen.dart';
 import 'calendar_screen.dart';
-import 'month_grid.dart';
+import 'day_preview.dart';
 
-/// The calendar connected to the database.
+/// Loads what the calendar shows and hands it to [CalendarScreen].
 ///
-/// Kept separate from [CalendarScreen], which stays a pure function of its input
-/// so every state can be rendered in a golden file without a database. This is
-/// the thin layer that reads real data and writes it back.
-class CalendarPage extends ConsumerStatefulWidget {
+/// The same split as `TodayPage`: the database stops here. The estimated window
+/// is recomputed from the stored period starts on every load rather than being
+/// carried over from the Today screen, because section 4 forbids caching it and
+/// the user may have corrected a start date in between.
+class CalendarPage extends StatefulWidget {
   /// Creates the page.
-  const CalendarPage({super.key});
+  const CalendarPage({
+    required this.logDao,
+    required this.settingsDao,
+    required this.clock,
+    this.onEntriesChanged,
+    super.key,
+  });
+
+  /// Told after anything is saved or deleted, since a new period start moves
+  /// the estimate and with it the reminder.
+  final VoidCallback? onEntriesChanged;
+
+  /// Reads and writes what the user logged.
+  final LogDao logDao;
+
+  /// Reads the mode the estimate is computed under.
+  final SettingsDao settingsDao;
+
+  /// Supplies today's calendar day.
+  final Clock clock;
 
   @override
-  ConsumerState<CalendarPage> createState() => _CalendarPageState();
+  State<CalendarPage> createState() => _CalendarPageState();
 }
 
-class _CalendarPageState extends ConsumerState<CalendarPage> {
-  /// The month on screen, or null while it still follows today.
-  ///
-  /// Widget state rather than a provider: which month someone is looking at
-  /// belongs to this screen and to this visit, and nothing else in the app has
-  /// any business reading it.
-  CycleDate? _month;
+class _CalendarPageState extends State<CalendarPage> {
+  CalendarViewData? _data;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// Reads the whole history at once. The calendar scrolls through all of
+  /// it, and two small queries over every logged day cost less than reading
+  /// month by month as she scrolls.
+  Future<void> _load() async {
+    try {
+      final today = widget.clock.today();
+      final starts = await widget.logDao.allPeriodStarts();
+      final settings = await widget.settingsDao.cycleSettings();
+      final days = await widget.logDao.loggedDays();
+      final prediction = predictNextPeriod(
+        periodStarts: starts,
+        settings: settings,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _error = null;
+        _data = CalendarViewData(
+          today: today,
+          periodStarts: starts.toSet(),
+          flowByDay: days.flow,
+          loggedDays: days.logged,
+          sexDays: days.sex,
+          pregnancyTestDays: days.pregnancyTest,
+          predicted: predictedWindowOrNull(prediction),
+          fertileWindow: estimateFertileWindow(
+            prediction: prediction,
+            optedIn: settings.fertileWindowOptedIn,
+          ),
+        );
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    }
+  }
+
+  /// Shows [date] at a glance, then opens it for editing if she asks.
+  Future<void> _previewDay(CycleDate date) async {
+    final data = _data;
+    if (data == null) return;
+    final entry = await widget.logDao.entryOn(date);
+    if (!mounted) return;
+
+    final edit = await showDayPreview(
+      context,
+      DayPreviewData(
+        date: date,
+        today: data.today,
+        entry: entry,
+        isPeriodStart: data.periodStarts.contains(date),
+        marker: data.markerOn(date),
+        // Only for days that have happened: a future cycle day would be a
+        // count along an estimate, stated as if it were a fact.
+        cycleDay: date.isAfter(data.today)
+            ? null
+            : cycleDayOn(date, data.periodStarts),
+      ),
+    );
+    if (edit && mounted) await _openDay(date);
+  }
+
+  Future<void> _openDay(CycleDate date) async {
+    final today = widget.clock.today();
+    final entry = await widget.logDao.entryOn(date);
+    final starts = await widget.logDao.allPeriodStarts();
+    final settings = await widget.settingsDao.cycleSettings();
+    if (!mounted) return;
+
+    final result = await showLogEntrySheet(
+      context,
+      LogEntryScreen(
+        date: date,
+        today: today,
+        entry: entry,
+        isPeriodStart: starts.contains(date),
+        offerPill: settings.mode == CycleMode.hormonalContraception,
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    switch (result) {
+      case LogEntrySaved(:final draft):
+        await widget.logDao.saveEntry(draft.entry);
+        if (draft.isPeriodStart) {
+          await widget.logDao.addPeriodStart(draft.entry.date);
+        } else {
+          await widget.logDao.removePeriodStart(draft.entry.date);
+        }
+      case LogEntryDeleted(:final date):
+        await widget.logDao.deleteEntry(date);
+        await widget.logDao.removePeriodStart(date);
+    }
+
+    widget.onEntriesChanged?.call();
+    await _load();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final today = ref.watch(clockProvider).today();
-    final firstWeekday = firstWeekdayOf(context);
-    final grid = MonthGrid.of(
-      _month ?? CycleDate(today.year, today.month, 1),
-      firstWeekday: firstWeekday,
-    );
+    final l10n = AppLocalizations.of(context);
 
-    final starts = ref.watch(periodStartsProvider);
-    final settings = ref.watch(settingsProvider);
-    // Only the visible weeks, padding days included, so paging back through
-    // years never grows the query.
-    final logged = ref.watch(
-      loggedDaysProvider((grid.days.first, grid.days.last)),
-    );
-
-    if (starts.hasError || logged.hasError || settings.hasError) {
-      return _Frame(child: DataErrorPanel(onRetry: _reload));
-    }
-    // Riverpod keeps the previous value while a re-read is in flight, so a save
-    // refreshes the grid in place instead of blanking the month the user is
-    // looking at. The spinner is only for the first read.
-    if (!starts.hasValue || !logged.hasValue || !settings.hasValue) {
-      return const _Frame(child: Center(child: CircularProgressIndicator()));
+    if (_error != null) {
+      return GroupedPage(
+        title: l10n.calendarTitle,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(l10n.couldNotOpenData, textAlign: TextAlign.center),
+          ),
+        ],
+      );
     }
 
-    // Computed here and stored nowhere, per section 4. A start date corrected
-    // on this screen changes the estimate drawn on this screen on the very next
-    // build, with no cache to keep in step.
-    final periodStarts = starts.requireValue;
-    final prediction = predictNextPeriod(
-      periodStarts: periodStarts,
-      settings: settings.requireValue.cycle,
-    );
+    final data = _data;
+    if (data == null) {
+      // Same title as the loaded screen, so the switch is not a jump.
+      return GroupedPage(
+        title: l10n.calendarTitle,
+        children: const [
+          SizedBox(height: 80),
+          Center(child: CircularProgressIndicator.adaptive()),
+        ],
+      );
+    }
 
-    return CalendarScreen(
-      data: CalendarViewData(
-        today: today,
-        periodStarts: periodStarts.toSet(),
-        loggedDays: logged.requireValue,
-        prediction: predictedWindowOrNull(prediction),
-      ),
-      grid: grid,
-      onSelectDay: (day) => logDay(context, ref, day),
-      onPreviousMonth: () => setState(() => _month = grid.previous().month),
-      onNextMonth: () => setState(() => _month = grid.next().month),
-    );
+    return CalendarScreen(data: data, onSelectDay: _previewDay);
   }
-
-  void _reload() {
-    ref
-      ..invalidate(periodStartsProvider)
-      ..invalidate(settingsProvider)
-      ..invalidate(loggedDaysProvider);
-  }
-}
-
-/// The scaffold [CalendarScreen] builds for itself, for the states before it.
-///
-/// Loading and failure keep the same title bar as success, so the screen does
-/// not appear to change identity while it reads.
-class _Frame extends StatelessWidget {
-  const _Frame({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(AppLocalizations.of(context).calendarTitle)),
-    body: child,
-  );
 }

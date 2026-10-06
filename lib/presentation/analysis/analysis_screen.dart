@@ -1,454 +1,170 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-import '../../domain/logic/logged_summary.dart';
+import '../../domain/logic/period_length.dart';
+import '../../domain/logic/period_prediction.dart';
+import '../../domain/models/cycle.dart';
+import '../../domain/models/cycle_date.dart';
 import '../../l10n/app_localizations.dart';
-import '../symptom_labels.dart';
+import '../grouped_page.dart';
+import '../section_card.dart';
+import 'temperature_chart.dart';
 
-/// One completed cycle, ready to draw.
-class CycleSummary {
-  /// Creates the summary.
-  const CycleSummary({
-    required this.startedOn,
-    required this.lengthInDays,
-    required this.periodDays,
-  });
-
-  /// The day the period started.
-  final DateTime startedOn;
-
-  /// How long the cycle ran.
-  final int lengthInDays;
-
-  /// How many consecutive days of flow were recorded, per
-  /// docs/cycle-logic.md section 1. Zero when she marked a start without
-  /// logging any.
-  final int periodDays;
-}
-
-/// Everything the analysis screen shows, already computed.
+/// Everything the cycles screen needs, already computed.
+///
+/// All of it derived on read from the stored period starts, per section 4, and
+/// none of it written back. A stored average would be wrong the moment the user
+/// corrected a start date, which she does constantly.
 class AnalysisViewData {
   /// Creates the view data.
   const AnalysisViewData({
     this.cycles = const [],
-    this.symptoms = const [],
-    this.daysLogged = 0,
-    this.typicalLength,
-    this.shortestLength,
-    this.longestLength,
-    this.typicalPeriodDays,
+    this.eligible = const [],
+    this.medianLength,
+    this.shortest,
+    this.longest,
+    this.statisticsVisible = true,
+    this.periodLengths = const {},
+    this.usualPeriodLength,
+    this.knownPeriodCount = 0,
+    this.temperatureChart,
   });
 
-  /// Completed cycles, oldest first.
-  final List<CycleSummary> cycles;
+  /// The latest cycle's temperature readings, or null when none was ever
+  /// logged. Description, so shown in every mode.
+  final TemperatureChartData? temperatureChart;
 
-  /// Symptoms she has logged, most frequent first.
-  final List<SymptomTally> symptoms;
+  /// How long each period lasted, by its start day. Missing means not worked
+  /// out; see [PeriodLength] for known, ongoing and unknown.
+  final Map<CycleDate, PeriodLength> periodLengths;
 
-  /// How many days have anything recorded on them.
-  final int daysLogged;
+  /// The median of the finished lengths, once there are enough.
+  ///
+  /// Shown in every mode, pregnancy included: a duration is description, not
+  /// a statistic about cycles (docs/cycle-logic.md §1 and §6).
+  final int? usualPeriodLength;
 
-  /// The median cycle length, or null without enough history.
-  final int? typicalLength;
+  /// How many finished lengths [usualPeriodLength] rests on.
+  final int knownPeriodCount;
 
-  /// The shortest and longest completed cycles.
-  final int? shortestLength;
-  final int? longestLength;
+  /// Whether the length summaries and chart may be shown.
+  ///
+  /// False in pregnancy: docs/cycle-logic.md section 6 hides cycle statistics
+  /// there rather than zeroing them. The history of recorded starts is pure
+  /// description and stays.
+  final bool statisticsVisible;
 
-  /// The median period duration, or null when none was ever recorded.
-  final int? typicalPeriodDays;
+  /// Every cycle implied by the recorded starts, oldest first. The last may be
+  /// in progress.
+  final List<Cycle> cycles;
 
-  /// Whether there is anything at all to show.
-  bool get isEmpty => cycles.isEmpty && symptoms.isEmpty && daysLogged == 0;
+  /// The completed cycles of plausible length that the statistics rest on.
+  final List<Cycle> eligible;
+
+  /// The median length of [eligible], or null when there are too few.
+  final int? medianLength;
+
+  /// The shortest length among [eligible], in days.
+  final int? shortest;
+
+  /// The longest length among [eligible], in days.
+  final int? longest;
 }
 
-/// What she has actually logged, and nothing else.
+/// The user's own cycle history, described back to her.
 ///
-/// The one screen in this app that never predicts. docs/cycle-logic.md section
-/// 6 is explicit that pure description -- cycles logged, period durations --
-/// may be shown in **every** cycle mode, including the ones where estimates are
-/// off, so this screen is deliberately *not* gated on
-/// [CycleSettings.predictionsEnabled].
-///
-/// That is the opposite of the fertile-window switch in settings, which is
-/// disabled in those modes, and the two sit close enough together to look
-/// contradictory. They are not: that switch turns on an estimate, and this
-/// screen contains none.
-///
-/// A pure function of [data], like the other screens, so every state -- and the
-/// thin ones matter most -- is a golden without a database.
+/// Section 8 governs every word here. This screen states what was recorded and
+/// how much it varied; it does not call a cycle irregular, does not name a
+/// condition, and does not tell her what any of it means about her.
 class AnalysisScreen extends StatelessWidget {
   /// Creates the screen.
-  const AnalysisScreen({required this.data, super.key});
+  const AnalysisScreen({required this.data, this.onShareReport, super.key});
 
-  /// What to show.
+  /// The history to render.
   final AnalysisViewData data;
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.analysisTitle)),
-      body: SafeArea(
-        child: data.isEmpty
-            ? _NothingYet()
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children: [
-                  _Summary(data: data),
-                  if (data.cycles.length >= 2) ...[
-                    const SizedBox(height: 24),
-                    _SectionHeading(l10n.cycleLengthsHeading),
-                    _CycleLengthChart(cycles: data.cycles),
-                  ],
-                  if (data.cycles.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    _SectionHeading(l10n.cycleByCycleHeading),
-                    // The chart's values, in words. Section 9 forbids
-                    // information carried by shape alone, and a bar whose
-                    // height is the only place a number lives is exactly that.
-                    _CycleList(cycles: data.cycles),
-                  ],
-                  if (data.symptoms.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    _SectionHeading(l10n.symptomsLoggedHeading),
-                    _SymptomList(
-                      symptoms: data.symptoms,
-                      daysLogged: data.daysLogged,
-                    ),
-                  ],
-                ],
-              ),
-      ),
-    );
-  }
-}
-
-/// The headline numbers.
-class _Summary extends StatelessWidget {
-  const _Summary({required this.data});
-
-  final AnalysisViewData data;
+  /// Makes and shares the PDF report, given where the tap was (the iPad
+  /// share popover points at it). Null hides the row.
+  final void Function(Rect? origin)? onShareReport;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final typical = data.typicalLength;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (typical == null)
-          Text(l10n.notEnoughCyclesYet, style: theme.textTheme.bodyMedium)
-        else ...[
-          Text(l10n.typicalCycleLength, style: theme.textTheme.labelLarge),
-          Text(l10n.daysCount(typical), style: theme.textTheme.headlineMedium),
-          if (data.shortestLength != null && data.longestLength != null)
-            Text(
-              l10n.rangeOfLengths(data.shortestLength!, data.longestLength!),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-        ],
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 24,
-          runSpacing: 8,
-          children: [
-            _Stat(label: l10n.cyclesRecorded, value: '${data.cycles.length}'),
-            _Stat(label: l10n.daysLogged, value: '${data.daysLogged}'),
-            if (data.typicalPeriodDays != null)
-              _Stat(
-                label: l10n.typicalPeriodLength,
-                value: l10n.daysCount(data.typicalPeriodDays!),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(value, style: theme.textTheme.titleLarge),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// How many days apart the chart's horizontal lines and left-hand labels are.
-///
-/// Seven, so the unit is a week and one of the lines lands on 28 -- the number
-/// everyone has been told a cycle is. It is a landmark to read the bars
-/// against, not a target: docs/cycle-logic.md section 0 is explicit that only
-/// about 13% of cycles are 28 days, and nothing here marks it as normal.
-const _axisIntervalDays = 7.0;
-
-/// One bar per completed cycle.
-///
-/// A single series, so there is no categorical palette to validate and no
-/// legend to draw -- the heading names what the bars are. Deliberately no trend
-/// line and no projection: section 8 forbids implying a direction, and a line
-/// sloping off the right-hand edge is a prediction whatever the axis is called.
-///
-/// The numbers live in the list below rather than on every bar, which keeps the
-/// chart readable and still satisfies section 9.
-class _CycleLengthChart extends StatelessWidget {
-  const _CycleLengthChart({required this.cycles});
-
-  final List<CycleSummary> cycles;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final lengths = [for (final cycle in cycles) cycle.lengthInDays];
-    final tallest = lengths.reduce((a, b) => a > b ? a : b);
-
-    return Semantics(
-      // The chart itself says nothing to a screen reader. The list beneath it
-      // carries every value, so this is labelled as a picture of them rather
-      // than left as an unexplained blank.
-      label: l10n.cycleLengthChartDescription(cycles.length),
-      excludeSemantics: true,
-      child: SizedBox(
-        height: 180,
-        child: BarChart(
-          BarChartData(
-            maxY: (tallest + 4).toDouble(),
-            // Recessive: the data is the ink, the frame is not. The grid is
-            // horizontal only and one shade off the surface, and it is solid --
-            // a dashed grid reads as a projection or a threshold when it is
-            // only a grid.
-            gridData: FlGridData(
-              drawVerticalLine: false,
-              horizontalInterval: _axisIntervalDays,
-              getDrawingHorizontalLine: (value) => FlLine(
-                color: theme.colorScheme.outlineVariant,
-                strokeWidth: 1,
-              ),
-            ),
-            borderData: FlBorderData(show: false),
-            // No tooltip. On a touch device it would need a tap to appear, and
-            // every value is already written out in the list below the chart,
-            // which is also what a screen reader is given.
-            barTouchData: BarTouchData(enabled: false),
-            titlesData: FlTitlesData(
-              topTitles: const AxisTitles(),
-              rightTitles: const AxisTitles(),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  interval: _axisIntervalDays,
-                  // Scaled for the same reason the bottom strip is: a fixed
-                  // width clips the numbers at a larger text size.
-                  reservedSize: MediaQuery.textScalerOf(context).scale(28),
-                  getTitlesWidget: (value, meta) => Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Text(
-                      '${value.toInt()}',
-                      textAlign: TextAlign.right,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
+    return GroupedPage(
+      title: l10n.analysisTitle,
+      children: data.cycles.isEmpty
+          ? [_Empty(message: l10n.nothingToSummariseYet)]
+          : [
+              if (!data.statisticsVisible) ...[
+                SectionCard(
+                  icon: Icons.visibility_off_outlined,
+                  heading: l10n.modePregnancy,
+                  child: Text(
+                    l10n.statisticsHiddenInPregnancy,
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
                 ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  // Follows the text rather than a fixed 22: at a larger text
-                  // size a fixed strip clips the numbers off at the bottom,
-                  // which is the same failure the calendar's day circles had.
-                  reservedSize: MediaQuery.textScalerOf(context).scale(22),
-                  getTitlesWidget: (value, meta) => Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '${value.toInt() + 1}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            barGroups: [
-              for (var i = 0; i < cycles.length; i++)
-                BarChartGroupData(
-                  x: i,
-                  barRods: [
-                    BarChartRodData(
-                      toY: cycles[i].lengthInDays.toDouble(),
-                      color: theme.colorScheme.primary,
-                      width: 14,
-                      // Rounded at the data end, square on the baseline.
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 28),
+              ] else ...[
+                _Statistics(data: data),
+                const SizedBox(height: 12),
+              ],
+              _PeriodLength(data: data),
+              const SizedBox(height: 12),
+              if (data.temperatureChart case final chart?) ...[
+                TemperatureChartCard(data: chart),
+                const SizedBox(height: 12),
+              ],
+              if (data.statisticsVisible && data.eligible.length >= 2) ...[
+                _LengthChart(cycles: data.eligible),
+                const SizedBox(height: 28),
+              ],
+              _History(cycles: data.cycles, lengths: data.periodLengths),
+              if (onShareReport case final share?) ...[
+                const SizedBox(height: 28),
+                _ShareReport(onShare: share),
+              ],
             ],
-          ),
-        ),
-      ),
     );
   }
 }
 
-/// Every cycle's numbers, in words.
-class _CycleList extends StatelessWidget {
-  const _CycleList({required this.cycles});
+class _Empty extends StatelessWidget {
+  const _Empty({required this.message});
 
-  final List<CycleSummary> cycles;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final materialL10n = MaterialLocalizations.of(context);
-
-    return Column(
-      children: [
-        for (final cycle in cycles.reversed)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    materialL10n.formatMediumDate(cycle.startedOn),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-                Text(
-                  l10n.daysCount(cycle.lengthInDays),
-                  style: theme.textTheme.bodyMedium,
-                ),
-                if (cycle.periodDays > 0) ...[
-                  const SizedBox(width: 12),
-                  Text(
-                    l10n.bleedingDays(cycle.periodDays),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// How often each symptom was logged.
-class _SymptomList extends StatelessWidget {
-  const _SymptomList({required this.symptoms, required this.daysLogged});
-
-  final List<SymptomTally> symptoms;
-  final int daysLogged;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final most = symptoms.first.days;
-
-    return Column(
-      children: [
-        for (final tally in symptoms)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    symptomLabel(l10n, tally.symptom.key),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: ExcludeSemantics(
-                    child: LinearProgressIndicator(
-                      value: tally.days / most,
-                      minHeight: 6,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  l10n.daysCount(tally.days),
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// Before there is anything to analyse.
-///
-/// The state most likely to look broken, and the one a new user sees first.
-class _NothingYet extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.fromLTRB(24, 80, 24, 24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.insights_outlined,
-              size: 40,
-              color: theme.colorScheme.onSurfaceVariant,
+            ExcludeSemantics(
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.insights_outlined,
+                  size: 32,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
-              l10n.nothingToAnalyseYet,
+              message,
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.nothingToAnalyseYetDetail,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
           ],
         ),
       ),
@@ -456,22 +172,366 @@ class _NothingYet extends StatelessWidget {
   }
 }
 
-class _SectionHeading extends StatelessWidget {
-  const _SectionHeading(this.text);
+class _Statistics extends StatelessWidget {
+  const _Statistics({required this.data});
 
-  final String text;
+  final AnalysisViewData data;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+    final median = data.medianLength;
+
+    // Too little history is a state with something to say, not a blank. The
+    // number needed matches what prediction asks for, so the two screens do not
+    // give the user different accounts of how much is enough.
+    if (median == null) {
+      final have = data.eligible.length;
+      return SectionCard(
+        icon: Icons.timelapse_outlined,
+        heading: l10n.typicalLengthHeading,
+        child: Text(
+          l10n.needMoreForStatistics(cyclesNeededToPredict - have),
+          style: theme.textTheme.bodyLarge,
+        ),
+      );
+    }
+
+    final shortest = data.shortest;
+    final longest = data.longest;
+
+    final typical = SectionCard(
+      icon: Icons.timelapse_outlined,
+      heading: l10n.typicalLengthHeading,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.lengthInDays(median), style: theme.textTheme.headlineLarge),
+          const SizedBox(height: 4),
+          Text(
+            l10n.basedOnCycles(data.eligible.length),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shortest == null || longest == null) return typical;
+
+    final variation = SectionCard(
+      icon: Icons.straighten_outlined,
+      heading: l10n.variationHeading,
       child: Text(
-        text,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
+        shortest == longest
+            ? l10n.variationSteady
+            : l10n.variationRange(shortest, longest),
+        style: theme.textTheme.bodyLarge,
+      ),
+    );
+
+    // Side by side when there is room; stacked at large text sizes, where two
+    // columns would squeeze each figure into a sliver.
+    final roomy = MediaQuery.textScalerOf(context).scale(1) <= 1.2;
+    if (!roomy) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [typical, const SizedBox(height: 16), variation],
+      );
+    }
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: typical),
+          const SizedBox(width: 12),
+          Expanded(child: variation),
+        ],
+      ),
+    );
+  }
+}
+
+/// A bar per completed cycle, oldest to newest.
+///
+/// Every bar is labelled with its own number, so the chart is a second way of
+/// reading the figures rather than the only way: length alone would put this in
+/// the same category as colour alone, which section 9 rules out.
+class _LengthChart extends StatelessWidget {
+  const _LengthChart({required this.cycles});
+
+  final List<Cycle> cycles;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final lengths = [for (final cycle in cycles) ?cycle.lengthInDays];
+    if (lengths.isEmpty) return const SizedBox.shrink();
+
+    final longest = lengths.reduce((a, b) => a > b ? a : b);
+
+    return SectionCard(
+      icon: Icons.bar_chart_rounded,
+      heading: l10n.cycleLengthsHeading,
+      child: Semantics(
+        label: l10n.cycleLengthChartLabel,
+        child: Column(
+          children: [
+            for (final length in lengths)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: AlignmentDirectional.centerStart,
+                        // Scaled against the longest recorded cycle rather
+                        // than against 28: the comparison that means anything
+                        // is with her own other cycles.
+                        child: FractionallySizedBox(
+                          widthFactor: length / longest,
+                          heightFactor: 1,
+                          child: DecoratedBox(
+                            // Solid, as in Apple's own charts: the bar's
+                            // length is the data and nothing should compete.
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 64,
+                      child: Text(
+                        l10n.lengthInDays(length),
+                        textAlign: TextAlign.end,
+                        // Equal-width digits, so a column of lengths lines up.
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _PeriodLength extends StatelessWidget {
+  const _PeriodLength({required this.data});
+
+  final AnalysisViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final usual = data.usualPeriodLength;
+
+    return SectionCard(
+      icon: Icons.water_drop_outlined,
+      heading: l10n.usualPeriodLengthHeading,
+      child: usual == null
+          ? Text(l10n.needFlowForPeriodLength, style: theme.textTheme.bodyLarge)
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.lengthInDays(usual),
+                  style: theme.textTheme.headlineLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.basedOnPeriods(data.knownPeriodCount),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _History extends StatelessWidget {
+  const _History({required this.cycles, this.lengths = const {}});
+
+  final List<Cycle> cycles;
+  final Map<CycleDate, PeriodLength> lengths;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+
+    // Newest first: the recent cycles are the ones anyone opens this to check.
+    final newestFirst = cycles.reversed.toList();
+
+    // An inset grouped list, as in Settings: heading outside, rows inside,
+    // hairlines inset from the leading edge.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GroupHeader(l10n.historyHeading),
+        Card(
+          child: Column(
+            children: [
+              for (final (index, cycle) in newestFirst.indexed) ...[
+                if (index > 0) const Divider(indent: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.cycleStartedOn(
+                                _formatDay(locale, cycle.start),
+                              ),
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                            // Unknown lengths say nothing rather than "0".
+                            if (switch (lengths[cycle.start]) {
+                                  KnownPeriodLength(:final days) =>
+                                    l10n.periodLastedInHistory(days),
+                                  OngoingPeriodLength(:final daysSoFar) =>
+                                    l10n.periodOngoingInHistory(daysSoFar),
+                                  _ => null,
+                                }
+                                case final line?)
+                              Text(
+                                line,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      switch (cycle.lengthInDays) {
+                        final length? => Text(
+                          l10n.lengthInDays(length),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        // Spelled out rather than defaulted: an in-progress cycle
+                        // has no length yet, and rendering a blank there would
+                        // read as missing data instead of an unfinished cycle.
+                        null => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: ShapeDecoration(
+                            shape: const StadiumBorder(),
+                            color: theme.colorScheme.primaryContainer,
+                          ),
+                          child: Text(
+                            l10n.cycleInProgress,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      },
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatDay(String locale, CycleDate date) =>
+    DateFormat.yMMMd(locale).format(DateTime(date.year, date.month, date.day));
+
+class _ShareReport extends StatelessWidget {
+  const _ShareReport({required this.onShare});
+
+  final void Function(Rect? origin) onShare;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Builder(
+            builder: (context) => InkWell(
+              onTap: () {
+                final box = context.findRenderObject() as RenderBox?;
+                onShare(
+                  box == null
+                      ? null
+                      : box.localToGlobal(Offset.zero) & box.size,
+                );
+              },
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.ios_share_rounded,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          l10n.shareReport,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        GroupFooter(l10n.shareReportFooter),
+      ],
     );
   }
 }

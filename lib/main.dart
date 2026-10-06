@@ -1,129 +1,268 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/database/database.dart';
+import 'data/app_lock/device_authenticator.dart';
 import 'data/database/open_database.dart';
-import 'data/reminders.dart';
+import 'data/reminders/reminder_scheduler.dart';
+import 'data/widget/widget_bridge.dart';
+import 'data/database_key_store.dart';
+import 'data/demo_data.dart';
+import 'data/erase_all_data.dart';
 import 'data/system_clock.dart';
+import 'domain/models/app_preferences.dart';
 import 'l10n/app_localizations.dart';
-import 'presentation/app_shell.dart';
-import 'presentation/lock/lock_gate.dart';
-import 'presentation/providers.dart';
-import 'presentation/theme.dart';
+import 'presentation/home_shell.dart';
+import 'presentation/lock/app_lock.dart';
+import 'presentation/no_haptics.dart';
+import 'presentation/onboarding/onboarding_flow.dart';
+import 'presentation/reminders/reminder_sync.dart';
+import 'presentation/widget/widget_sync.dart';
+import 'presentation/preferences_mapping.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Opened once, here, rather than lazily inside a provider: it is async and
-  // touches the filesystem and the keystore, and a failure to decrypt should
-  // stop the app rather than surface as a broken screen.
-  final opened = await openEncryptedDatabase();
-
-  final reminders = await _startReminders(opened.database);
-
-  runApp(
-    ProviderScope(
-      overrides: [
-        databaseProvider.overrideWithValue(opened.database),
-        documentsDirectoryProvider.overrideWithValue(opened.documents),
-        remindersProvider.overrideWithValue(reminders),
-      ],
-      child: const PeriodApp(),
-    ),
-  );
-}
-
-/// Sets up section 9's log reminder and puts back whatever she asked for.
-///
-/// Rescheduled on every start rather than only when she changes it, because
-/// several things silently drop what is pending and none of them tell the app:
-/// an Android reboot before the boot receiver runs, a restore from a backup
-/// that brought a different schedule, a locale change that leaves the pending
-/// notification written in the old language, and the operating system clearing
-/// them for its own reasons.
-///
-/// Failure here never stops the app. A missing reminder is a small loss; a
-/// health app that will not open because a notification could not be scheduled
-/// is a much larger one, and this runs before the first frame.
-Future<Reminders> _startReminders(AppDatabase database) async {
-  final reminders = LocalNotificationReminders();
-
-  try {
-    // Resolved from the device rather than assumed, because this runs before
-    // there is a widget tree to read a locale from and the text it picks is
-    // what she will actually see on her lock screen. Defaulting to English here
-    // would leave a German user with an English notification until the next
-    // time she opened settings.
-    final l10n = await AppLocalizations.delegate.load(_deviceLocale());
-    await reminders.initialize(
-      channelName: l10n.reminderChannelName,
-      channelDescription: l10n.reminderChannelDescription,
-    );
-
-    final stored = await database.settingsDao.readSettings();
-    const clock = SystemClock();
-    await reminders.applySchedule(
-      stored.reminder,
-      today: clock.today(),
-      now: clock.timeOfDay(),
-      title: l10n.reminderNotificationTitle,
-      body: l10n.reminderNotificationBody,
-    );
-  } on Object {
-    // A refused permission, a platform that cannot schedule, a stored mode this
-    // build cannot read. None of them is a reason not to open the app.
-  }
-
-  return reminders;
-}
-
-/// The first locale the device asks for that this app actually has.
-///
-/// Falls back to the first supported locale, which is what [MaterialApp] does
-/// with an unsupported one -- so the notification and the app agree rather than
-/// disagreeing in a way only a German speaker would notice.
-Locale _deviceLocale() {
-  for (final locale in WidgetsBinding.instance.platformDispatcher.locales) {
-    for (final supported in AppLocalizations.supportedLocales) {
-      if (supported.languageCode == locale.languageCode) return supported;
-    }
-  }
-  return AppLocalizations.supportedLocales.first;
+  // The database is opened from inside the app rather than here, so that a
+  // failure to open it can be reported in the user's own language instead of on
+  // a grey screen.
+  // Flutter's binding with every vibration request dropped: the app has no
+  // haptic feedback at all.
+  NoHapticsBinding.ensureInitialized();
+  runApp(const PeriodApp());
 }
 
 /// The application root.
 ///
-/// Deliberately thin: localisation, theme, and the shell that owns navigation.
-/// Everything a screen needs comes from providers rather than from here.
-class PeriodApp extends StatelessWidget {
+/// Owns the one database connection and hands it down. There is no dependency
+/// injection framework: section 6 lists `flutter_riverpod` as allowed but not
+/// as required, and a single connection passed by constructor is legible
+/// without one. When a second screen needs it, that is the moment to revisit.
+class PeriodApp extends StatefulWidget {
   /// Creates the application root.
   const PeriodApp({super.key});
 
   @override
+  State<PeriodApp> createState() => _PeriodAppState();
+}
+
+class _PeriodAppState extends State<PeriodApp> {
+  /// The open database, or null while opening.
+  AppDatabase? _database;
+
+  /// Why the database could not be opened.
+  ///
+  /// There is no unencrypted fallback and there must not be one. If the store
+  /// cannot be opened as an encrypted store, the app says so and stops, rather
+  /// than appearing to save entries it is not saving or saving them in the
+  /// clear.
+  Object? _error;
+
+  /// Appearance and language. The device's choices until the stored ones are
+  /// read, which happens before the first screen with her data is shown.
+  AppPreferences _preferences = const AppPreferences();
+
+  /// The optional app lock, once the database says whether it is on. Until
+  /// then only the loading screen shows, which holds nothing of hers.
+  AppLock? _lock;
+
+  /// Whether the first-launch introduction shows instead of the app.
+  bool _onboarding = false;
+
+  /// Keeps reminders scheduled; created with the database it reads.
+  ReminderSync? _reminders;
+
+  /// Keeps the home-screen widget's snapshot current.
+  WidgetSync? _widget;
+
+  final WidgetBridge _widgetBridge = const MethodChannelWidgetBridge();
+
+  final DatabaseKeyStore _keyStore = SecureDatabaseKeyStore();
+  final ReminderScheduler _scheduler = LocalNotificationsReminderScheduler();
+
+  /// Shows the one message that has to survive the whole app being rebuilt:
+  /// that everything was deleted.
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
+  /// Deletes everything and starts again as a fresh install.
+  ///
+  /// Every screen is taken down first, so nothing reads the database while it
+  /// is closed and deleted. If deletion fails part-way, the file and its key
+  /// are still intact (see [eraseAllData]) and the app simply reopens them.
+  Future<void> _eraseEverything(String done, String failed) async {
+    final database = _database;
+    if (database == null) return;
+    final lock = _lock;
+
+    setState(() {
+      _database = null;
+      _lock = null;
+      _reminders = null;
+      _widget = null;
+    });
+    // Disposed after the frame that stops the lock gate listening to it.
+    WidgetsBinding.instance.addPostFrameCallback((_) => lock?.dispose());
+
+    var erased = false;
+    try {
+      await eraseAllData(
+        database: database,
+        directory: await databaseDirectory(),
+        keyStore: _keyStore,
+        reminders: _scheduler,
+        widget: _widgetBridge,
+      );
+      erased = true;
+    } on Object {
+      erased = false;
+    }
+
+    if (!mounted) return;
+    if (erased) setState(() => _preferences = const AppPreferences());
+    await _open();
+    _messenger.currentState?.showSnackBar(
+      SnackBar(content: Text(erased ? done : failed)),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _open();
+  }
+
+  Future<void> _open() async {
+    try {
+      final database = await openEncryptedDatabase(keyStore: _keyStore);
+      // Asked before any example data goes in, so a fresh install with the
+      // demo flag still counts as a first launch.
+      final onboarding = await _needsOnboarding(database);
+      if (demoDataRequested &&
+          (await database.logDao.allPeriodStarts()).isEmpty) {
+        await seedDemoData(database, const SystemClock().today());
+      }
+      // Read before the database is handed to the screens, so the first
+      // screen already has her theme and language rather than switching
+      // under her a moment later.
+      final preferences = await database.settingsDao.appPreferences();
+      final lock = AppLock(
+        authenticator: LocalAuthDeviceAuthenticator(),
+        enabled: await database.settingsDao.appLockEnabled(),
+        save: database.settingsDao.saveAppLockEnabled,
+      );
+      if (!mounted) {
+        lock.dispose();
+        await database.close();
+        return;
+      }
+      setState(() {
+        _preferences = preferences;
+        _onboarding = onboarding;
+        _lock = lock;
+        _reminders = ReminderSync(
+          logDao: database.logDao,
+          settingsDao: database.settingsDao,
+          scheduler: _scheduler,
+          clock: const SystemClock(),
+        );
+        _widget = WidgetSync(
+          logDao: database.logDao,
+          settingsDao: database.settingsDao,
+          bridge: _widgetBridge,
+          clock: const SystemClock(),
+          lockEnabled: () => lock.enabled,
+        );
+        _database = database;
+      });
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    }
+  }
+
+  /// The introduction shows once, on a fresh install: never after it was
+  /// finished or skipped, and never over data already there (an install
+  /// from before it existed is marked done instead). The debug flag shows it
+  /// every time.
+  Future<bool> _needsOnboarding(AppDatabase database) async {
+    if (onboardingAlwaysRequested) return true;
+    if (await database.settingsDao.onboardingDone()) return false;
+    final hasData =
+        (await database.logDao.allPeriodStarts()).isNotEmpty ||
+        (await database.logDao.loggedDays()).logged.isNotEmpty;
+    if (hasData) await database.settingsDao.saveOnboardingDone();
+    return !hasData;
+  }
+
+  @override
+  void dispose() {
+    _lock?.dispose();
+    _database?.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      // Both appearances, from the one place that defines them, so a golden
-      // renders what the app renders. themeMode is left at its default, which
-      // follows the device: there is no in-app appearance switch, because that
-      // would be a second place to change a setting the system already owns.
-      //
-      // Until this was here the app was light in every condition, while six
-      // dark goldens rendered a theme it never built.
-      theme: appLightTheme,
-      darkTheme: appDarkTheme,
-      // The gate, not the shell. While locked it replaces the app rather
-      // than covering it, so nothing of hers is built behind the lock.
-      home: const LockGate(child: AppShell()),
+    return periodMaterialApp(
+      preferences: _preferences,
+      lock: _lock,
+      messengerKey: _messenger,
+      home: Builder(
+        builder: (context) {
+          if (_error != null) return const _CouldNotOpen();
+          final database = _database;
+          if (database == null) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator.adaptive()),
+            );
+          }
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 450),
+            child: _onboarding
+                ? OnboardingFlow(
+                    key: const ValueKey('onboarding'),
+                    settingsDao: database.settingsDao,
+                    logDao: database.logDao,
+                    clock: const SystemClock(),
+                    onFinished: () => setState(() => _onboarding = false),
+                  )
+                : HomeShell(
+                    key: const ValueKey('home'),
+                    logDao: database.logDao,
+                    settingsDao: database.settingsDao,
+                    clock: const SystemClock(),
+                    appLock: _lock,
+                    reminderSync: _reminders,
+                    widgetSync: _widget,
+                    onEraseEverything: _eraseEverything,
+                    // Applied at once, from the Settings screen: the whole app
+                    // re-themes or re-translates in place, on the same tab.
+                    onPreferencesChanged: (preferences) =>
+                        setState(() => _preferences = preferences),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Shown when the encrypted database could not be opened.
+class _CouldNotOpen extends StatelessWidget {
+  const _CouldNotOpen();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            l10n.couldNotOpenData,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -34,6 +34,11 @@ class DayEntries extends Table {
   /// The user's own note. Free text, never parsed.
   TextColumn get note => text().nullable()();
 
+  /// Basal body temperature in hundredths of a degree Celsius. Added in schema
+  /// version 3; null for every day logged before it, and for any day without a
+  /// reading.
+  IntColumn get temperatureCenti => integer().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {date};
 }
@@ -60,25 +65,25 @@ class DaySymptoms extends Table {
   Set<Column<Object>> get primaryKey => {date, symptomKey};
 }
 
-/// The user's preferences, as key-value pairs.
+/// The user's settings, one row per setting. Added in schema version 2.
 ///
-/// Key-value rather than a column per setting, for the reason section 5 gives
-/// for symptoms: a typed row means every new preference is another migration,
-/// and every migration is another chance to destroy data that has no cloud
-/// backup. This table takes new keys forever without touching the schema again.
+/// Key/value rather than a column per setting, for the same reason symptoms are
+/// keyed by string: a new setting is a new row, never a migration. Section 5
+/// calls migrations the most dangerous code in the app, so the table is shaped
+/// to need as few of them as possible.
 ///
-/// Values are stored by name, never by enum index, so reordering an enum cannot
-/// silently reinterpret a stored row as something the user never chose. See
-/// [SettingsDao] for how each key is read back, and what happens when a value is
-/// one this build does not recognise.
+/// Stored here, inside the encrypted database, rather than in a preferences
+/// file: a mode such as "pregnancy" is exactly the kind of fact section 1 says
+/// must not sit on the device in plain text.
 @DataClassName('SettingRow')
-class Settings extends Table {
+class AppSettings extends Table {
   /// The setting's stable key, e.g. `cycle_mode`.
-  TextColumn get key => text()();
+  TextColumn get settingKey => text()();
 
-  /// The stored value, as text.
-  TextColumn get value => text()();
+  /// The stored value, as text. Read back defensively: a value this build does
+  /// not understand falls back to the default rather than failing to start.
+  TextColumn get settingValue => text()();
 
   @override
-  Set<Column<Object>> get primaryKey => {key};
+  Set<Column<Object>> get primaryKey => {settingKey};
 }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keeps the icon reminders use from being stripped by the release build's
+     resource shrinker; without it, scheduled notifications can fail silently. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@mipmap/ic_launcher" />

@@ -1,238 +1,414 @@
 import 'package:drift/drift.dart';
 
+import '../../../domain/models/app_preferences.dart';
+import '../../../domain/models/cycle_date.dart';
 import '../../../domain/models/cycle_mode.dart';
-import '../../../domain/models/reminder_schedule.dart';
-import '../../../domain/models/reminder_time.dart';
+import '../../../domain/models/profile.dart';
+import '../../../domain/models/reminder_settings.dart';
 import '../database.dart';
 import '../tables.dart';
 
 part 'settings_dao.g.dart';
 
-/// The keys this app stores. Stable strings, never renamed: a rename would make
-/// an existing user's setting invisible and silently revert her to the default.
+/// The keys settings are stored under. Stable: renaming one orphans the value
+/// already on users' devices.
 abstract final class SettingKeys {
-  /// Which cycle mode the user selected, stored by [CycleMode.name].
+  /// Which [CycleMode] the user is in, by enum name.
   static const cycleMode = 'cycle_mode';
 
-  /// Whether she asked for predictions despite a mode that disables them.
+  /// `true` when a perimenopause user asked for predictions anyway.
   static const predictionsOptedIn = 'predictions_opted_in';
 
-  /// Whether she asked to see the fertile window estimate.
+  /// `true` when the user asked to see the estimated fertile window.
   static const fertileWindowOptedIn = 'fertile_window_opted_in';
 
-  /// Whether the app asks the device to confirm it is her before opening.
-  ///
-  /// A new key in a table built to take them, so section 9's lock needed no
-  /// schema change at all.
-  static const appLockEnabled = 'app_lock_enabled';
+  /// Which [AppearanceChoice], by enum name.
+  static const appearance = 'appearance';
 
-  /// Whether she asked to be reminded to log.
-  static const reminderEnabled = 'reminder_enabled';
+  /// Which [LanguageChoice], by enum name.
+  static const language = 'language';
 
-  /// The time of day she chose, as `HH:mm`.
+  /// `true` when the app asks for Face ID, Touch ID or the passcode to open.
+  static const appLock = 'app_lock';
+
+  /// `true` when she wants a reminder before the estimated window.
+  static const reminderPeriod = 'reminder_period';
+
+  /// Days before the window for that reminder, as a decimal integer.
+  static const reminderDaysBefore = 'reminder_days_before';
+
+  /// `true` when she wants a daily reminder to log.
+  static const reminderDaily = 'reminder_daily';
+
+  /// The reminder time as `HH:MM`, 24-hour.
   static const reminderTime = 'reminder_time';
 
-  /// The weekdays she chose, as comma-separated ISO weekday numbers, `1,3,5`.
-  ///
-  /// Stored by number rather than by name because [CycleDate.weekday] already
-  /// defines 1 through 7 and there is no enum here to reorder. Three more keys
-  /// in a table built to take them: reminders, like the lock before them, need
-  /// no schema change.
-  static const reminderWeekdays = 'reminder_weekdays';
+  /// `true` when she wants a pill reminder.
+  static const reminderPill = 'reminder_pill';
+
+  /// The pill reminder time as `HH:MM`, 24-hour.
+  static const reminderPillTime = 'reminder_pill_time';
+
+  /// Her [PillPack], by enum name.
+  static const reminderPillPack = 'reminder_pill_pack';
+
+  /// The first day of a pill pack, `YYYY-MM-DD`; empty for none.
+  static const reminderPillPackStart = 'reminder_pill_pack_start';
+
+  /// `true` when she wants ring reminders.
+  static const reminderRing = 'reminder_ring';
+
+  /// The day the current ring went in, `YYYY-MM-DD`; empty for none.
+  static const reminderRingInserted = 'reminder_ring_inserted';
+
+  /// `true` when she wants patch reminders.
+  static const reminderPatch = 'reminder_patch';
+
+  /// The day the current patch pack began, `YYYY-MM-DD`; empty for none.
+  static const reminderPatchStarted = 'reminder_patch_started';
+
+  /// `true` when she wants injection reminders.
+  static const reminderInjection = 'reminder_injection';
+
+  /// The day of her last injection, `YYYY-MM-DD`; empty for none.
+  static const reminderInjectionLast = 'reminder_injection_last';
+
+  /// Weeks between injections, as a decimal integer.
+  static const reminderInjectionWeeks = 'reminder_injection_weeks';
+
+  /// `true` when she wants IUD or implant reminders.
+  static const reminderDevice = 'reminder_device';
+
+  /// The day it should be replaced by, `YYYY-MM-DD`; empty for none.
+  static const reminderDeviceReplaceBy = 'reminder_device_replace_by';
+
+  /// Weeks ahead to be reminded, as a decimal integer.
+  static const reminderDeviceWeeks = 'reminder_device_weeks';
+
+  /// The time for the ring, patch, injection and device reminders, `HH:MM`.
+  static const reminderMethodTime = 'reminder_method_time';
+
+  /// `true` when the home-screen widget may show details.
+  static const widgetDetailed = 'widget_detailed';
+
+  /// Her birth year, as a decimal integer.
+  static const profileBirthYear = 'profile_birth_year';
+
+  /// The cycle length she says is usual, in days.
+  static const profileCycleLength = 'profile_cycle_length';
+
+  /// The period length she says is usual, in days.
+  static const profilePeriodLength = 'profile_period_length';
+
+  /// Her [ContraceptionMethod], by enum name.
+  static const profileContraception = 'profile_contraception';
+
+  /// Her [KnownCondition]s, by enum name, comma-separated.
+  static const profileConditions = 'profile_conditions';
+
+  /// `true` once she finished or skipped the first-launch introduction.
+  static const onboardingDone = 'onboarding_done';
 }
 
-/// Everything the app reads out of the settings table.
-///
-/// One value rather than three separate reads, so a screen asks once and every
-/// consumer sees the same answer.
-class StoredSettings {
-  /// Creates the settings.
-  const StoredSettings({
-    this.cycle = const CycleSettings(),
-    this.fertileWindowOptedIn = false,
-    this.appLockEnabled = false,
-    this.reminder = const ReminderSchedule(),
-  });
-
-  /// The cycle mode and its opt-in.
-  final CycleSettings cycle;
-
-  /// Whether the fertile window estimate is shown. Off unless asked for,
-  /// per docs/cycle-logic.md section 4.
-  final bool fertileWindowOptedIn;
-
-  /// Whether the app asks the device to confirm it is her before opening.
-  ///
-  /// Off unless asked for, per section 9: the lock is optional, which is also
-  /// why the database key is generated rather than derived from it.
-  final bool appLockEnabled;
-
-  /// When she asked to be reminded to log.
-  ///
-  /// Off unless asked for. See docs/cycle-logic.md section 7 -- this carries no
-  /// inference about her cycle, so it needs no mode gate and reads the same in
-  /// every cycle mode.
-  final ReminderSchedule reminder;
-}
-
-/// Reads and writes the user's preferences.
-@DriftAccessor(tables: [Settings])
+/// Reads and writes the user's settings.
+@DriftAccessor(tables: [AppSettings])
 class SettingsDao extends DatabaseAccessor<AppDatabase>
     with _$SettingsDaoMixin {
   /// Creates the accessor.
   SettingsDao(super.attachedDatabase);
 
-  /// Everything stored, with defaults for whatever has never been set.
-  Future<StoredSettings> readSettings() async {
-    final rows = await select(settings).get();
-    final stored = {for (final row in rows) row.key: row.value};
+  /// The stored cycle settings, with the defaults for anything not stored.
+  ///
+  /// A value this build does not recognise -- written by a newer version, say,
+  /// then downgraded -- reads as the default rather than throwing. Failing to
+  /// start over a setting would lock her out of her own data.
+  Future<CycleSettings> cycleSettings() async {
+    final values = await _values();
 
-    return StoredSettings(
-      cycle: CycleSettings(
-        mode: _readMode(stored[SettingKeys.cycleMode]),
-        predictionsOptedIn: _readBool(stored[SettingKeys.predictionsOptedIn]),
-      ),
-      fertileWindowOptedIn: _readBool(stored[SettingKeys.fertileWindowOptedIn]),
-      appLockEnabled: _readBool(stored[SettingKeys.appLockEnabled]),
-      reminder: ReminderSchedule(
-        enabled: _readBool(stored[SettingKeys.reminderEnabled]),
-        time: _readReminderTime(stored[SettingKeys.reminderTime]),
-        weekdays: _readWeekdays(stored[SettingKeys.reminderWeekdays]),
-      ),
+    return CycleSettings(
+      mode:
+          CycleMode.values.asNameMap()[values[SettingKeys.cycleMode]] ??
+          CycleMode.natural,
+      predictionsOptedIn: values[SettingKeys.predictionsOptedIn] == 'true',
+      fertileWindowOptedIn: values[SettingKeys.fertileWindowOptedIn] == 'true',
     );
   }
 
-  /// Every stored row, exactly as written.
+  /// Stores [settings], replacing whatever was there.
   ///
-  /// Raw rather than the typed [StoredSettings], so a backup carries settings
-  /// this build has never heard of and a later version added. Nothing here
-  /// interprets a value, which is why this cannot throw the way
-  /// [readSettings] deliberately does.
-  Future<Map<String, String>> readAll() async {
-    final rows = await select(settings).get();
-    return {for (final row in rows) row.key: row.value};
-  }
-
-  /// Replaces every stored row with [values].
-  Future<void> replaceAll(Map<String, String> values) async {
+  /// One transaction, so the settings can never be half-written: a mode from
+  /// one save paired with an opt-in from another is a state she never chose.
+  Future<void> saveCycleSettings(CycleSettings settings) async {
     await transaction(() async {
-      await delete(settings).go();
-      for (final pair in values.entries) {
-        await _write(pair.key, pair.value);
-      }
-    });
-  }
-
-  /// Stores the cycle mode and its opt-in.
-  Future<void> writeCycleSettings(CycleSettings value) async {
-    await transaction(() async {
-      await _write(SettingKeys.cycleMode, value.mode.name);
-      await _write(
+      await _put(SettingKeys.cycleMode, settings.mode.name);
+      await _put(
         SettingKeys.predictionsOptedIn,
-        value.predictionsOptedIn.toString(),
+        '${settings.predictionsOptedIn}',
+      );
+      await _put(
+        SettingKeys.fertileWindowOptedIn,
+        '${settings.fertileWindowOptedIn}',
       );
     });
   }
 
-  /// Stores whether the fertile window estimate is shown.
-  Future<void> writeFertileWindowOptIn({required bool optedIn}) =>
-      _write(SettingKeys.fertileWindowOptedIn, optedIn.toString());
-
-  /// Stores whether the app locks itself.
-  Future<void> writeAppLockEnabled({required bool enabled}) =>
-      _write(SettingKeys.appLockEnabled, enabled.toString());
-
-  /// Stores when she asked to be reminded to log.
-  ///
-  /// All three keys in one transaction. Written separately, a crash between
-  /// them could leave the time from one choice beside the weekdays from
-  /// another -- a reminder she never set, at a time she did not pick.
-  Future<void> writeReminderSchedule(ReminderSchedule value) async {
-    await transaction(() async {
-      await _write(SettingKeys.reminderEnabled, value.enabled.toString());
-      await _write(SettingKeys.reminderTime, value.time.toHhMm());
-      await _write(
-        SettingKeys.reminderWeekdays,
-        (value.validWeekdays.toList()..sort()).join(','),
-      );
-    });
-  }
-
-  Future<void> _write(String key, String value) async {
-    await into(settings).insert(
-      SettingsCompanion.insert(key: key, value: value),
-      mode: InsertMode.replace,
+  /// The stored appearance and language, with the defaults for anything not
+  /// stored or not understood.
+  Future<AppPreferences> appPreferences() async {
+    final values = await _values();
+    return AppPreferences(
+      appearance:
+          AppearanceChoice.values.asNameMap()[values[SettingKeys.appearance]] ??
+          AppearanceChoice.system,
+      language:
+          LanguageChoice.values.asNameMap()[values[SettingKeys.language]] ??
+          LanguageChoice.system,
     );
   }
-}
 
-/// Reads a stored cycle mode.
-///
-/// Absent means never set, which is a fresh install: the default is a natural
-/// cycle. A value this build does not recognise is a different thing entirely
-/// and **throws** rather than falling back.
-///
-/// Falling back would mean [CycleMode.natural], and natural is the one mode
-/// that *enables* predictions. A database written by a newer build -- restored
-/// from a backup, say -- would then silently turn predictions on for someone who
-/// deliberately turned them off, which is exactly what section 10 and
-/// docs/cycle-logic.md section 6 exist to prevent. Failing loudly puts the
-/// error panel on screen instead of a confident wrong answer.
-CycleMode _readMode(String? stored) {
-  if (stored == null) return CycleMode.natural;
-  for (final mode in CycleMode.values) {
-    if (mode.name == stored) return mode;
+  /// Stores [preferences], replacing whatever was there.
+  Future<void> saveAppPreferences(AppPreferences preferences) async {
+    await transaction(() async {
+      await _put(SettingKeys.appearance, preferences.appearance.name);
+      await _put(SettingKeys.language, preferences.language.name);
+    });
   }
-  throw StateError(
-    'Unknown cycle mode "$stored" in the database. This build cannot tell '
-    'whether predictions should be on, and will not guess.',
+
+  /// Whether the app lock is on. Off unless she turned it on.
+  Future<bool> appLockEnabled() async =>
+      (await _values())[SettingKeys.appLock] == 'true';
+
+  /// Turns the app lock on or off.
+  Future<void> saveAppLockEnabled({required bool enabled}) =>
+      _put(SettingKeys.appLock, '$enabled');
+
+  /// The stored reminder settings, with defaults for anything not stored or
+  /// not understood. Out-of-range numbers fall back rather than being trusted.
+  Future<ReminderSettings> reminderSettings() async {
+    final values = await _values();
+    const defaults = ReminderSettings();
+
+    int? number(String key, int min, int max) {
+      final value = int.tryParse(values[key] ?? '');
+      return value != null && value >= min && value <= max ? value : null;
+    }
+
+    (int, int)? time(String key) {
+      final match = RegExp(r'^(\d{2}):(\d{2})$').firstMatch(values[key] ?? '');
+      if (match == null) return null;
+      final hour = int.parse(match.group(1)!);
+      final minute = int.parse(match.group(2)!);
+      return hour < 24 && minute < 60 ? (hour, minute) : null;
+    }
+
+    CycleDate? day(String key) {
+      final value = values[key];
+      if (value == null || value.isEmpty) return null;
+      try {
+        return CycleDate.parseIso8601(value);
+      } on FormatException {
+        return null;
+      }
+    }
+
+    final cycleTime = time(SettingKeys.reminderTime);
+    final pillTime = time(SettingKeys.reminderPillTime);
+    final methodTime = time(SettingKeys.reminderMethodTime);
+    final deviceWeeks = int.tryParse(
+      values[SettingKeys.reminderDeviceWeeks] ?? '',
+    );
+
+    return ReminderSettings(
+      periodComing: values[SettingKeys.reminderPeriod] == 'true',
+      daysBefore:
+          number(
+            SettingKeys.reminderDaysBefore,
+            ReminderSettings.minDaysBefore,
+            ReminderSettings.maxDaysBefore,
+          ) ??
+          defaults.daysBefore,
+      dailyLog: values[SettingKeys.reminderDaily] == 'true',
+      hour: cycleTime?.$1 ?? defaults.hour,
+      minute: cycleTime?.$2 ?? defaults.minute,
+      pill: values[SettingKeys.reminderPill] == 'true',
+      pillHour: pillTime?.$1 ?? defaults.pillHour,
+      pillMinute: pillTime?.$2 ?? defaults.pillMinute,
+      pillPack:
+          PillPack.values.asNameMap()[values[SettingKeys.reminderPillPack]] ??
+          defaults.pillPack,
+      pillPackStart: day(SettingKeys.reminderPillPackStart),
+      ring: values[SettingKeys.reminderRing] == 'true',
+      ringInserted: day(SettingKeys.reminderRingInserted),
+      patch: values[SettingKeys.reminderPatch] == 'true',
+      patchStarted: day(SettingKeys.reminderPatchStarted),
+      injection: values[SettingKeys.reminderInjection] == 'true',
+      injectionLast: day(SettingKeys.reminderInjectionLast),
+      injectionWeeks:
+          number(
+            SettingKeys.reminderInjectionWeeks,
+            ReminderSettings.minInjectionWeeks,
+            ReminderSettings.maxInjectionWeeks,
+          ) ??
+          defaults.injectionWeeks,
+      device: values[SettingKeys.reminderDevice] == 'true',
+      deviceReplaceBy: day(SettingKeys.reminderDeviceReplaceBy),
+      deviceWeeksBefore:
+          ReminderSettings.deviceWeeksOptions.contains(deviceWeeks)
+          ? deviceWeeks!
+          : defaults.deviceWeeksBefore,
+      methodHour: methodTime?.$1 ?? defaults.methodHour,
+      methodMinute: methodTime?.$2 ?? defaults.methodMinute,
+    );
+  }
+
+  /// Stores [settings], replacing whatever was there.
+  Future<void> saveReminderSettings(ReminderSettings settings) async {
+    String two(int n) => n.toString().padLeft(2, '0');
+    String time(int hour, int minute) => '${two(hour)}:${two(minute)}';
+    String day(CycleDate? date) => date?.toIso8601() ?? '';
+    await transaction(() async {
+      await _put(SettingKeys.reminderPeriod, '${settings.periodComing}');
+      await _put(SettingKeys.reminderDaysBefore, '${settings.daysBefore}');
+      await _put(SettingKeys.reminderDaily, '${settings.dailyLog}');
+      await _put(
+        SettingKeys.reminderTime,
+        time(settings.hour, settings.minute),
+      );
+      await _put(SettingKeys.reminderPill, '${settings.pill}');
+      await _put(
+        SettingKeys.reminderPillTime,
+        time(settings.pillHour, settings.pillMinute),
+      );
+      await _put(SettingKeys.reminderPillPack, settings.pillPack.name);
+      await _put(
+        SettingKeys.reminderPillPackStart,
+        day(settings.pillPackStart),
+      );
+      await _put(SettingKeys.reminderRing, '${settings.ring}');
+      await _put(SettingKeys.reminderRingInserted, day(settings.ringInserted));
+      await _put(SettingKeys.reminderPatch, '${settings.patch}');
+      await _put(SettingKeys.reminderPatchStarted, day(settings.patchStarted));
+      await _put(SettingKeys.reminderInjection, '${settings.injection}');
+      await _put(
+        SettingKeys.reminderInjectionLast,
+        day(settings.injectionLast),
+      );
+      await _put(
+        SettingKeys.reminderInjectionWeeks,
+        '${settings.injectionWeeks}',
+      );
+      await _put(SettingKeys.reminderDevice, '${settings.device}');
+      await _put(
+        SettingKeys.reminderDeviceReplaceBy,
+        day(settings.deviceReplaceBy),
+      );
+      await _put(
+        SettingKeys.reminderDeviceWeeks,
+        '${settings.deviceWeeksBefore}',
+      );
+      await _put(
+        SettingKeys.reminderMethodTime,
+        time(settings.methodHour, settings.methodMinute),
+      );
+    });
+  }
+
+  /// Whether the widget may show more than the day number. Off unless she
+  /// turned it on.
+  Future<bool> widgetDetailed() async =>
+      (await _values())[SettingKeys.widgetDetailed] == 'true';
+
+  /// Turns the widget's details on or off.
+  Future<void> saveWidgetDetailed({required bool detailed}) =>
+      _put(SettingKeys.widgetDetailed, '$detailed');
+
+  /// Whether she has finished or skipped the first-launch introduction.
+  Future<bool> onboardingDone() async =>
+      (await _values())[SettingKeys.onboardingDone] == 'true';
+
+  /// Records that the introduction is behind her, so it never shows again.
+  Future<void> saveOnboardingDone() => _put(SettingKeys.onboardingDone, 'true');
+
+  /// What she has said about herself. Anything missing, out of range or not
+  /// understood reads as unsaid rather than being trusted or thrown over.
+  Future<Profile> profile({required int currentYear}) async {
+    final values = await _values();
+
+    int? within(String key, int min, int max) {
+      final value = int.tryParse(values[key] ?? '');
+      return value != null && value >= min && value <= max ? value : null;
+    }
+
+    final conditionNames = KnownCondition.values.asNameMap();
+    return Profile(
+      birthYear: within(
+        SettingKeys.profileBirthYear,
+        currentYear - Profile.maxAge,
+        currentYear - Profile.minAge,
+      ),
+      usualCycleLength: within(
+        SettingKeys.profileCycleLength,
+        Profile.minCycleLength,
+        Profile.maxCycleLength,
+      ),
+      usualPeriodLength: within(
+        SettingKeys.profilePeriodLength,
+        Profile.minPeriodLength,
+        Profile.maxPeriodLength,
+      ),
+      contraception: ContraceptionMethod.values
+          .asNameMap()[values[SettingKeys.profileContraception]],
+      conditions: {
+        for (final name in (values[SettingKeys.profileConditions] ?? '').split(
+          ',',
+        ))
+          ?conditionNames[name],
+      },
+    );
+  }
+
+  /// Stores [profile], replacing whatever was there. A field she cleared is
+  /// deleted rather than kept as an empty value.
+  Future<void> saveProfile(Profile profile) async {
+    Future<void> putOrClear(String key, Object? value) =>
+        value == null ? _clear(key) : _put(key, '$value');
+
+    await transaction(() async {
+      await putOrClear(SettingKeys.profileBirthYear, profile.birthYear);
+      await putOrClear(
+        SettingKeys.profileCycleLength,
+        profile.usualCycleLength,
+      );
+      await putOrClear(
+        SettingKeys.profilePeriodLength,
+        profile.usualPeriodLength,
+      );
+      await putOrClear(
+        SettingKeys.profileContraception,
+        profile.contraception?.name,
+      );
+      await putOrClear(
+        SettingKeys.profileConditions,
+        profile.conditions.isEmpty
+            ? null
+            : [
+                for (final condition in KnownCondition.values)
+                  if (profile.conditions.contains(condition)) condition.name,
+              ].join(','),
+      );
+    });
+  }
+
+  Future<void> _clear(String key) =>
+      (delete(appSettings)..where((row) => row.settingKey.equals(key))).go();
+
+  Future<Map<String, String>> _values() async {
+    final rows = await select(appSettings).get();
+    return {for (final row in rows) row.settingKey: row.settingValue};
+  }
+
+  Future<void> _put(String key, String value) => into(appSettings).insert(
+    AppSettingsCompanion.insert(settingKey: key, settingValue: value),
+    mode: InsertMode.replace,
   );
-}
-
-/// Reads a stored flag. Absent or anything but "true" means off.
-///
-/// Deliberately lenient where [_readMode] is strict: both of these flags are
-/// opt-ins, so an unreadable value resolving to "off" leaves the user with less
-/// shown than she asked for rather than more, which is the safe direction.
-bool _readBool(String? stored) => stored == 'true';
-
-/// Reads a stored reminder time.
-///
-/// Absent or unreadable falls back to the default, and is deliberately lenient
-/// where [_readMode] is strict. The direction is what decides it: an unreadable
-/// mode would resolve to the one mode that *enables* predictions, showing the
-/// user more than she asked for, so it throws. A time cannot do that -- a
-/// reminder only ever fires when [SettingKeys.reminderEnabled] is true, and
-/// that flag is read separately, so the worst an unreadable time can do is fire
-/// a reminder she did want at an hour she did not pick.
-///
-/// Not silently, though: the value is replaced on the next write, and a time
-/// that cannot be parsed is a bug worth seeing rather than guessing around.
-ReminderTime _readReminderTime(String? stored) {
-  if (stored == null) return const ReminderSchedule().time;
-  try {
-    return ReminderTime.parseHhMm(stored);
-  } on FormatException {
-    return const ReminderSchedule().time;
-  }
-}
-
-/// Reads a stored set of weekdays, `1,3,5`.
-///
-/// Anything unparseable resolves to the empty set, which means no reminder
-/// fires at all. That is the safe direction for an opt-in: a garbled value
-/// leaves the user with less than she asked for rather than a notification on a
-/// day she never chose.
-///
-/// Empty and absent are kept apart from each other only by [ReminderSchedule]'s
-/// default, which is every day: absent means she has never chosen, so a fresh
-/// install that turns reminders on gets a daily one. An empty stored string
-/// means she deselected every day, and is honoured.
-Set<int> _readWeekdays(String? stored) {
-  if (stored == null) return const ReminderSchedule().weekdays;
-  return {
-    for (final part in stored.split(','))
-      if (int.tryParse(part.trim()) case final day?)
-        if (day >= 1 && day <= 7) day,
-  };
 }
